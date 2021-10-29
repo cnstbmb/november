@@ -1,19 +1,19 @@
-import {ILogger} from './types';
+import { ILogger } from './types';
 
 export class NullLogger implements ILogger {
     info(..._params: unknown[]) {
-        // do nothing
+    // do nothing
     }
 
     warn(..._params: unknown[]) {
-        // do nothing
+    // do nothing
     }
 
     error(..._params: unknown[]) {
-        // do nothing
+    // do nothing
     }
 
     debug(..._params: unknown[]) {
-        // do nothing
+    // do nothing
     }
 }

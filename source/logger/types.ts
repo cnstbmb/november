@@ -1,4 +1,4 @@
-import {EventEmitter} from 'events';
+import { EventEmitter } from 'events';
 
 export interface ILogger {
     info(...params: unknown[]): void;
@@ -10,15 +10,14 @@ export interface ILogger {
     debug(...params: unknown[]): void;
 }
 
+export interface IMultistreamLoggerSupport {
+    addStreamBuffer(stream: unknown): void;
+}
 
 export interface IChildLoggerSupport {
     child(data: unknown): IAppLogger;
 
     bindings(): unknown;
-}
-
-export interface IMultistreamLoggerSupport {
-    addStreamBuffer(stream: unknown): void;
 }
 
 export interface IAppLogger extends ILogger, IChildLoggerSupport, IMultistreamLoggerSupport {

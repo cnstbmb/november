@@ -1,8 +1,8 @@
 import * as env from '../env';
-import {NullLogger} from './null-logger';
-import {ConsoleLogger} from './console-logger';
-import {Logger} from './logger';
-import {createPinoLogger} from './pino-logger';
+import { NullLogger } from './null-logger';
+import { ConsoleLogger } from './console-logger';
+import { Logger } from './logger';
+import { createPinoLogger } from './pino-logger';
 
 const logLevel = env.logLevel() || (env.isProd() ? 'info' : 'trace');
 const showSrc = env.showSrc();
@@ -26,8 +26,8 @@ export function makeLogger() {
         const settings = {
             showSrc,
             logFile,
-            prettyPrint: prettyPrint,
-            noConsoleLogs: env.noConsoleLog()
+            prettyPrint,
+            noConsoleLogs: env.noConsoleLog(),
         };
 
         console.log(`Initializing logger: pino.Logger level: ${logLevel} settings: ${JSON.stringify(settings)}`);
@@ -36,5 +36,4 @@ export function makeLogger() {
     }
 
     return new Logger(loggerBackend);
-
 }

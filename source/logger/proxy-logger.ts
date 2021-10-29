@@ -1,4 +1,4 @@
-import {ILogger} from './types';
+import { ILogger } from './types';
 
 export class ProxyLogger implements ILogger {
     constructor(protected loggerBackend: ILogger) {

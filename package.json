@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/cnstbmb/november/issues"
   },
-  "homepage": "https://github.com/cnstbmb/november#readme"
+  "homepage": "https://github.com/cnstbmb/november#readme",
+  "devDependencies": {
+    "typescript": "^4.4.4"
+  }
 }

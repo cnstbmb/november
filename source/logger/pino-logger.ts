@@ -19,22 +19,21 @@ export function createPinoLogger(name: string, level: string, settings?: {
 
     if (!(settings && settings.noConsoleLogs)) {
         console.log('Adding console logs');
-        streams.push({level: level, stream: process.stdout});
+        streams.push({ level, stream: process.stdout });
     }
 
     const logFile = settings && settings.logFile;
     if (logFile) {
         console.log('Will write logs to file');
 
-
-        const stream = fs.createWriteStream(logFile, {flags: 'a'});
+        const stream = fs.createWriteStream(logFile, { flags: 'a' });
         streams.push({
             level: 'debug',
-            stream
+            stream,
         });
         streams.push({
             level: 'warn',
-            stream
+            stream,
         });
     }
 
@@ -42,7 +41,7 @@ export function createPinoLogger(name: string, level: string, settings?: {
     let logger = pino({
         name,
         level,
-        // prettyPrint: settings && settings.prettyPrint
+    // prettyPrint: settings && settings.prettyPrint
     }, multistream);
     logger.multistream = multistream;
 
@@ -53,8 +52,8 @@ export function createPinoLogger(name: string, level: string, settings?: {
     logger.addStreamBuffer = function (streamBuffer: string | object) {
         this.multistream.add({
             level: 'trace',
-            type: 'stream',    // Нам нужны строки. Если хочется получить объекты то можно использовать raw
-            stream: streamBuffer
+            type: 'stream', // Нам нужны строки. Если хочется получить объекты то можно использовать raw
+            stream: streamBuffer,
         });
     };
 

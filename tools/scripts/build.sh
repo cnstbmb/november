@@ -9,6 +9,7 @@ echo "start building project"
 
 cd $SCRIPTPATH/../../
 
+npm run lint:fix
 node ./node_modules/typescript/bin/tsc
 
 end=`date +%s`

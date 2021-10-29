@@ -13,6 +13,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tools/scripts/build.sh",
+    "lint": "eslint --debug source/**/*.ts",
+    "lint:fix": "eslint --debug source/**/*.ts --fix",
     "start": "npm run build && PORT=3000 tools/scripts/run.sh"
   },
   "repository": {
@@ -32,7 +34,10 @@
     "@types/pino-multi-stream": "^5.1.2",
     "@typescript-eslint/eslint-plugin": "^5.2.0",
     "@typescript-eslint/parser": "^5.2.0",
-    "eslint": "^8.1.0",
+    "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-prettier": "^4.0.0",
     "typescript": "^4.4.4"
   }
 }

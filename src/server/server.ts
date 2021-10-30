@@ -1,5 +1,5 @@
-import express, { Request, Response } from 'express';
 import * as http from 'http';
+import express, { Request, Response } from 'express';
 import { serverPort } from '../env';
 import { ILogger } from '../logger/types';
 

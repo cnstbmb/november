@@ -1,43 +1,21 @@
 {
   "name": "november",
   "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
-  "dependencies": {
-    "express": "^4.17.1",
-    "pino": "^7.0.5",
-    "pino-caller": "^3.2.0",
-    "pino-multi-stream": "^6.0.0",
-    "pino-pretty": "^7.1.0"
-  },
+  "description": "monorepo",
+  "main": "null",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tools/scripts/build.sh",
-    "lint": "eslint --debug src/**/*.ts",
-    "lint:fix": "eslint --debug src/**/*.ts --fix",
-    "start": "npm run build && PORT=3000 tools/scripts/run.sh"
+    "build:server": "cd server/ && npm run build",
+    "start:server": "cd server/ && npm run start"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cnstbmb/november.git"
   },
-  "author": "",
+  "author": "cnstbmb@gmail.com",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/cnstbmb/november/issues"
   },
-  "homepage": "https://github.com/cnstbmb/november#readme",
-  "devDependencies": {
-    "@types/express": "^4.17.13",
-    "@types/node": "^16.11.6",
-    "@types/pino": "^6.3.12",
-    "@types/pino-multi-stream": "^5.1.2",
-    "@typescript-eslint/eslint-plugin": "^5.2.0",
-    "@typescript-eslint/parser": "^5.2.0",
-    "eslint": "^7.32.0",
-    "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.25.2",
-    "eslint-plugin-prettier": "^4.0.0",
-    "typescript": "^4.4.4"
-  }
+  "homepage": "https://github.com/cnstbmb/november#readme"
 }

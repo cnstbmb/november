@@ -2,6 +2,7 @@ import express from 'express';
 import * as http from 'http';
 import { serverPort } from './env';
 import { ILogger } from './logger/types';
+import { Request, Response } from 'express'
 
 export class Server {
     private application: express.Express;
@@ -36,9 +37,9 @@ export class Server {
 
     private routeTest(): void {
         this.logger.info('test');
-        this.application.get('/test', (_req, res) => {
+        this.application.get('/test', (_req: Request, res: Response) => {
             this.logger.info('Hello World! shutting down');
-            res.send('Hello World! shutting down')
+            res.send('Hello World! shutting down');
             this.stop();
         });
     }

@@ -1,28 +1,29 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import * as http from 'http';
-import { serverPort } from './env';
-import { ILogger } from './logger/types';
-import { Request, Response } from 'express'
+import { serverPort } from '../env';
+import { ILogger } from '../logger/types';
 
 export class Server {
     private application: express.Express;
+
     private port: number = serverPort();
+
     private server: http.Server | undefined;
- 
+
     constructor(private logger: ILogger) {
         this.application = express();
     }
 
     start(): void {
         this.server = this.application.listen(this.port, () => {
-            this.logger.info(`Example app listening at http://localhost:${this.port}`)
-        })
+            this.logger.info(`Example app listening at http://localhost:${this.port}`);
+        });
     }
 
     registerRoutes(): void {
         this.logger.info('Registration routes');
         this.routeTest();
-        this.logger.info('Registration routes success')
+        this.logger.info('Registration routes success');
     }
 
     stop(): void {

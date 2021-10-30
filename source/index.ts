@@ -1,4 +1,4 @@
-import {Server} from './server'
+import {Server} from './server/server'
 import{makeLogger} from './logger/logger-factory'
 
 const logger = makeLogger();

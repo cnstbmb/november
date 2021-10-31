@@ -1,5 +1,7 @@
 import * as http from 'http';
 import express, { Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
 import { serverPort } from '../env';
 import { ILogger } from '../logger/types';
 
@@ -9,6 +11,8 @@ export class Server {
     private port: number = serverPort();
 
     private server: http.Server | undefined;
+
+    private readonly angularAppDist = path.join(__dirname, '..', 'static', 'frontend');
 
     constructor(private logger: ILogger) {
         this.application = express();
@@ -23,6 +27,7 @@ export class Server {
     registerRoutes(): void {
         this.logger.info('Registration routes');
         this.routeTest();
+        this.registerFrontendStatic();
         this.logger.info('Registration routes success');
     }
 
@@ -42,6 +47,18 @@ export class Server {
             this.logger.info('Hello World! shutting down');
             res.send('Hello World! shutting down');
             this.stop();
+        });
+    }
+
+    private registerFrontendStatic(): void {
+        this.application.get('*.*', express.static(this.angularAppDist));
+        this.application.all('*', (_req: Request, res: Response) => {
+            if (!fs.existsSync(this.angularAppDist)) {
+                this.logger.warn('Compilied application not found');
+                res.status(404).send('application not found.');
+                return;
+            }
+            res.status(200).sendFile('/', { root: this.angularAppDist });
         });
     }
 }

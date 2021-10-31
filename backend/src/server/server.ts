@@ -65,8 +65,8 @@ export class Server {
 
     private registerMiddleWares() {
         this.application.use((req: Request, _res: Response, next) => {
-            this.logger.info('method: ' + req.method + '; url: ' + req.url);
+            this.logger.info(`method: ${req.method}; url: ${req.url}`);
             next();
-          })
+        });
     }
 }

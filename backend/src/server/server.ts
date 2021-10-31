@@ -26,6 +26,7 @@ export class Server {
 
     registerRoutes(): void {
         this.logger.info('Registration routes');
+        this.registerMiddleWares();
         this.routeTest();
         this.registerFrontendStatic();
         this.logger.info('Registration routes success');
@@ -60,5 +61,12 @@ export class Server {
             }
             res.status(200).sendFile('/', { root: this.angularAppDist });
         });
+    }
+
+    private registerMiddleWares() {
+        this.application.use((req: Request, _res: Response, next) => {
+            this.logger.info('method: ' + req.method + '; url: ' + req.url);
+            next();
+          })
     }
 }

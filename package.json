@@ -5,8 +5,13 @@
   "main": "null",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:server": "cd server/ && npm run build",
-    "start:server": "cd server/ && npm run start"
+    "build:backend": "cd backend/ && npm run build",
+    "start:backend": "cd backend/ && npm run start",
+    "lint:fix:backend": "cd backend/ && npm run lint:fix",
+    "build:frontend": "cd frontend/ && npm run build",
+    "start:frontend": "cd frontend/ && npm run start",
+    "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
@@ -17,5 +22,8 @@
   "bugs": {
     "url": "https://github.com/cnstbmb/november/issues"
   },
-  "homepage": "https://github.com/cnstbmb/november#readme"
+  "homepage": "https://github.com/cnstbmb/november#readme",
+  "devDependencies": {
+    "husky": "^7.0.4"
+  }
 }

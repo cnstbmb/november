@@ -1,0 +1,42 @@
+{
+    "env": {
+        "browser": true,
+        "es2021": true,
+        "node": true,
+        "jest/globals": true
+    },
+    "extends": [
+        "airbnb-base"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": { "project": ["./tsconfig.json"] },
+    "plugins": [
+        "@typescript-eslint",
+        "prettier",
+        "jest"
+    ],
+    "rules": {
+        "indent": [
+            "error",
+            4
+        ],
+        "linebreak-style": [
+            "error",
+            "unix"
+        ],
+        "quotes": [
+            "error",
+            "single"
+        ],
+        "no-unused-vars": "off",
+        "no-empty-function": "off",
+        "no-use-before-define": "off",
+        "no-useless-constructor": "off",
+        "no-console": "off",
+        "func-names": "off",
+        "class-methods-use-this": "off",
+        "import/extensions": "off",
+        "import/prefer-default-export": "off",
+        "import/no-unresolved": "off"
+    }
+}

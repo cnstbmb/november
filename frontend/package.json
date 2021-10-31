@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "npm run lint:fix && ng build",
+    "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "lint": "eslint --debug src/**/*.ts",
     "lint:fix": "eslint --debug src/**/*.ts --fix",

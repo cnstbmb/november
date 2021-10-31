@@ -11,7 +11,8 @@
     "build:frontend": "cd frontend/ && npm run build",
     "start:frontend": "cd frontend/ && npm run start",
     "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "build:prod": "tools/scripts/build_prod.sh" 
   },
   "repository": {
     "type": "git",

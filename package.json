@@ -10,8 +10,9 @@
     "lint:fix:backend": "cd backend/ && npm run lint:fix",
     "build:frontend": "cd frontend/ && npm run build",
     "start:frontend": "cd frontend/ && npm run start",
+    "watch:frontend": "cd frontend/ && npm run watch",
     "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
-    "prepare": "husky install",
+    "prepare": "husky install && cd frontend && npm i && cd ../backend && npm i ",
     "build:prod": "tools/scripts/build_prod.sh" 
   },
   "repository": {

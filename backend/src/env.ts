@@ -1,13 +1,12 @@
 const AVAILABLE_ENVS = {
     PROD: 'prod',
     DEV: 'dev',
-    TEST: 'test'
+    TEST: 'test',
 };
 
 export function serverPort(): number {
     return +(process?.env?.PORT || 3000);
 }
-
 
 export function currentEnv(): string {
     return process.env.NODE_ENV || '';

@@ -35,7 +35,8 @@
               "src/styles.less",
               "node_modules/primeng/resources/themes/saga-green/theme.css",
               "node_modules/primeng/resources/primeng.min.css",
-              "node_modules/primeicons/primeicons.css"
+              "node_modules/primeicons/primeicons.css",
+              "node_modules/primeflex/primeflex.css"
             ],
             "scripts": [],
             "deployUrl": "http://localhost:3000/"

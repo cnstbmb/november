@@ -1,3 +1,5 @@
+import pino from 'pino';
+
 const AVAILABLE_ENVS = {
     PROD: 'prod',
     DEV: 'dev',
@@ -12,8 +14,18 @@ export function currentEnv(): string {
     return process.env.NODE_ENV || '';
 }
 
-export function logLevel(): string | undefined {
-    return process.env.LOG_LEVEL;
+export function logLevel(): pino.LevelWithSilent | undefined {
+    const level = process.env.LOG_LEVEL;
+    if (!level) {
+        return undefined;
+    }
+
+    const levels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
+    if (!levels.includes(level)) {
+        throw new Error(`NOT CORRECT LOG LEVEL, use one from "${level.toString()}"`);
+    }
+
+    return level as pino.LevelWithSilent;
 }
 
 export function showSrc(): boolean {

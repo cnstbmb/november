@@ -1,21 +1,15 @@
-import fs, { WriteStream as FSWriteStream } from 'fs';
+import fs from 'fs';
 import pinoms from 'pino-multi-stream';
 import pino from 'pino';
 import pinoCaller from 'pino-caller';
-import { WriteStream as NodeWriteStream } from 'node:tty';
 
-interface Stream {
-    level: string;
-    stream: FSWriteStream | (NodeWriteStream & { fd: number });
-}
-
-export function createPinoLogger(name: string, level: string, settings?: {
+export function createPinoLogger(name: string, level: pino.LevelWithSilent, settings?: {
     showSrc?: boolean,
     logFile?: string,
     noConsoleLogs?: boolean,
     prettyPrint?: boolean
 }) {
-    const streams: Stream[] = [];
+    const streams: pinoms.Streams = [];
 
     if (!(settings && settings.noConsoleLogs)) {
         console.log('Adding console logs');
@@ -43,19 +37,20 @@ export function createPinoLogger(name: string, level: string, settings?: {
         level,
     // prettyPrint: settings && settings.prettyPrint
     }, multistream);
-    logger.multistream = multistream;
+    // logger.multistream = multistream;
 
     if (settings && settings.showSrc) {
         logger = pinoCaller(logger);
     }
 
-    logger.addStreamBuffer = function (streamBuffer: string | object) {
-        this.multistream.add({
-            level: 'trace',
-            type: 'stream', // Нам нужны строки. Если хочется получить объекты то можно использовать raw
-            stream: streamBuffer,
-        });
-    };
+    // logger.addStreamBuffer = function (streamBuffer: string | object) {
+    //     this.multistream.add({
+    //         level: 'trace',
+    // Нам нужны строки. Если хочется получить объекты то можно использовать raw
+    //         type: 'stream',
+    //         stream: streamBuffer,
+    //     });
+    // };
 
     logger.warn('Pino was constructed');
 

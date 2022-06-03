@@ -1,16 +1,17 @@
+import pino from 'pino';
 import * as env from '../env';
 import { NullLogger } from './null-logger';
 import { ConsoleLogger } from './console-logger';
 import { Logger } from './logger';
 import { createPinoLogger } from './pino-logger';
 
-const logLevel = env.logLevel() || (env.isProd() ? 'info' : 'trace');
+const logLevel: pino.LevelWithSilent = env.logLevel() || (env.isProd() ? 'info' : 'trace');
 const showSrc = env.showSrc();
 const logToFile = env.logToFile();
 
 const logFile = (logToFile) ? `${logToFile}/${env.currentEnv()}.log` : undefined;
 
-const noLogs = logLevel === 'none';
+const noLogs = logLevel === 'silent';
 
 const prettyPrint = process.stdout.isTTY && env.prettyLogs();
 

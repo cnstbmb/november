@@ -38,7 +38,7 @@
               "node_modules/primeicons/primeicons.css"
             ],
             "scripts": [],
-            "deployUrl": "http://localhost:4200/"
+            "deployUrl": "http://localhost:3000/"
           },
           "configurations": {
             "production": {
@@ -84,6 +84,9 @@
         },
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "deployUrl": "http://localhost:4200/"
+          },
           "configurations": {
             "production": {
               "browserTarget": "frontend:build:production"

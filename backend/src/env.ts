@@ -37,7 +37,7 @@ export function logToFile(): string | undefined {
 }
 
 export function prettyLogs(): boolean {
-    return process.env.PRETTY_LOGS !== '0';
+    return !!process.env.PRETTY_LOGS;
 }
 
 export function noConsoleLog(): boolean {

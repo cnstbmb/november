@@ -38,8 +38,7 @@
               "node_modules/primeicons/primeicons.css",
               "node_modules/primeflex/primeflex.css"
             ],
-            "scripts": [],
-            "deployUrl": "http://localhost:3000/"
+            "scripts": []
           },
           "configurations": {
             "production": {

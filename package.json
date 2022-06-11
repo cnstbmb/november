@@ -13,7 +13,9 @@
     "watch:frontend": "cd frontend/ && npm run watch",
     "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
     "prepare": "husky install && cd frontend && npm i && cd ../backend && npm i ",
-    "build:prod": "tools/scripts/build_prod.sh"
+    "build:prod": "tools/scripts/build_prod.sh",
+    "deploy": "tools/scripts/deploy.sh",
+    "build_and_deploy": "npm run build:prod && npm run deploy"
   },
   "repository": {
     "type": "git",

@@ -1,41 +1,9 @@
 <app-canvas-background>
-  <div class="base">
-    <div class="links">
-      <span class="mr-4">
-        <a href="https://vk.com/khimenkov"
-          ><img
-            width="120"
-            height="120"
-            src="./assets/VK-Monochrom-Logo/Monochrome-White/VK_Monochrome_Compact_Logo.svg" /></a
-      ></span>
-      <span class="mr-4">
-        <a href="https://www.facebook.com/k.khimenkov/"
-          ><img
-            width="120"
-            height="120"
-            src="./assets/Facebook-Brand-Asset-Pack-2019/f-Logos-2019-1/f_Logo_Online_04_2019/white/PNG/f_logo_RGB-White_144.png" /></a
-      ></span>
-      <span class="mr-4">
-        <a href="https://www.instagram.com/k.khimenkov/"
-          ><img
-            width="120"
-            height="120"
-            src="./assets/Instagram-Logo-Pack/02-White-Glyph/Instagram_Glyph_White.svg" /></a
-      ></span>
-      <span class="mr-4">
-        <a href="https://github.com/cnstbmb"
-          ><img
-            width="120"
-            height="120"
-            src="./assets/GitHub-Mark/PNG/GitHub-Mark-Light-120px-plus.png" /></a
-      ></span>
-      <span class="mr-4">
-        <a href="https://www.linkedin.com/in/khimenkov/"
-          ><img
-            width="120"
-            height="120"
-            src="./assets/LinkedIn-Logos/In/Digital/White/1x/In-White-128.png" /></a
-      ></span>
+  <div
+    class="select-none w-full h-full flex flex-column sm:flex-row align-content-center align-self-center align-items-center justify-content-center"
+  >
+    <div class="sm:mr-4 mb-2" *ngFor="let linkData of socialLinks">
+      <a [href]="linkData.href"><img class="md:w-9rem w-4rem" [src]="linkData.imgPath" /></a>
     </div>
   </div>
 </app-canvas-background>

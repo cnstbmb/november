@@ -1,0 +1,7 @@
+version: "3.5"
+services:
+  nodejs-server:
+    ports:
+      - "80:3000"
+    image: "cnstbmb/khimenkov-site:latest"
+    restart: always

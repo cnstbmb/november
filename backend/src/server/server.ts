@@ -12,7 +12,7 @@ export class Server {
 
     private server: http.Server | undefined;
 
-    private readonly angularAppDist = path.join(__dirname, '..', 'static', 'frontend');
+    private readonly angularAppDist = path.join(__dirname, '..', 'static');
 
     constructor(private logger: ILogger) {
         this.application = express();
@@ -55,7 +55,7 @@ export class Server {
         this.application.get('*.*', express.static(this.angularAppDist));
         this.application.all('*', (_req: Request, res: Response) => {
             if (!fs.existsSync(this.angularAppDist)) {
-                this.logger.warn('Compilied application not found');
+                this.logger.warn('Compiled application not found');
                 res.status(404).send('application not found.');
                 return;
             }

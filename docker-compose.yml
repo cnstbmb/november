@@ -2,6 +2,67 @@ version: "3.5"
 services:
   nodejs-server:
     ports:
-      - "80:3000"
+      - "3000:3000"
     image: "cnstbmb/khimenkov-site:latest"
     restart: always
+    container_name: nodejs-server
+    networks:
+      - app-network
+#  web:
+#    image: nginx
+#    container_name: nginx
+#    labels:
+#      - sh.acme.autoload.domain=example.com
+#    labels:
+#      - sh.acme.autoload.domain=himenkov.ru
+#  acme.sh:
+#    image: neilpang/acme.sh
+#    container_name: acme.sh
+#    command: daemon
+#    volumes:
+#      - ./acmeout:/acme.sh
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    environment:
+#      - DEPLOY_DOCKER_CONTAINER_LABEL=sh.acme.autoload.domain=himenkov.ru
+#      - DEPLOY_DOCKER_CONTAINER_KEY_FILE=/etc/nginx/ssl/example.com/key.pem
+#      - DEPLOY_DOCKER_CONTAINER_CERT_FILE="/etc/nginx/ssl/example.com/cert.pem"
+#      - DEPLOY_DOCKER_CONTAINER_CA_FILE="/etc/nginx/ssl/example.com/ca.pem"
+#      - DEPLOY_DOCKER_CONTAINER_FULLCHAIN_FILE="/etc/nginx/ssl/example.com/full.pem"
+#      - DEPLOY_DOCKER_CONTAINER_RELOAD_CMD="service nginx force-reload"
+  webserver:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - web-root:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+    depends_on:
+      - nodejs-server
+    networks:
+      - app-network
+#  certbot:
+#    image: certbot/certbot
+#    container_name: certbot
+#    volumes:
+#      - certbot-etc:/etc/letsencrypt
+#      - certbot-var:/var/lib/letsencrypt
+#      - web-root:/var/www/html
+#    depends_on:
+#      - webserver
+#    command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --staging -d himenkov.ru  -d www.himenkov.ru
+volumes:
+  certbot-etc:
+  certbot-var:
+  web-root:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/app/server/
+      o: bind
+networks:
+  app-network:
+    driver: bridge

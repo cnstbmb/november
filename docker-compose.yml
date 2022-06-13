@@ -12,11 +12,13 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - web-root:/var/www/html
       - ./nginx-conf:/etc/nginx/conf.d
       - certbot-etc:/etc/letsencrypt
       - certbot-var:/var/lib/letsencrypt
+      - dhparam:/etc/ssl/certs
     depends_on:
       - nodejs-server
     networks:
@@ -30,7 +32,7 @@ services:
       - web-root:/var/www/html
     depends_on:
       - webserver
-    command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --staging -d himenkov.ru  -d www.himenkov.ru
+    command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d himenkov.ru -d www.himenkov.ru
 volumes:
   certbot-etc:
   certbot-var:
@@ -38,7 +40,13 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: /home/app/server/views
+      device: /srv/views
+      o: bind
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/dhparam/
       o: bind
 networks:
   app-network:

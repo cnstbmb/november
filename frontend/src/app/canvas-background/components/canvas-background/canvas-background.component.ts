@@ -63,6 +63,7 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   ngAfterViewInit(): void {
+    this.context = this.canvas.nativeElement.getContext('2d');
     this.resize();
     this.draw();
     this.spawnBoxes();
@@ -138,8 +139,7 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
       CanvasBackgroundComponent.throwErrorCanvasNotInitialized();
       return;
     }
-    const canvasWidth = this.canvas.nativeElement.width;
-    const canvasHeight = this.canvas.nativeElement.height;
+    const { width: canvasWidth, height: canvasHeight } = this.canvas.nativeElement;
     this.context.clearRect(0, 0, canvasWidth, canvasHeight);
     this.drawLight();
 
@@ -182,7 +182,6 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   private spawnBoxes(): void {
-    this.context = this.canvas.nativeElement.getContext('2d');
     if (!this.context) {
       CanvasBackgroundComponent.throwErrorCanvasNotInitialized();
       return;

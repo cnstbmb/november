@@ -27,6 +27,7 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
 
   @HostListener('window:resize') onResize() {
     this.resize();
+    this.spawnBoxes();
   }
 
   @HostListener('mousemove', ['$event']) onMouseMove(mouseEvent: CanvasMouseEvent) {
@@ -41,7 +42,7 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
     y: 200
   };
 
-  private readonly boxes: CanvasBox[] = [];
+  private boxes: CanvasBox[] = [];
 
   private readonly grey = grey;
 
@@ -62,18 +63,9 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   ngAfterViewInit(): void {
-    this.context = this.canvas.nativeElement.getContext('2d');
-    if (!this.context) {
-      CanvasBackgroundComponent.throwErrorCanvasNotInitialized();
-      return;
-    }
     this.resize();
     this.draw();
-
-    const { width: canvasWidth, height: canvasHeight } = this.canvas.nativeElement;
-    for (let i = 0; i < this.boxesAmount; i += 1) {
-      this.boxes.push(new Box(canvasWidth, canvasHeight, this.context, this.light));
-    }
+    this.spawnBoxes();
   }
 
   private resize(): void {
@@ -187,5 +179,18 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
 
   private static throwErrorCanvasNotInitialized(): void {
     throw new Error('canvas is  not initialized');
+  }
+
+  private spawnBoxes(): void {
+    this.context = this.canvas.nativeElement.getContext('2d');
+    if (!this.context) {
+      CanvasBackgroundComponent.throwErrorCanvasNotInitialized();
+      return;
+    }
+    const { width: canvasWidth, height: canvasHeight } = this.canvas.nativeElement;
+    this.boxes = [];
+    for (let i = 0; i < this.boxesAmount; i += 1) {
+      this.boxes.push(new Box(canvasWidth, canvasHeight, this.context, this.light));
+    }
   }
 }

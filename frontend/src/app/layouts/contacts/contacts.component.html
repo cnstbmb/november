@@ -1,0 +1,11 @@
+<app-canvas-background>
+  <div
+    class="select-none w-full h-full flex flex-column sm:flex-row align-content-center align-self-center align-items-center justify-content-center"
+  >
+    <div class="sm:mr-4 mb-2" *ngFor="let linkData of socialLinks">
+      <a [href]="linkData.href"
+        ><img class="md:w-9rem w-4rem" [src]="linkData.imgPath" [alt]="linkData.imgAlt"
+      /></a>
+    </div>
+  </div>
+</app-canvas-background>

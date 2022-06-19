@@ -1,0 +1,35 @@
+<div class="h-screen w-screen flex justify-content-center align-content-center flex-wrap">
+  <div class="flex align-items-center justify-content-center align-items-center">
+    <div
+      class="h-20rem w-30rem justify-content-center align-items-center flex-column"
+      [formGroup]="authForm"
+    >
+      <div class="mb-5">
+        <span class="p-float-label">
+          <input class="w-full" type="text" id="loginForm" pInputText formControlName="login" />
+          <label for="loginForm">Login</label>
+        </span>
+      </div>
+      <div class="mb-5">
+        <span class="p-float-label">
+          <p-password
+            inputStyleClass="w-full"
+            styleClass="w-full"
+            id="passwordForm"
+            formControlName="password"
+            [feedback]="false"
+          ></p-password>
+          <label for="passwordForm">Password</label>
+        </span>
+      </div>
+      <div>
+        <p-button
+          label="Login"
+          type="submit"
+          styleClass="p-button-lg w-full"
+          [disabled]="!authForm.valid"
+        ></p-button>
+      </div>
+    </div>
+  </div>
+</div>

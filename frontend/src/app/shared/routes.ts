@@ -1,5 +1,7 @@
 export enum Route {
   root = '',
   notMatch = '**',
-  contacts = 'contacts'
+  contacts = 'contacts',
+  letscode = 'letscode',
+  auth = 'auth'
 }

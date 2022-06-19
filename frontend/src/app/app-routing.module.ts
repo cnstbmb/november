@@ -9,6 +9,14 @@ const routes: Routes = [
     path: Route.contacts,
     loadChildren: () => import('./layouts/contacts/contacts.module').then(m => m.ContactsModule)
   },
+  {
+    path: Route.letscode,
+    loadChildren: () => import('./layouts/lets-code/lets-code.module').then(m => m.LetsCodeModule)
+  },
+  {
+    path: Route.auth,
+    loadChildren: () => import('./layouts/auth/auth.module').then(m => m.AuthModule)
+  },
   { path: Route.notMatch, component: PageNotFoundComponent }
 ];
 

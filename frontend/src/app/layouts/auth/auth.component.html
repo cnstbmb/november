@@ -6,8 +6,8 @@
     >
       <div class="mb-5">
         <span class="p-float-label">
-          <input class="w-full" type="text" id="loginForm" pInputText formControlName="login" />
-          <label for="loginForm">Login</label>
+          <input class="w-full" type="text" id="loginForm" pInputText formControlName="email" />
+          <label for="loginForm">Email</label>
         </span>
       </div>
       <div class="mb-5">
@@ -27,6 +27,7 @@
           label="Login"
           type="submit"
           styleClass="p-button-lg w-full"
+          (click)="login()"
           [disabled]="!authForm.valid"
         ></p-button>
       </div>

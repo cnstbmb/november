@@ -8,12 +8,18 @@
     "build": "tools/scripts/build.sh",
     "lint": "eslint --debug src/**/*.ts",
     "lint:fix": "eslint --debug src/**/*.ts --fix",
-    "start": "npm run build && PORT=3000 tools/scripts/run.sh"
+    "start": "PORT=3000 tools/scripts/run.sh"
   },
   "author": "cnstbmb@gmail.com",
   "license": "ISC",
   "dependencies": {
+    "@types/express-jwt": "^6.0.4",
+    "@types/jsonwebtoken": "^8.5.8",
+    "body-parser": "^1.20.0",
+    "cookie-parser": "^1.4.6",
     "express": "^4.17.1",
+    "express-jwt": "^7.7.5",
+    "jsonwebtoken": "^8.5.1",
     "pino": "^7.0.5",
     "pino-caller": "^3.2.0",
     "pino-multi-stream": "^6.0.0",

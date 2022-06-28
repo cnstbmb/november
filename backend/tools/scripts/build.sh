@@ -9,7 +9,10 @@ echo "start building project"
 
 cd $SCRIPTPATH/../../
 
+rm -rf compiled
+#rm -rf compiled/configs
 node ./node_modules/typescript/bin/tsc
+cp -r ./configs ./compiled/configs
 
 end=`date +%s`
 runtime=$((end-start))

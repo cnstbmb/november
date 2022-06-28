@@ -1,0 +1,1 @@
+-`docker run -it cnstbmb/khimenkov-site /bin/sh`

@@ -1,1 +1,3 @@
--`docker run -it cnstbmb/khimenkov-site /bin/sh`
+-  `docker run -it cnstbmb/khimenkov-site /bin/sh`
+-  unix `docker run --rm -P -p 127.0.0.1:5432:5432 -v $(pwd)/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD="88005553535" --name pg postgres:alpine`
+-  windows`docker run --rm -P -p 127.0.0.1:5432:5432 -v %cd%/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD="88005553535" --name pg postgres:alpine`

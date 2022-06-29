@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { ApplicationRoutes } from '../types';
 import { ILogger } from '../../logger/types';
-import { HttpStatusCode } from '../../lib/types/http-status-code';
+import { HttpStatusCode } from '../../types/http-status-code';
 
 export class Frontend extends ApplicationRoutes {
     private readonly angularAppDist = path.join(__dirname, '..', '..', 'static');

@@ -5,7 +5,7 @@ import * as jwt from 'jsonwebtoken';
 // import cookieParser from 'cookie-parser';
 import { expressjwt/* , Request as JWTRequest */ } from 'express-jwt';
 import { ILogger } from '../../logger/types';
-import { HttpStatusCode } from '../../lib/types/http-status-code';
+import { HttpStatusCode } from '../../types/http-status-code';
 import { ApplicationRoutes } from '../types';
 
 type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;

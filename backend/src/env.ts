@@ -6,12 +6,8 @@ const AVAILABLE_ENVS = {
     TEST: 'test',
 };
 
-export function serverPort(): number | undefined {
-    const port = process?.env?.PORT;
-    if (!port) {
-        return undefined;
-    }
-    return +(port);
+export function serverPort(): number {
+    return +(process?.env?.PORT || 3000);
 }
 
 export function currentEnv(): string {

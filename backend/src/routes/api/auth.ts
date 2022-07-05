@@ -11,9 +11,9 @@ import { ApplicationRoutes } from '../types';
 type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
 export class Auth extends ApplicationRoutes {
-    private readonly rsaPrivateKeyPath = path.join(__dirname, '..', '..', 'configs', 'private.key');
+    private readonly rsaPrivateKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth.key');
 
-    private readonly rsaPublicKeyPath = path.join(__dirname, '..', '..', 'configs', 'private.key.pub');
+    private readonly rsaPublicKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth.key.pub');
 
     private readonly rsaPrivateKey: Buffer;
 

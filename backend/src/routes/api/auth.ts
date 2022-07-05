@@ -34,10 +34,6 @@ export class Auth extends ApplicationRoutes {
         this.checkIfAuthenticated = expressjwt(
             { secret: this.rsaPublicKey, algorithms: [this.algorithm] },
         ).unless({ path: ['/api/login'] });
-
-        console.log(__dirname);
-        console.log('=====================>', this.rsaPrivateKeyPath);
-        console.log('=====================>', this.rsaPublicKey);
     }
 
     register(): void {

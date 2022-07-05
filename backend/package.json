@@ -8,7 +8,11 @@
     "build": "tools/scripts/build.sh",
     "lint": "eslint --debug src/**/*.ts",
     "lint:fix": "eslint --debug src/**/*.ts --fix",
-    "start": "PORT=3000 tools/scripts/run.sh"
+    "start": "PORT=3000 NODE_ENV=dev tools/scripts/run.sh",
+    "migration:create:table": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json create",
+    "migration:create:db": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json db:create",
+    "migration:up": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json up",
+    "migration:down": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json down"
   },
   "author": "cnstbmb@gmail.com",
   "license": "ISC",
@@ -17,6 +21,8 @@
     "@types/jsonwebtoken": "^8.5.8",
     "body-parser": "^1.20.0",
     "cookie-parser": "^1.4.6",
+    "db-migrate": "^0.11.13",
+    "db-migrate-pg": "^1.2.2",
     "express": "^4.17.1",
     "express-jwt": "^7.7.5",
     "jsonwebtoken": "^8.5.1",

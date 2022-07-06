@@ -28,7 +28,6 @@ export class Auth extends ApplicationRoutes {
     constructor(logger: ILogger, application: express.Express) {
         super(logger, application);
 
-        this.checkRsaKeys();
         this.rsaPrivateKey = fs.readFileSync(this.rsaPrivateKeyPath);
         this.rsaPublicKey = fs.readFileSync(this.rsaPublicKeyPath);
         this.checkIfAuthenticated = expressjwt(
@@ -42,20 +41,6 @@ export class Auth extends ApplicationRoutes {
         this.application.route('/api/login')
             .post(this.loginRoute);
         this.application.route('/api/unauth_test').get(this.checkIfAuthenticated, this.test);
-    }
-
-    private checkRsaKeys(): void {
-        if (!fs.existsSync(this.rsaPrivateKeyPath)) {
-            const errorMessage = `RSA private key not found. Path: ${this.rsaPrivateKeyPath}`;
-            this.logger.error(errorMessage);
-            throw new Error(errorMessage);
-        }
-
-        if (!fs.existsSync(this.rsaPublicKeyPath)) {
-            const errorMessage = `RSA private key not found. Path: ${this.rsaPublicKeyPath}`;
-            this.logger.error(errorMessage);
-            throw new Error(errorMessage);
-        }
     }
 
     private test(_req: Request, res: Response) {

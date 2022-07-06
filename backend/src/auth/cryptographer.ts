@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import { BCryptConfig } from './types';
 
 export class Cryptographer {
     private readonly rsaPrivateKeyPath = path.join(__dirname, '..', 'configs', 'crypto-pass.pem');
@@ -12,11 +13,12 @@ export class Cryptographer {
 
     private readonly rsaPublicKey: Buffer;
 
-    private readonly saltRound = 10;
+    private readonly saltRound: number;
 
-    constructor() {
+    constructor(bcryptConfig: BCryptConfig) {
         this.rsaPrivateKey = fs.readFileSync(this.rsaPrivateKeyPath);
         this.rsaPublicKey = fs.readFileSync(this.rsaPublicKeyPath);
+        this.saltRound = bcryptConfig.round;
     }
 
     async bcryptString(value: string): Promise<string> {

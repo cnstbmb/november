@@ -7,7 +7,7 @@ export interface PgResult<Response> {
 
 export interface PgAdapter {
     query<Response>(query: string,
-          params?: string[]
+          params?: queryParams[]
     ): Promise<PgResult<Response>>;
 }
 
@@ -21,3 +21,5 @@ export interface PoolStats {
     idle: number,
     waiting: number
 }
+
+export type queryParams = string | number | Date;

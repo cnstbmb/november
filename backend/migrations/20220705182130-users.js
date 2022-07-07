@@ -17,7 +17,12 @@ exports.setup = function (options, seedLink) {
 const tableName = 'users';
 
 exports.up = (db) => db.createTable(tableName, {
-    id: { type: type.STRING, primaryKey: true, defaultValue: String('uuid_generate_v4()') },
+    id: {
+        type: type.STRING,
+        primaryKey: true,
+        // eslint-disable-next-line no-new-wrappers
+        defaultValue: new String('uuid_generate_v4()'),
+    },
     created: { type: type.DATE_TIME },
     updated: { type: type.DATE_TIME },
     login: { type: type.STRING },

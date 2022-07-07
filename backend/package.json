@@ -9,10 +9,11 @@
     "lint": "eslint --debug src/**/*.ts",
     "lint:fix": "eslint --debug src/**/*.ts --fix",
     "start": "PORT=3000 NODE_ENV=dev tools/scripts/run.sh",
-    "migration:create:table": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json create",
+    "migration:create": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json create",
     "migration:create:db": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json db:create",
     "migration:up": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json up",
-    "migration:down": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json down"
+    "migration:down": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json down",
+    "user:create": "tools/scripts/add-user.sh"
   },
   "author": "cnstbmb@gmail.com",
   "license": "ISC",
@@ -29,7 +30,8 @@
     "pino": "^7.0.5",
     "pino-caller": "^3.2.0",
     "pino-multi-stream": "^6.0.0",
-    "pino-pretty": "^7.1.0"
+    "pino-pretty": "^7.1.0",
+    "prompt": "^1.3.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.0",
@@ -40,6 +42,7 @@
     "@types/pg": "^8.6.5",
     "@types/pino": "^6.3.12",
     "@types/pino-multi-stream": "^5.1.2",
+    "@types/prompt": "^1.1.2",
     "@typescript-eslint/eslint-plugin": "^5.2.0",
     "@typescript-eslint/parser": "^5.2.0",
     "eslint": "^7.32.0",

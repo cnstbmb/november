@@ -2,7 +2,9 @@ import { QueryResult, Pool } from 'pg';
 import * as util from 'util';
 import { ILogger } from '../logger/types';
 import { getRandomShortHexId } from '../utils/random';
-import { PgAdapter, PgAdapterConfig, PgResult } from './types';
+import {
+    PgAdapter, PgAdapterConfig, PgResult, queryParams,
+} from './types';
 
 export class PgClient implements PgAdapter {
     private readonly pool: Pool;
@@ -33,7 +35,7 @@ export class PgClient implements PgAdapter {
         logger.info('Initialized PgClient with: \'%j\'', sanitized);
     }
 
-    async query<Result>(query: string, params: string[] = []): Promise<PgResult<Result>> {
+    async query<Result>(query: string, params: queryParams[] = []): Promise<PgResult<Result>> {
         const queryId = getRandomShortHexId();
 
         if (this.log) {

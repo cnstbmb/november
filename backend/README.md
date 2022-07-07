@@ -11,4 +11,13 @@ Generation ssl:
 
 Migraions: 
  - `npm run migration:create:db -- %DB_NAME%` - создание БД
- - `npm run migration:create:table -- %TABLE_NAME%` - Создание таблицы
+ - `npm run migration:create -- %MIGRATION_NAME%` - Создание миграции
+
+
+
+psql client ubuntu
+- `sudo apt-get install -y postgresql-client`
+- `psql -h localhost -U %user% -d %DB%`
+
+Установка дополнения
+- `CREATE extension IF NOT exists "uuid-ossp";`

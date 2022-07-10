@@ -38,6 +38,10 @@ export class UsersController {
         throw new Error('Method updateUser not implemented');
     }
 
+    async getUserByLogin(login: string): Promise<User | undefined> {
+        return this.storage.getUserByLogin(login);
+    }
+
     async isCorrectLoginPassword(login: string, password: string): Promise<boolean> {
         this.logger.info(`${this.loggerPrefix} Start validating login password`);
         const user = await this.storage.getUserByLogin(login);

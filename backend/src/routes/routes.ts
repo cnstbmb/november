@@ -4,6 +4,7 @@ import { HealthCheck } from './healthz/health-check';
 import { Auth } from './api/auth';
 import { ILogger } from '../logger/types';
 import { Frontend } from './static/frontend';
+import { UsersController } from '../controllers/users/controller';
 
 export class Routes extends ApplicationRoutes {
     readonly healthCheck: HealthCheck;
@@ -12,11 +13,15 @@ export class Routes extends ApplicationRoutes {
 
     readonly frontend: Frontend;
 
-    constructor(logger: ILogger, application: express.Express) {
+    constructor(
+        logger: ILogger,
+        application: express.Express,
+        usersController: UsersController,
+    ) {
         super(logger, application);
 
         this.healthCheck = new HealthCheck(logger, application);
-        this.auth = new Auth(logger, application);
+        this.auth = new Auth(logger, application, usersController);
         this.frontend = new Frontend(logger, application);
     }
 

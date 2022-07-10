@@ -47,7 +47,7 @@ export function compose(): Root {
     const dbClient = new PgClient(logger, dbConfig);
     const usersStorage = new UsersStorage(logger, dbClient);
     const usersController = new UsersController(logger, usersStorage, cryptographer);
-    const routes = new Routes(logger, application);
+    const routes = new Routes(logger, application, usersController);
     const server = new Server(logger, routes, application);
 
     return {

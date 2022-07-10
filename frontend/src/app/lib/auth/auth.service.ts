@@ -4,13 +4,14 @@ import { AuthLocalStorage, AuthResult } from '@app/lib/auth/types';
 import { Observable } from 'rxjs';
 import { shareReplay, tap } from 'rxjs/operators';
 import * as moment from 'moment';
+import { apiUrl } from '@shared/api-url';
 
 @Injectable()
 export class AuthService {
   constructor(private readonly http: HttpClient) {}
 
   login(email: string, password: string): Observable<AuthResult> {
-    return this.http.post<AuthResult>('/api/login', { email, password }).pipe(
+    return this.http.post<AuthResult>(apiUrl('/api/login'), { email, password }).pipe(
       tap(authResponse => this.setSession(authResponse)),
       shareReplay()
     );

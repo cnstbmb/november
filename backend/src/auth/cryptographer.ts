@@ -22,11 +22,13 @@ export class Cryptographer {
     }
 
     async bcryptString(value: string): Promise<string> {
-        return bcrypt.hash(value, this.saltRound);
+        const hash = Cryptographer.getMd5Hash(value);
+        return bcrypt.hash(hash, this.saltRound);
     }
 
     async compareBcryptString(value: string, encryptedValue: string): Promise<boolean> {
-        return bcrypt.compare(value, encryptedValue);
+        const hash = Cryptographer.getMd5Hash(value);
+        return bcrypt.compare(hash, encryptedValue);
     }
 
     encryptString(data: string): string {
@@ -43,5 +45,9 @@ export class Cryptographer {
         );
 
         return decryptedStringBuffer.toString('utf-8');
+    }
+
+    static getMd5Hash(data: string): string {
+        return crypto.createHash('md5').update(data).digest('hex');
     }
 }

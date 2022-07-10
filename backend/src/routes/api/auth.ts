@@ -7,13 +7,14 @@ import { expressjwt/* , Request as JWTRequest */ } from 'express-jwt';
 import { ILogger } from '../../logger/types';
 import { HttpStatusCode } from '../../types/http-status-code';
 import { ApplicationRoutes } from '../types';
+import { UsersController } from '../../controllers/users/controller';
 
 type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
 export class Auth extends ApplicationRoutes {
-    private readonly rsaPrivateKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth.key');
+    private readonly rsaPrivateKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth.pem');
 
-    private readonly rsaPublicKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth.key.pub');
+    private readonly rsaPublicKeyPath = path.join(__dirname, '..', '..', 'configs', 'auth-public.pem');
 
     private readonly rsaPrivateKey: Buffer;
 
@@ -25,7 +26,13 @@ export class Auth extends ApplicationRoutes {
 
     private readonly checkIfAuthenticated: AuthenticationMiddleware;
 
-    constructor(logger: ILogger, application: express.Express) {
+    private readonly tokenLifeTimeMs = 86400;
+
+    constructor(
+        logger: ILogger,
+        application: express.Express,
+        private readonly usersController: UsersController,
+    ) {
         super(logger, application);
 
         this.rsaPrivateKey = fs.readFileSync(this.rsaPrivateKeyPath);
@@ -38,9 +45,8 @@ export class Auth extends ApplicationRoutes {
     register(): void {
         this.logger.info('Registering auth route');
         // this.application.use(this.checkIfAuthenticated);
-        this.application.route('/api/login')
-            .post(this.loginRoute);
-        this.application.route('/api/unauth_test').get(this.checkIfAuthenticated, this.test);
+        this.application.route('/api/login').post(this.loginRoute.bind(this));
+        this.application.route('/api/unauth_test').get(this.checkIfAuthenticated.bind(this), this.test.bind(this));
     }
 
     private test(_req: Request, res: Response) {
@@ -48,15 +54,23 @@ export class Auth extends ApplicationRoutes {
         res.send();
     }
 
-    private loginRoute(req: Request, res: Response) {
-        const { email, password: _password } = req.body;
+    private async loginRoute(req: Request, res: Response) {
+        const { email, password } = req.body;
 
-        if (!this.validateEmailAndPassword()) {
+        const isValidEmailPassword = await this.validateEmailAndPassword(email, password);
+        if (!isValidEmailPassword) {
+            this.logger.info(`invalid email|password for "${email}"`);
             res.sendStatus(HttpStatusCode.UNAUTHORIZED);
             return;
         }
 
-        const userId = this.findUserIdForEmail(email);
+        const userId = await this.findUserIdForEmail(email);
+
+        if (!userId) {
+            this.logger.info(`Can't find user by email: "${email}"`);
+            res.sendStatus(HttpStatusCode.NOT_FOUND);
+            return;
+        }
 
         const jwtBearerToken = jwt.sign({}, this.rsaPrivateKey, {
             algorithm: this.algorithm,
@@ -65,19 +79,27 @@ export class Auth extends ApplicationRoutes {
         });
 
         // this.addJwtTokenCookie(res, jwtBearerToken);
-        this.addJsonJwtToken(res, jwtBearerToken, 0);
+        this.addJsonJwtToken(res, jwtBearerToken, this.tokenLifeTimeMs);
         // send the JWT back to the user
         // TODO - multiple options available
+        this.logger.info('JWT Token done');
         res.status(HttpStatusCode.OK);
         res.send();
     }
 
-    private validateEmailAndPassword(): boolean {
-        throw new Error('validateEmailAndPassword() not implemented');
+    private async validateEmailAndPassword(login: string, password: string): Promise<boolean> {
+        return this.usersController.isCorrectLoginPassword(login, password);
     }
 
-    private findUserIdForEmail(_email: string): string {
-        throw new Error('findUserIdForEmail() not implemented');
+    private async findUserIdForEmail(email: string): Promise<string | undefined> {
+        const user = await this.usersController.getUserByLogin(email);
+        if (!user) {
+            this.logger.error(`Failed. User "${email}" not found`);
+            return undefined;
+        }
+
+        this.logger.info(`User ${email} found`);
+        return user.id;
     }
 
     // private addJwtTokenCookie(res: Response, token: string): void {

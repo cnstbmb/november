@@ -1,7 +1,8 @@
 import * as http from 'http';
 import express, { Request, Response } from 'express';
 import bodyParser from 'body-parser';
-import { serverPort } from '../env';
+import cors from 'cors';
+import { isDev, serverPort } from '../env';
 import { ILogger } from '../logger/types';
 import { Routes } from '../routes/routes';
 
@@ -36,6 +37,7 @@ export class Server {
     registerRoutes(): void {
         this.logger.info('Registration routes');
         this.registerMiddleWares();
+        this.corsRequestForLocalDev();
         this.routes.register();
         this.logger.info('Registration routes success');
     }
@@ -46,5 +48,12 @@ export class Server {
             this.logger.info(`method: ${req.method}; url: ${req.url}`);
             next();
         });
+    }
+
+    private corsRequestForLocalDev(): void {
+        if (!isDev) {
+            return;
+        }
+        this.application.use(cors());
     }
 }

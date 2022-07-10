@@ -49,9 +49,9 @@ export function isProd() {
 }
 
 export function isDev() {
-    return currentEnv() === AVAILABLE_ENVS.PROD;
+    return currentEnv() === AVAILABLE_ENVS.DEV;
 }
 
 export function isTest() {
-    return currentEnv() === AVAILABLE_ENVS.PROD;
+    return currentEnv() === AVAILABLE_ENVS.TEST;
 }

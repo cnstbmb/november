@@ -4,6 +4,6 @@ export interface AuthResult {
 }
 
 export enum AuthLocalStorage {
-  expires_at = 'expires_at',
-  id_token = 'id_token'
+  expires_at = '@expires_at',
+  id_token = '@id_token'
 }

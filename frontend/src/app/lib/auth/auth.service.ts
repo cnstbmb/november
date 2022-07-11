@@ -23,7 +23,7 @@ export class AuthService {
   }
 
   public isLoggedIn(): boolean {
-    return moment().isBefore(this.getExpiration());
+    return !!(this.getIdToken() && moment().isBefore(this.getExpiration()));
   }
 
   isLoggedOut(): boolean {
@@ -38,6 +38,10 @@ export class AuthService {
 
     const expiresAt = JSON.parse(expiration);
     return moment(expiresAt);
+  }
+
+  getIdToken(): string | null {
+    return localStorage.getItem(AuthLocalStorage.id_token);
   }
 
   private setSession(authResult: AuthResult): void {

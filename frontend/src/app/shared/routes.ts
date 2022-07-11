@@ -3,5 +3,5 @@ export enum Route {
   notMatch = '**',
   contacts = 'contacts',
   letscode = 'letscode',
-  auth = 'auth'
+  login = 'login'
 }

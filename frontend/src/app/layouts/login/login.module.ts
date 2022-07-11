@@ -5,14 +5,14 @@ import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { AuthComponent } from './auth.component';
-import { AuthRoutingModule } from './auth-routing.module';
+import { LoginComponent } from './login.component';
+import { LoginRoutingModule } from './login-routing.module';
 
 @NgModule({
-  declarations: [AuthComponent],
+  declarations: [LoginComponent],
   imports: [
     CommonModule,
-    AuthRoutingModule,
+    LoginRoutingModule,
     InputTextModule,
     PasswordModule,
     FormsModule,
@@ -20,4 +20,4 @@ import { AuthRoutingModule } from './auth-routing.module';
     ButtonModule
   ]
 })
-export class AuthModule {}
+export class LoginModule {}

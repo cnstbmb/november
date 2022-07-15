@@ -11,10 +11,7 @@ export class AuthService {
   constructor(private readonly http: HttpClient) {}
 
   login(email: string, password: string): Observable<AuthResult> {
-    return this.http.post<AuthResult>(apiUrl('/api/login'), { email, password }).pipe(
-      tap(authResponse => this.setSession(authResponse)),
-      shareReplay()
-    );
+    return this.http.post<AuthResult>('/api/login', { email, password }).pipe(shareReplay());
   }
 
   logout(): void {

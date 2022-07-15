@@ -2,12 +2,13 @@ import path from 'path';
 import fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
-// import cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { expressjwt/* , Request as JWTRequest */ } from 'express-jwt';
 import { ILogger } from '../../logger/types';
 import { HttpStatusCode } from '../../types/http-status-code';
 import { ApplicationRoutes } from '../types';
 import { UsersController } from '../../controllers/users/controller';
+import { isProd } from '../../env';
 
 type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
@@ -24,9 +25,9 @@ export class Auth extends ApplicationRoutes {
 
     private readonly tokenLifetime = '24h';
 
-    private readonly checkIfAuthenticated: AuthenticationMiddleware;
+    private readonly tokenLifeTimeMs = 24 * 60 * 60 * 1000;
 
-    private readonly tokenLifeTimeMs = 86400;
+    private readonly checkIfAuthenticated: AuthenticationMiddleware;
 
     constructor(
         logger: ILogger,
@@ -38,13 +39,20 @@ export class Auth extends ApplicationRoutes {
         this.rsaPrivateKey = fs.readFileSync(this.rsaPrivateKeyPath);
         this.rsaPublicKey = fs.readFileSync(this.rsaPublicKeyPath);
         this.checkIfAuthenticated = expressjwt(
-            { secret: this.rsaPublicKey, algorithms: [this.algorithm] },
+            {
+                secret: this.rsaPublicKey,
+                algorithms: [this.algorithm],
+                getToken: (req: Request) => {
+                    const authHeader = req.headers.authorization;
+                    return authHeader?.split(' ')[1];
+                },
+            },
         ).unless({ path: ['/api/login'] });
     }
 
     register(): void {
         this.logger.info('Registering auth route');
-        // this.application.use(this.checkIfAuthenticated);
+        this.application.use(cookieParser());
         this.application.route('/api/login').post(this.loginRoute.bind(this));
         this.application.route('/api/unauth_test').get(this.checkIfAuthenticated.bind(this), this.test.bind(this));
     }
@@ -78,9 +86,8 @@ export class Auth extends ApplicationRoutes {
             subject: userId,
         });
 
-        // this.addJwtTokenCookie(res, jwtBearerToken);
-        this.addJsonJwtToken(res, jwtBearerToken, this.tokenLifeTimeMs);
-        // send the JWT back to the user
+        this.addJwtTokenCookie(res, jwtBearerToken);
+        // this.addJsonJwtToken(res, jwtBearerToken, this.tokenLifeTimeMs);
         // TODO - multiple options available
         this.logger.info('JWT Token done');
         res.status(HttpStatusCode.OK);
@@ -102,14 +109,34 @@ export class Auth extends ApplicationRoutes {
         return user.id;
     }
 
-    // private addJwtTokenCookie(res: Response, token: string): void {
-    //     res.cookie('SESSIONID', token, { /* httpOnly: true , */ secure: true });
-    // }
-
-    private addJsonJwtToken(res: Response, token: string, expiresIn: number): void {
-        res.json({
-            idToken: token,
-            expiresIn,
+    private addJwtTokenCookie(res: Response, token: string): void {
+        res.cookie('SESSIONID', token, {
+            secure: isProd(), // true,
+            maxAge: this.tokenLifeTimeMs,
         });
     }
+
+    // private addJsonJwtToken(res: Response, token: string, expiresIn: number): void {
+    //     res.json({
+    //         idToken: token,
+    //         expiresIn,
+    //     });
+    // }
+    // checkAuthenticatedByCookies(req: Request, res: Response, next: NextFunction) {
+    //     const authHeader = req.headers.authorization;
+    //     const token = authHeader?.split(' ')[1];
+    //
+    //     if (token == null) return res.sendStatus(401);
+    //
+    //     jwt.verify(token, this.rsaPublicKey, (err, user) => {
+    //         if (err) {
+    //             return res.sendStatus(403);
+    //         }
+    //
+    //         req.user = user;
+    //         next();
+    //
+    //         return null;
+    //     });
+    // }
 }

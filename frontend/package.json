@@ -25,6 +25,7 @@
     "eslint-plugin-jest": "^25.2.2",
     "lodash-es": "^4.17.15",
     "moment": "^2.29.3",
+    "ngx-cookie-service": "^12.0.3",
     "primeflex": "^3.2.1",
     "primeicons": "^5.0.0",
     "primeng": "^12.2.3",

@@ -3,5 +3,6 @@ export enum Route {
   notMatch = '**',
   contacts = 'contacts',
   letscode = 'letscode',
-  login = 'login'
+  login = 'login',
+  admin = 'admin'
 }

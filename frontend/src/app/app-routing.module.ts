@@ -19,6 +19,11 @@ const routes: Routes = [
     path: Route.login,
     loadChildren: () => import('./layouts/login/login.module').then(m => m.LoginModule)
   },
+  {
+    path: Route.admin,
+    canActivate: [AuthGuard],
+    loadChildren: () => import('./layouts/admin/admin.module').then(m => m.AdminModule)
+  },
   { path: Route.notMatch, component: PageNotFoundComponent }
 ];
 

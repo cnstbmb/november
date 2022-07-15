@@ -10,7 +10,13 @@ import { MainComponent } from './main/main.component';
 import { LinkShorterComponent } from './link-shorter/link-shorter.component';
 
 @NgModule({
-  declarations: [MenuComponent, NewPostComponent, NewUserComponent, MainComponent, LinkShorterComponent],
+  declarations: [
+    MenuComponent,
+    NewPostComponent,
+    NewUserComponent,
+    MainComponent,
+    LinkShorterComponent
+  ],
   imports: [CommonModule, AdminRoutingModule, PanelMenuModule]
 })
 export class AdminModule {}

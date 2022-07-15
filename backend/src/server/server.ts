@@ -37,7 +37,6 @@ export class Server {
     registerRoutes(): void {
         this.logger.info('Registration routes');
         this.registerMiddleWares();
-        this.corsRequestForLocalDev();
         this.routes.register();
         this.logger.info('Registration routes success');
     }
@@ -48,12 +47,18 @@ export class Server {
             this.logger.info(`method: ${req.method}; url: ${req.url}`);
             next();
         });
+        this.corsRequestForLocalDev();
     }
 
     private corsRequestForLocalDev(): void {
         if (!isDev) {
             return;
         }
-        this.application.use(cors());
+        this.application.use(cors({
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true,
+            preflightContinue: true,
+            origin: '*',
+        }));
     }
 }

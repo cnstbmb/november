@@ -1,5 +1,11 @@
 import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MenuItem } from 'primeng/api';
+import { ActivatedRoute, Router } from '@angular/router';
+
+export enum AdminFragments {
+  newPost = 'newPost',
+  linkShorter = 'linkShorter'
+}
 
 @Component({
   selector: 'app-admin-menu',
@@ -8,82 +14,78 @@ import { MenuItem } from 'primeng/api';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MenuComponent implements OnInit {
+  readonly adminFragments = AdminFragments;
+
   items!: MenuItem[];
 
+  fragment: string | null = null;
+
+  activeMenuItem!: MenuItem;
+
+  constructor(private route: ActivatedRoute, private router: Router) {
+    this.buildMenu();
+    this.findActiveItem(this.route.snapshot.fragment);
+  }
+
   ngOnInit() {
+    this.subscribeFragmentChange();
+    this.parseUrlParams();
+  }
+
+  private goNewPost(): void {
+    this.updateRouteParamsWithoutReload(AdminFragments.newPost);
+  }
+
+  private goLinkShorter(): void {
+    this.updateRouteParamsWithoutReload(AdminFragments.linkShorter);
+  }
+
+  private logout(): void {
+    this.router.navigate(['']);
+  }
+
+  private parseUrlParams(): void {
+    console.log(this.route.queryParams);
+  }
+
+  private buildMenu(): void {
     this.items = [
       {
-        label: 'File',
-        icon: 'pi pi-pw pi-file',
-        items: [
-          {
-            label: 'New',
-            icon: 'pi pi-fw pi-plus',
-            items: [
-              { label: 'User', icon: 'pi pi-fw pi-user-plus' },
-              { label: 'Filter', icon: 'pi pi-fw pi-filter' }
-            ]
-          },
-          { label: 'Open', icon: 'pi pi-fw pi-external-link' },
-          { separator: true },
-          { label: 'Quit', icon: 'pi pi-fw pi-times' }
-        ]
+        label: 'New post',
+        icon: 'pi pi-fw pi-plus-circle',
+        fragment: AdminFragments.newPost,
+        command: this.goNewPost.bind(this)
       },
       {
-        label: 'Edit',
-        icon: 'pi pi-fw pi-pencil',
-        items: [
-          { label: 'Delete', icon: 'pi pi-fw pi-trash' },
-          { label: 'Refresh', icon: 'pi pi-fw pi-refresh' }
-        ]
+        label: 'Link shorter',
+        icon: 'pi pi-fw pi-link',
+        fragment: AdminFragments.linkShorter,
+        command: this.goLinkShorter.bind(this)
       },
-      {
-        label: 'Help',
-        icon: 'pi pi-fw pi-question',
-        items: [
-          {
-            label: 'Contents',
-            icon: 'pi pi-pi pi-bars'
-          },
-          {
-            label: 'Search',
-            icon: 'pi pi-pi pi-search',
-            items: [
-              {
-                label: 'Text',
-                items: [
-                  {
-                    label: 'Workspace'
-                  }
-                ]
-              },
-              {
-                label: 'User',
-                icon: 'pi pi-fw pi-file'
-              }
-            ]
-          }
-        ]
-      },
-      {
-        label: 'Actions',
-        icon: 'pi pi-fw pi-cog',
-        items: [
-          {
-            label: 'Edit',
-            icon: 'pi pi-fw pi-pencil',
-            items: [
-              { label: 'Save', icon: 'pi pi-fw pi-save' },
-              { label: 'Update', icon: 'pi pi-fw pi-save' }
-            ]
-          },
-          {
-            label: 'Other',
-            icon: 'pi pi-fw pi-tags',
-            items: [{ label: 'Delete', icon: 'pi pi-fw pi-minus' }]
-          }
-        ]
-      }
+      { label: 'Logout', icon: 'pi pi-fw pi-power-off', command: this.logout.bind(this) }
     ];
+  }
+
+  private updateRouteParamsWithoutReload(fragment: AdminFragments): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParamsHandling: 'merge',
+      fragment
+    });
+  }
+
+  private subscribeFragmentChange(): void {
+    this.route.fragment.subscribe(fragment => {
+      this.fragment = fragment;
+      this.findActiveItem(fragment);
+    });
+  }
+
+  private findActiveItem(fragment: string | null): void {
+    if (!fragment) {
+      return;
+    }
+    this.activeMenuItem =
+      this.items?.find(item => item.fragment === fragment) || this.activeMenuItem;
   }
 }

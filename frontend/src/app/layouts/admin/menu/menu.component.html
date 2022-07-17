@@ -1,1 +1,6 @@
-<p-panelMenu [model]="items" [style]="{ width: '300px' }"></p-panelMenu>
+<p-tabMenu [model]="items" [activeItem]="activeMenuItem"></p-tabMenu>
+<div [ngSwitch]="fragment">
+  <app-new-post *ngSwitchCase="adminFragments.newPost"></app-new-post>
+  <app-link-shorter *ngSwitchCase="adminFragments.linkShorter"></app-link-shorter>
+  <div *ngSwitchDefault>Welcome to admin page</div>
+</div>

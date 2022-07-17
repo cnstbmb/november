@@ -65,6 +65,7 @@ export class Auth extends ApplicationRoutes {
     private async loginRoute(req: Request, res: Response) {
         const { email, password } = req.body;
 
+        // TODO: если БД недоступна, ответа от сервера не поступает на клиент.
         const isValidEmailPassword = await this.validateEmailAndPassword(email, password);
         if (!isValidEmailPassword) {
             this.logger.info(`invalid email|password for "${email}"`);

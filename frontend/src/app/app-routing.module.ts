@@ -24,6 +24,10 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     loadChildren: () => import('./layouts/admin/admin.module').then(m => m.AdminModule)
   },
+  {
+    path: Route.blog,
+    loadChildren: () => import('./layouts/blog/blog.module').then(m => m.BlogModule)
+  },
   { path: Route.notMatch, component: PageNotFoundComponent }
 ];
 

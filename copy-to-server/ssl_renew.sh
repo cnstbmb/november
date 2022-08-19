@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 COMPOSE="/usr/local/bin/docker-compose --no-ansi"
 DOCKER="/usr/bin/docker"

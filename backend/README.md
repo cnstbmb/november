@@ -17,6 +17,7 @@ Migraions:
 
 psql client ubuntu
 - `sudo apt-get install -y postgresql-client`
+- `npm run migration:create:db -- november` || `psql -h localhost -U %user%` && `CREATE DATABASE november`
 - `psql -h localhost -U %user% -d %DB%`
 
 Установка дополнения

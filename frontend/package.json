@@ -3,13 +3,14 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --serve-path=/ --poll 500",
+    "start": "ng serve --serve-path=/",
     "build": "ng build",
     "build:prod": "ng build --configuration=production --deploy-url=/",
     "watch": "ng build --watch --configuration development",
     "lint": "eslint --debug src",
     "lint:fix": "eslint --debug src --fix src",
-    "test": "ng test"
+    "test": "ng test",
+    "build:docker:prod": "./tools/scripts/build_prod.sh"
   },
   "private": true,
   "dependencies": {
@@ -29,6 +30,7 @@
     "primeflex": "^3.2.1",
     "primeicons": "^5.0.0",
     "primeng": "^12.2.3",
+    "quill": "^1.3.7",
     "rxjs": "~6.6.0",
     "rxjs-compat": "^6.6.7",
     "tslib": "^2.3.0",

@@ -1,4 +1,5 @@
 import pino from 'pino';
+import fse from 'fs-extra';
 import * as env from '../env';
 import { NullLogger } from './null-logger';
 import { ConsoleLogger } from './console-logger';
@@ -24,6 +25,7 @@ export function makeLogger() {
     } else if (env.isTest()) {
         loggerBackend = new ConsoleLogger();
     } else {
+        createLogFile(logFile);
         const settings = {
             showSrc,
             logFile,
@@ -37,4 +39,12 @@ export function makeLogger() {
     }
 
     return new Logger(loggerBackend);
+}
+
+function createLogFile(filePath?: string): void {
+    if (!filePath) {
+        return;
+    }
+
+    fse.ensureFileSync(filePath);
 }

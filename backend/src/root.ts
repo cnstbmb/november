@@ -12,6 +12,9 @@ import { UsersStorage } from './storages/users/storage';
 import { UsersController } from './controllers/users/controller';
 import { Routes } from './routes/routes';
 import { Server } from './server/server';
+import { WebTokenGuard } from './routes/web-token.guard';
+import { BlogController } from './controllers/blog/controller';
+import { BlogStorage } from './storages/blog_posts/storage';
 
 interface Root {
     logger: ILogger;
@@ -47,7 +50,10 @@ export function compose(): Root {
     const dbClient = new PgClient(logger, dbConfig);
     const usersStorage = new UsersStorage(logger, dbClient);
     const usersController = new UsersController(logger, usersStorage, cryptographer);
-    const routes = new Routes(logger, application, usersController);
+    const blogStorage = new BlogStorage(logger, dbClient);
+    const blogController = new BlogController(logger, blogStorage);
+    const webTokenGuard = new WebTokenGuard(logger, application);
+    const routes = new Routes(logger, application, webTokenGuard, usersController, blogController);
     const server = new Server(logger, routes, application);
 
     return {

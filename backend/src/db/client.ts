@@ -3,7 +3,7 @@ import * as util from 'util';
 import { ILogger } from '../logger/types';
 import { getRandomShortHexId } from '../utils/random';
 import {
-    PgAdapter, PgAdapterConfig, PgResult, queryParams,
+    PgAdapter, PgAdapterConfig, PgResult, QueryParams,
 } from './types';
 
 export class PgClient implements PgAdapter {
@@ -35,14 +35,13 @@ export class PgClient implements PgAdapter {
         logger.info('Initialized PgClient with: \'%j\'', sanitized);
     }
 
-    async query<Result>(query: string, params: queryParams[] = []): Promise<PgResult<Result>> {
+    async query<Result>(query: string, params: QueryParams[] = []): Promise<PgResult<Result>> {
         const queryId = getRandomShortHexId();
 
         if (this.log) {
-            this.logger.info(`[DB] request: "${query}", with params "%s"`, params);
             const jsonParams = params ? JSON.stringify(params) : '';
             this.logger.info({ qid: queryId }, util.format(
-                '[PgAdapter.query] sql: \'%s\', params: \'%s\'',
+                '[PgClient.query] sql: \'%s\', params: \'%s\'',
                 this.queryForLog(query, this.config.maxSqlLogLength),
                 this.queryForLog(jsonParams, this.config.maxParamsLogLength),
             ));
@@ -84,7 +83,7 @@ export class PgClient implements PgAdapter {
                 duration: queryDuration,
                 rNums: pgResult.rowCount,
             },
-            `[PgAdapter.query] done in ${queryDuration} ms.`);
+            `[PgClient.query] done in ${queryDuration} ms.`);
         }
 
         return pgResult;

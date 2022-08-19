@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 env
 
 script_start_time=`date +%s`
-echo "start building production docker image"
+echo "start building backend production docker image"
 
 build_backend_start_time=`date +%s`
 cd $SCRIPTPATH/../..

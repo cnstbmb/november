@@ -6,10 +6,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:backend": "cd backend/ && npm run build",
+    "build:backend:docker": "cd backend/ && npm run build:docker:prod",
     "start:backend": "cd backend/ && npm run start",
     "lint:fix:backend": "cd backend/ && npm run lint:fix",
     "build:frontend": "cd frontend/ && npm run build",
     "start:frontend": "cd frontend/ && npm run start",
+    "build:frontend:docker": "cd frontend/ && npm run build:docker:prod",
     "watch:frontend": "cd frontend/ && npm run watch",
     "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
     "prepare": "husky install && cd frontend && npm i && cd ../backend && npm i ",

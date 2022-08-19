@@ -1,11 +1,9 @@
 import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MenuItem } from 'primeng/api';
 import { ActivatedRoute, Router } from '@angular/router';
-
-export enum AdminFragments {
-  newPost = 'newPost',
-  linkShorter = 'linkShorter'
-}
+import { AuthService } from '@app/lib/auth/auth.service';
+import { Route } from '@app/shared/routes';
+import { AdminFragments } from '@app/shared/route/fragments';
 
 @Component({
   selector: 'app-admin-menu',
@@ -22,14 +20,13 @@ export class MenuComponent implements OnInit {
 
   activeMenuItem!: MenuItem;
 
-  constructor(private route: ActivatedRoute, private router: Router) {
+  constructor(private route: ActivatedRoute, private router: Router, private auth: AuthService) {
     this.buildMenu();
     this.findActiveItem(this.route.snapshot.fragment);
   }
 
   ngOnInit() {
     this.subscribeFragmentChange();
-    this.parseUrlParams();
   }
 
   private goNewPost(): void {
@@ -41,18 +38,15 @@ export class MenuComponent implements OnInit {
   }
 
   private logout(): void {
-    this.router.navigate(['']);
-  }
-
-  private parseUrlParams(): void {
-    console.log(this.route.queryParams);
+    this.auth.logout();
+    this.router.navigate([Route.login]);
   }
 
   private buildMenu(): void {
     this.items = [
       {
         label: 'New post',
-        icon: 'pi pi-fw pi-plus-circle',
+        icon: 'pi pi-fw pi-file',
         fragment: AdminFragments.newPost,
         command: this.goNewPost.bind(this)
       },

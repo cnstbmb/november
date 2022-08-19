@@ -1,1 +1,40 @@
-<p>new-post works!</p>
+<div>
+  <form [formGroup]="postForm" (ngSubmit)="submitPost()">
+    <div class="h-full m-5">
+      <div class="w-full mb-4 flex flex-wrap">
+        <span class="p-float-label mr-4 w-5">
+          <input
+            pInputText
+            type="text"
+            formControlName="title"
+            inputId="postTitle"
+            [required]="true"
+            class="w-full"
+          />
+          <label for="postTitle">Title</label>
+        </span>
+        <span class="p-float-label w-5">
+          <p-chips
+            formControlName="hashtags"
+            inputId="tagsChips"
+            inputStyleClass="w-full"
+          ></p-chips>
+          <label for="tagsChips">Hashtags</label>
+        </span>
+      </div>
+      <p-editor
+        formControlName="text"
+        [style]="{ height: '500px' }"
+        (onTextChange)="postContentChanged()"
+      ></p-editor>
+    </div>
+    <div class="flex justify-content-end flex-wrap h-full h-full mr-4">
+      <p-button
+        label="Save"
+        type="submit"
+        icon="pi pi-save"
+        [disabled]="postForm.invalid"
+      ></p-button>
+    </div>
+  </form>
+</div>

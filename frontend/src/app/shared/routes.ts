@@ -5,5 +5,6 @@ export enum Route {
   letscode = 'letscode',
   login = 'login',
   admin = 'admin',
-  blog = 'blog'
+  blog = 'blog',
+  notFound = '404'
 }

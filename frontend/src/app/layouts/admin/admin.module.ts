@@ -2,6 +2,11 @@ import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 import { TabMenuModule } from 'primeng/tabmenu';
+import { ButtonModule } from 'primeng/button';
+import { EditorModule } from 'primeng/editor';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ChipsModule } from 'primeng/chips';
+import { InputTextModule } from 'primeng/inputtext';
 import { AdminRoutingModule } from './admin-routing.module';
 import { MenuComponent } from './menu/menu.component';
 import { NewPostComponent } from './new-post/new-post.component';
@@ -10,6 +15,16 @@ import { LinkShorterComponent } from './link-shorter/link-shorter.component';
 
 @NgModule({
   declarations: [MenuComponent, NewPostComponent, MainComponent, LinkShorterComponent],
-  imports: [CommonModule, AdminRoutingModule, TabMenuModule]
+  imports: [
+    CommonModule,
+    AdminRoutingModule,
+    TabMenuModule,
+    EditorModule,
+    FormsModule,
+    ReactiveFormsModule,
+    ButtonModule,
+    ChipsModule,
+    InputTextModule
+  ]
 })
 export class AdminModule {}

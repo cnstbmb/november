@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '@app/lib/auth/auth.service';
 import { MessageService } from 'primeng/api';
 import { Route } from '@shared/routes';
+import { AdminFragments } from '@app/shared/route/fragments';
 
 @Component({
   selector: 'app-auth',
@@ -34,7 +35,9 @@ export class LoginComponent {
     this.authService.login(email, password).subscribe(
       () => {
         console.log('User is logged in');
-        this.router.navigateByUrl(`/${Route.admin}`);
+        this.router.navigate([Route.admin], {
+          fragment: AdminFragments.newPost
+        });
       },
       (error: { status: number }) => {
         console.log({ error });

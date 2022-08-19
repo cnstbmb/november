@@ -1,7 +1,6 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { Route } from '@shared/routes';
-import { PageNotFoundComponent } from '@app/layouts/page-not-found/page-not-found.component';
 import { AuthGuard } from '@app/lib/auth/auth-guard';
 
 const routes: Routes = [
@@ -28,7 +27,12 @@ const routes: Routes = [
     path: Route.blog,
     loadChildren: () => import('./layouts/blog/blog.module').then(m => m.BlogModule)
   },
-  { path: Route.notMatch, component: PageNotFoundComponent }
+  {
+    path: Route.notFound,
+    loadChildren: () =>
+      import('./layouts/page-not-found/page-not-found.module').then(m => m.PageNotFoundModule)
+  },
+  { path: Route.notMatch, redirectTo: Route.notFound, pathMatch: 'full' }
 ];
 
 @NgModule({

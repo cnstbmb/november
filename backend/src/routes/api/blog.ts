@@ -6,8 +6,6 @@ import { ILogger } from '../../logger/types';
 import { HttpStatusCode } from '../../types/http-status-code';
 import { BlogController } from '../../controllers/blog/controller';
 
-// type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
-
 export class Blog extends ApplicationRoutes {
 
     private readonly route: string = '/api/blog';
@@ -25,14 +23,32 @@ export class Blog extends ApplicationRoutes {
         this.logger.info(`Registering a blog route [${this.route}]`);
     
         this.application.use(cookieParser());
+        this.application.route('/api/blog').get(this.getBlogPosts.bind(this));
         this.application.route('/api/blog').post(this.webTokenGuard.protect(), this.createBlogPost.bind(this));
     }
 
     private async createBlogPost(req: Request, res: Response): Promise<void> {
-        const {title, text, hashtags} = req.body;
+        const {title, content, hashtags} = req.body;
         const {userId} = res.locals;
-        this.logger.info({title, text, hashtags, userId});
-        const blogPostId = await this.controller.savePost(userId, title, text, hashtags);
+        const blogPostId = await this.controller.savePost(userId, title, content, hashtags);
         res.status(HttpStatusCode.CREATED).json({id: blogPostId})
+    }
+    
+    private async getBlogPosts(req: Request, res: Response): Promise<void> {
+        const {rows, first} = req.query;
+
+        //TODO: парсер 
+        let limit = undefined;
+        if (typeof rows === 'string' || typeof rows === 'number') {
+            limit = +rows;
+        }
+
+        let offset = undefined;
+        if (typeof first === 'string' || typeof first === 'number') {
+            offset = +first;
+        }
+
+        const posts = await this.controller.getPosts(limit, offset);
+        res.status(HttpStatusCode.OK).json(posts);
     }
 }

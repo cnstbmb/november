@@ -27,42 +27,42 @@ export class Auth extends ApplicationRoutes {
     }
 
     private async loginRoute(req: Request, res: Response) {
-        const { email, password } = req.body;
+        const { login, password } = req.body;
 
         //FIXME: если БД недоступна, ответа от сервера не поступает на клиент.
-        const isValidEmailPassword = await this.validateEmailAndPassword(email, password);
-        if (!isValidEmailPassword) {
-            this.logger.info(`invalid email|password for "${email}"`);
+        const isValidLoginPassword = await this.validateLoginAndPassword(login, password);
+        if (!isValidLoginPassword) {
+            this.logger.info(`invalid login|password for "${login}"`);
             res.sendStatus(HttpStatusCode.UNAUTHORIZED);
             return;
         }
 
-        const userId = await this.findUserIdForEmail(email);
+        const userId = await this.findUserIdForLogin(login);
 
         if (!userId) {
-            this.logger.info(`Can't find user by email: "${email}"`);
+            this.logger.info(`Can't find user by login: "${login}"`);
             res.sendStatus(HttpStatusCode.NOT_FOUND);
             return;
         }
 
-        this.webTokenGuard.addJwtTokenCookie(res, userId, {userId})
+        this.webTokenGuard.addJwtTokenCookie(res, login, {userId})
         this.logger.info('JWT Token done');
         res.status(HttpStatusCode.OK);
         res.send();
     }
 
-    private async validateEmailAndPassword(login: string, password: string): Promise<boolean> {
+    private async validateLoginAndPassword(login: string, password: string): Promise<boolean> {
         return this.usersController.isCorrectLoginPassword(login, password);
     }
 
-    private async findUserIdForEmail(email: string): Promise<string | undefined> {
-        const user = await this.usersController.getUserByLogin(email);
+    private async findUserIdForLogin(login: string): Promise<string | undefined> {
+        const user = await this.usersController.getUserByLogin(login);
         if (!user) {
-            this.logger.error(`Failed. User "${email}" not found`);
+            this.logger.error(`Failed. User "${login}" not found`);
             return;
         }
 
-        this.logger.info(`User ${email} found`);
+        this.logger.info(`User ${login} found`);
         return user.id;
     }
 }

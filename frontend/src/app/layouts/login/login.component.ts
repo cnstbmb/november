@@ -14,7 +14,7 @@ import { AdminFragments } from '@app/shared/route/fragments';
 })
 export class LoginComponent {
   readonly authForm = this.fb.group({
-    email: this.fb.control('', [Validators.required, Validators.minLength(3)]),
+    login: this.fb.control('', [Validators.required, Validators.minLength(3)]),
     password: this.fb.control('', [Validators.required, Validators.minLength(3)])
   });
 
@@ -26,13 +26,13 @@ export class LoginComponent {
   ) {}
 
   login(): void | undefined {
-    const { email, password } = this.authForm.value;
+    const { login, password } = this.authForm.value;
 
-    if (!email || !password) {
+    if (!login || !password) {
       return;
     }
 
-    this.authService.login(email, password).subscribe(
+    this.authService.login(login, password).subscribe(
       () => {
         console.log('User is logged in');
         this.router.navigate([Route.admin], {

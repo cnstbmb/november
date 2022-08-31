@@ -3,6 +3,7 @@ import { QueryParams } from "../../db/types";
 import { ILogger } from "../../logger/types";
 import { BlogPost, BlogPostFilters } from "./types";
 
+//TODO: knex
 export class BlogStorage {
   private readonly tableName = "blog_posts";
 
@@ -50,15 +51,17 @@ export class BlogStorage {
         query += ` WHERE ${filterSubQuery}`;
     }
 
-    if (limit) {
+    query += ` ORDER BY created DESC`
+
+    if (limit != undefined) {
         queryParams.push(limit);
-        const limitQueryParamsPosition = queryParams.length + 1;
+        const limitQueryParamsPosition = queryParams.length;
         query += ` LIMIT $${limitQueryParamsPosition}`
     }
 
-    if (offset) {
+    if (offset != undefined) {
         queryParams.push(offset);
-        const offsetQueryParamsPosition = queryParams.length + 1;
+        const offsetQueryParamsPosition = queryParams.length;
         query += ` OFFSET $${offsetQueryParamsPosition}`
     }
 

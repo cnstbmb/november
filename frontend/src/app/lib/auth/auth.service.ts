@@ -11,8 +11,8 @@ export class AuthService {
 
   constructor(private readonly http: HttpClient, private readonly storage: CookiesStorageService) {}
 
-  login(email: string, password: string): Observable<AuthResult> {
-    return this.http.post<AuthResult>('/api/login', { email, password }).pipe(shareReplay());
+  login(login: string, password: string): Observable<AuthResult> {
+    return this.http.post<AuthResult>('/api/login', { login, password }).pipe(shareReplay());
   }
 
   logout(): void {

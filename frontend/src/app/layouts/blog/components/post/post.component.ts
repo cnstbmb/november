@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Input } from '@angular/core';
+import { BlogPostFullData } from '@app/shared/blog/types';
 
 @Component({
   selector: 'app-post',
@@ -6,4 +7,9 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
   styleUrls: ['./post.component.less'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PostComponent {}
+export class PostComponent {
+  @Input()
+  postData!: BlogPostFullData;
+
+  mouseOvered: boolean = false;
+}

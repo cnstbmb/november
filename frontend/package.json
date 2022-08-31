@@ -27,6 +27,7 @@
     "lodash-es": "^4.17.15",
     "moment": "^2.29.3",
     "ngx-cookie-service": "^12.0.3",
+    "ngx-infinite-scroll": "^10.0.1",
     "primeflex": "^3.2.1",
     "primeicons": "^5.0.0",
     "primeng": "^12.2.3",

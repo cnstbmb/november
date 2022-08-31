@@ -13,7 +13,7 @@ import { Message, MessageService } from 'primeng/api';
 })
 export class NewPostComponent implements OnDestroy {
   readonly postForm = this.fb.group({
-    text: this.fb.control('', [Validators.required]),
+    content: this.fb.control('', [Validators.required]),
     title: this.fb.control('', [Validators.required]),
     hashtags: this.fb.control([])
   });

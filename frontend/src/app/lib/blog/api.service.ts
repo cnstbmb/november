@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BlogPostData } from '@app/shared/blog/types';
+import { BlogPost, BlogPostData } from '@app/shared/blog/types';
 import { Observable, throwError } from 'rxjs';
 import { catchError, shareReplay } from 'rxjs/operators';
+import { LazyLoadEvent } from 'primeng/api';
 
 @Injectable()
 export class ApiService {
@@ -16,8 +17,20 @@ export class ApiService {
       .pipe(shareReplay(), catchError(this.handleError));
   }
 
-  async getPosts(params: unknown): Promise<void> {
-    console.log('get', this.url, params);
+  getPosts(params: LazyLoadEvent): Observable<BlogPost[] | string> {
+    const { first, rows } = params;
+    let queryParams = new HttpParams();
+    if (typeof first === 'number' && first >= 0) {
+      queryParams = queryParams.append('first', first);
+    }
+
+    if (rows) {
+      queryParams = queryParams.append('rows', rows);
+    }
+
+    return this.http
+      .get<BlogPost[]>(this.url, { params: queryParams })
+      .pipe(shareReplay(), catchError(this.handleError));
   }
 
   async deletePost(params: unknown): Promise<void> {
@@ -25,9 +38,6 @@ export class ApiService {
   }
 
   private handleError(error: any): Observable<string> {
-    console.log('========================');
-    console.log(error);
-    console.log('========================');
     let errorMessage = '';
     if (error.error instanceof ErrorEvent) {
       // client-side error

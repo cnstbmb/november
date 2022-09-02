@@ -7,25 +7,35 @@ services:
     networks:
       - app-network
     volumes:
-    - configs:/home/app/server/configs/
+      - configs:/home/app/server/configs
+      - logs:/home/app/server/logs
+    depends_on:
+      - postgres-db
+    env_file:
+      - database.env
   angular-app:
     image: "cnstbmb/khimenkov-angular-app:latest"
     restart: always
     container_name: angular-app
     ports:
-      - "80:8080"
+      - "8080:8080"
     networks:
       - app-network
     depends_on:
       - nodejs-server
   postgres-db:
-    image: postgres:14-alpine
+    image: postgres
     restart: always
     container_name: postgres-db
+    ports:
+      - "5432:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
+      - postgres_init:/docker-entrypoint-initdb.d
     networks:
       - app-network
+    env_file:
+      - database.env
   webserver:
     image: nginx:mainline-alpine
     container_name: webserver
@@ -68,11 +78,29 @@ volumes:
       type: none
       device: /srv/dhparam/
       o: bind
+  configs:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/configs
+      o: bind
   pg-data:
     driver: local
     driver_opts:
       type: none
-      device: /srv/postgres
+      device: /srv/pg-data
+      o: bind
+  logs:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/logs
+      o: bind
+  postgres_init:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/postgres/init
       o: bind
 networks:
   app-network:

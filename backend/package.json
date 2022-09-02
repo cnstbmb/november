@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tools/scripts/build.sh",
+    "build:docker:prod": "./tools/scripts/build_prod.sh",
     "lint": "eslint --debug src/**/*.ts",
     "lint:fix": "eslint --debug src/**/*.ts --fix",
     "start": "PORT=3000 NODE_ENV=dev tools/scripts/run.sh",
@@ -13,8 +14,7 @@
     "migration:create:db": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json db:create",
     "migration:up": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json up",
     "migration:down": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json down",
-    "user:create": "tools/scripts/add-user.sh",
-    "build:docker:prod": "./tools/scripts/build_prod.sh"
+    "user:create": "tools/scripts/add-user.sh"
   },
   "author": "cnstbmb@gmail.com",
   "license": "ISC",

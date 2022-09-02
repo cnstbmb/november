@@ -5,12 +5,12 @@
     "ng": "ng",
     "start": "ng serve --serve-path=/",
     "build": "ng build",
+    "build:docker:prod": "./tools/scripts/build_prod.sh",
     "build:prod": "ng build --configuration=production --deploy-url=/",
     "watch": "ng build --watch --configuration development",
     "lint": "eslint --debug src",
     "lint:fix": "eslint --debug src --fix src",
-    "test": "ng test",
-    "build:docker:prod": "./tools/scripts/build_prod.sh"
+    "test": "ng test"
   },
   "private": true,
   "dependencies": {

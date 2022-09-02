@@ -10,7 +10,7 @@ echo "start building production application"
 echo "start building backend production"
 build_backend_start_time=`date +%s`
 cd $SCRIPTPATH/../../backend
-npm run build
+npm run build:docker:prod
 build_backend_end_time=`date +%s`
 build_backend_time=$((build_backend_end_time-build_backend_start_time))
 echo "backend built successful after $((build_backend_time / 60)) minutes and $((build_backend_time % 60)) seconds."

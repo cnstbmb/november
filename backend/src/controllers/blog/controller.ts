@@ -3,8 +3,6 @@ import { BlogStorage } from "../../storages/blog_posts/storage";
 import { BlogPost } from "../../storages/blog_posts/types";
 
 export class BlogController {
-  private readonly loggerPrefix = "[BlogPostsStorage]";
-
   constructor(private logger: ILogger, private storage: BlogStorage) {}
 
   async savePost(
@@ -13,7 +11,7 @@ export class BlogController {
     content: string,
     hashtags = []
   ): Promise<string> {
-    this.logger.info(`${this.loggerPrefix} creating blog post`);
+    this.loggerInfo(` creating blog post`);
     const id = await this.storage.createBlogPost(
       author,
       title,
@@ -21,12 +19,23 @@ export class BlogController {
       hashtags
     );
 
-    this.logger.info(`${this.loggerPrefix} post created with id="${id}"`);
+    this.loggerInfo(` post created with id="${id}"`);
     return id;
   }
 
   async getPosts(limit?: number, offset?: number): Promise<BlogPost[]> {
-    this.logger.info(`${this.loggerPrefix} get posts limit ${limit}; offset ${offset}`);
+    this.loggerInfo(`get posts limit ${limit}; offset ${offset}`);
     return this.storage.selectPosts({}, limit, offset);
+  }
+
+  async deletePost(postId: string): Promise<string> {
+    this.loggerInfo(`mark post "${postId}" to delete`);
+
+    return this.storage.deletePost(postId);
+  }
+
+  private loggerInfo(message: string): void {
+    const prefix = "[BlogPostsStorageController]";
+    this.logger.info(`${prefix} ${message}`);
   }
 }

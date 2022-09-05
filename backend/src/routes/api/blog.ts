@@ -25,6 +25,7 @@ export class Blog extends ApplicationRoutes {
         this.application.use(cookieParser());
         this.application.route('/api/blog').get(this.getBlogPosts.bind(this));
         this.application.route('/api/blog').post(this.webTokenGuard.protect(), this.createBlogPost.bind(this));
+        this.application.route('/api/blog/:id').delete(this.webTokenGuard.protect(), this.removeBlogPost.bind(this));
     }
 
     private async createBlogPost(req: Request, res: Response): Promise<void> {
@@ -50,5 +51,11 @@ export class Blog extends ApplicationRoutes {
 
         const posts = await this.controller.getPosts(limit, offset);
         res.status(HttpStatusCode.OK).json(posts);
+    }
+
+    private async removeBlogPost(req: Request, res: Response): Promise<void> {
+        const {id} =  req.params;
+        const removedPostId = await this.controller.deletePost(id);
+        res.status(HttpStatusCode.OK).json({id: removedPostId});
     }
 }

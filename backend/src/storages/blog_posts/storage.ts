@@ -7,15 +7,13 @@ import { BlogPost, BlogPostFilters } from "./types";
 export class BlogStorage {
   private readonly tableName = "blog_posts";
 
-  private readonly loggerPrefix = "[BlogPostsStorage]";
-
   constructor(
     private readonly logger: ILogger,
     private readonly client: PgClient
   ) {}
 
   async createBlogPost( author: string, title: string, content: string, hashtags: string[] = []): Promise<string> {
-    this.logger.info(`${this.loggerPrefix} creating blog post`);
+    this.loggerInfo(`creating blog post`);
     const now = new Date();
 
     const query = `INSERT INTO ${this.tableName}
@@ -41,7 +39,7 @@ export class BlogStorage {
   }
 
   async selectPosts(filters: BlogPostFilters, limit?: number, offset?: number): Promise<BlogPost[]> {
-    this.logger.info(`${this.loggerPrefix} select blog posts by filter %j`, filters);
+    this.loggerInfo(`select blog posts by filter %j`, filters);
 
     let query = `SELECT * FROM ${this.tableName}`;
 
@@ -68,6 +66,13 @@ export class BlogStorage {
     return (await (this.client.query<BlogPost>(query, queryParams))).rows;
   }
 
+  async deletePost(id: string): Promise<string> {
+    this.loggerInfo(`Set deleted for post "${id}"`);
+    const now = new Date();
+    const query = `UPDATE ${this.tableName} SET deleted = $1, updated = $2 RETURNING id;`;
+    return (await this.client.query<{id: string}>(query, [id, now])).rows[0].id;
+  }
+
   private buildFilterSubquery<T=unknown>(filters: T): {subquery: string, params: QueryParams[]} {
     if (!Object.keys.length) {
         return {subquery: '', params: []};
@@ -76,12 +81,17 @@ export class BlogStorage {
     const queryParams: QueryParams[] = [];
     const queryFilters: string[] = [];
 
-    for (const [key, value] of Object.entries(filters)) {
+    for (const [key, value] of Object.entries(filters as any)) {
         queryParamsLength++;
-        queryParams.push(value);
+        queryParams.push(value as QueryParams);
         queryFilters.push(`${key} = $${queryParamsLength}`);
     }
 
     return {subquery: queryFilters.join(' AND '), params: queryParams};
-  } 
+  }
+  
+  private loggerInfo(...message: (string | unknown)[]): void {
+    const prefix = "[BlogPostsStorage]";
+    this.logger.info(`${prefix} `, message);
+  }
 }

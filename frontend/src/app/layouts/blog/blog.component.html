@@ -1,3 +1,13 @@
 <div class="overflow-auto" infiniteScroll (scrolled)="onScrollDown()" (scrolledUp)="onScrollUp()">
-  <app-post *ngFor="let post of posts$ | async" [postData]="$any(post)"></app-post>
+  <app-post
+    *ngFor="let post of posts$ | async"
+    [postData]="$any(post)"
+    (deletePost)="onDeletePost(post)"
+  ></app-post>
 </div>
+
+<p-confirmDialog
+  [style]="{ width: '33vw' }"
+  [baseZIndex]="10000"
+  rejectButtonStyleClass="p-button-outlined"
+></p-confirmDialog>

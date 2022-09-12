@@ -33,8 +33,9 @@ export class ApiService {
       .pipe(shareReplay(), catchError(this.handleError));
   }
 
-  async deletePost(params: unknown): Promise<void> {
-    console.log('delete', this.url, params);
+  deletePost(postId: string): Observable<{ id: string } | string> {
+    const url = `${this.url}/${postId}`;
+    return this.http.delete<{ id: string }>(url).pipe(shareReplay(), catchError(this.handleError));
   }
 
   private handleError(error: any): Observable<string> {

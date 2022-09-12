@@ -41,12 +41,12 @@ export class BlogStorage {
   async selectPosts(filters: BlogPostFilters, limit?: number, offset?: number): Promise<BlogPost[]> {
     this.loggerInfo(`select blog posts by filter %j`, filters);
 
-    let query = `SELECT * FROM ${this.tableName}`;
+    let query = `SELECT * FROM ${this.tableName} WHERE deleted=FALSE`;
 
     const {subquery: filterSubQuery, params: queryParams} = this.buildFilterSubquery<BlogPostFilters>(filters);
 
     if (filterSubQuery) {
-        query += ` WHERE ${filterSubQuery}`;
+        query += ` AND ${filterSubQuery}`;
     }
 
     query += ` ORDER BY created DESC`
@@ -69,8 +69,8 @@ export class BlogStorage {
   async deletePost(id: string): Promise<string> {
     this.loggerInfo(`Set deleted for post "${id}"`);
     const now = new Date();
-    const query = `UPDATE ${this.tableName} SET deleted = $1, updated = $2 RETURNING id;`;
-    return (await this.client.query<{id: string}>(query, [id, now])).rows[0].id;
+    const query = `UPDATE ${this.tableName} SET deleted = TRUE, updated = $1 WHERE id=$2 RETURNING id;`;
+    return (await this.client.query<{id: string}>(query, [now, id])).rows[0].id;
   }
 
   private buildFilterSubquery<T=unknown>(filters: T): {subquery: string, params: QueryParams[]} {

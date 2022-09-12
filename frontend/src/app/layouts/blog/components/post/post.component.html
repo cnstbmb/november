@@ -4,7 +4,7 @@
   (mouseover)="mouseOvered = true"
   (mouseout)="mouseOvered = false"
 >
-  <div *ngIf="!!postData" class="flex flex-column w-full h-full px-5 mt-5">
+  <div *ngIf="!!postData" class="flex flex-column w-full h-full px-5 mt-5 mb-2">
     <div class="flex justify-content-between flex-wrap">
       <div class="flex align-items-center w-30rem h-6rem font-bold text-3xl m-2 text-left">
         {{ postData.title }}
@@ -14,5 +14,14 @@
       </div>
     </div>
     <div class="m-2" [innerHTML]="postData.content"></div>
+    <div *ngIf="isAuthenticated" class="flex flex-row-reverse flex-wrap">
+      <button
+        pButton
+        class="p-button-sm p-button-rounded p-button-danger p-button-text"
+        icon="pi pi-trash"
+        iconPos="left"
+        (click)="delete()"
+      ></button>
+    </div>
   </div>
 </div>

@@ -4,6 +4,7 @@
   "description": "monorepo",
   "main": "null",
   "scripts": {
+    "test:algorithms": "node ./node_modules/jest/bin/jest.js ./algorithms/*",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:backend": "cd backend/ && npm run build",
     "build:backend:docker": "cd backend/ && npm run build:docker:prod",
@@ -30,6 +31,9 @@
   },
   "homepage": "https://github.com/cnstbmb/november#readme",
   "devDependencies": {
-    "husky": "^7.0.4"
+    "@types/jest": "^29.2.2",
+    "husky": "^7.0.4",
+    "jest": "^29.3.0",
+    "ts-jest": "^29.0.3"
   }
 }

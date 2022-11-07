@@ -1,4 +1,4 @@
-export type CompareElement = string | number;
+export type CompareElement = any;
 export type CompareResult = -1 | 0 | 1;
 export type CompareFunction = (
   a: CompareElement,

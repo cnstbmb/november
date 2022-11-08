@@ -1,5 +1,5 @@
 import { Comparator, CompareFunction } from "../utils/comparator";
-import LinkedListNode from "./node";
+import { LinkedListNode } from "./linked-list-node";
 
 export class LinkedList {
   head: LinkedListNode | null = null;
@@ -12,7 +12,7 @@ export class LinkedList {
   }
 
   prepend(value: any): LinkedList {
-    const newNode = new LinkedListNode(value, this.head);
+    const newNode: LinkedListNode = new LinkedListNode(value, this.head);
     this.head = newNode;
 
     if (!this.tail) {
@@ -23,7 +23,7 @@ export class LinkedList {
   }
 
   append(value: any): LinkedList {
-    const newNode = new LinkedListNode(value);
+    const newNode: LinkedListNode = new LinkedListNode(value);
 
     if (!this.head) {
       this.head = newNode;
@@ -39,14 +39,14 @@ export class LinkedList {
   }
 
   insert(value: any, rawIndex: number): LinkedList {
-    const index = rawIndex < 0 ? 0 : rawIndex;
+    const index: number = rawIndex < 0 ? 0 : rawIndex;
 
     if (index === 0) {
       this.prepend(value);
     } else {
-      let count = 1;
-      let currentNode = this.head;
-      const newNode = new LinkedListNode(value);
+      let count: number = 1;
+      let currentNode: LinkedListNode | null = this.head;
+      const newNode: LinkedListNode = new LinkedListNode(value);
 
       while (currentNode) {
         if (count === index) {
@@ -86,7 +86,7 @@ export class LinkedList {
       this.head = this.head.next;
     }
 
-    let currentNode = this.head;
+    let currentNode: LinkedListNode | null = this.head;
 
     if (currentNode !== null) {
       while (currentNode?.next) {
@@ -111,7 +111,7 @@ export class LinkedList {
       return null;
     }
 
-    let currentNode = this.head;
+    let currentNode: LinkedListNode | null = this.head;
 
     while (currentNode) {
       if (callback && callback(currentNode.value)) {
@@ -128,7 +128,7 @@ export class LinkedList {
   }
 
   deleteTail(): LinkedListNode | null {
-    const deletedTail = this.tail;
+    const deletedTail: LinkedListNode | null = this.tail;
 
     if (this.head === this.tail) {
       this.head = null;
@@ -137,7 +137,7 @@ export class LinkedList {
       return deletedTail;
     }
 
-    let currentNode = this.head;
+    let currentNode: LinkedListNode | null = this.head;
 
     while (currentNode?.next) {
       if (!currentNode.next.next) {
@@ -157,7 +157,7 @@ export class LinkedList {
       return null;
     }
 
-    const deletedHead = this.head;
+    const deletedHead: LinkedListNode | null = this.head;
 
     if (this.head.next) {
       this.head = this.head.next;
@@ -178,7 +178,7 @@ export class LinkedList {
   toArray(): LinkedListNode[] {
     const nodes: LinkedListNode[] = [];
 
-    let currentNode = this.head;
+    let currentNode: LinkedListNode | null = this.head;
     while (currentNode) {
       nodes.push(currentNode);
       currentNode = currentNode.next;

@@ -17,6 +17,7 @@
     "lint:fix:frontend": "cd frontend/ && npm run lint:fix",
     "prepare": "husky install && cd frontend && npm i && cd ../backend && npm i ",
     "build:prod": "tools/scripts/build_prod.sh",
+    "build:prod:yc": "tools/scripts/build_prod_yc.sh",
     "pg:docker:win": "docker run --rm -P -p 127.0.0.1:5432:5432 -v %cd%/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD=\"88005553535\" --name pg postgres:alpine",
     "pg:docker:linux": "docker run --rm -P -p 127.0.0.1:5432:5432 -v $(pwd)/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD=\"88005553535\" --name pg postgres:alpine"
   },

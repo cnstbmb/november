@@ -65,7 +65,17 @@ services:
     command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d himenkov.ru -d www.himenkov.ru
 volumes:
   certbot-etc:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/certbot/etc
+      o: bind
   certbot-var:
+    driver: local
+    driver_opts:
+      type: none
+      device: /srv/certbot/var
+      o: bind
   web-root:
     driver: local
     driver_opts:

@@ -1,6 +1,13 @@
 #!/bin/sh
+set -e
 
-cd /srv/
-docker-compose down
-docker-compose pull
-docker-compose up -d
+cd /srv
+
+# остановить проект (если поднят)
+docker compose down
+
+# подтянуть свежие образы
+docker compose pull
+
+# поднять в фоне
+docker compose up -d

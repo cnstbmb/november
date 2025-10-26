@@ -24,7 +24,7 @@ services:
     depends_on:
       - nodejs-server
   postgres-db:
-    image: postgres
+    image: postgres:17
     restart: always
     container_name: postgres-db
     ports:
@@ -62,7 +62,7 @@ services:
       - web-root:/var/www/html
     depends_on:
       - webserver
-    command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d himenkov.ru -d www.himenkov.ru
+    command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d konstantin.himenkov.ru
 volumes:
   certbot-etc:
     driver: local

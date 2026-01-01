@@ -53,6 +53,7 @@ services:
       - nodejs-server
     networks:
       - app-network
+      - remnawave-network
   certbot:
     image: certbot/certbot
     container_name: certbot
@@ -115,3 +116,6 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  remnawave-network:
+    name: remnawave-network
+    external: true

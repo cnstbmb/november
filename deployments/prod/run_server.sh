@@ -10,4 +10,4 @@ docker compose down
 docker compose pull
 
 # поднять в фоне
-docker compose up -d
+docker compose up -d && docker compose logs -f -t

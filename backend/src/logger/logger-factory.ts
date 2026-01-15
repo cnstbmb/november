@@ -16,6 +16,14 @@ const noLogs = logLevel === 'silent';
 
 const prettyPrint = process.stdout.isTTY && env.prettyLogs();
 
+function createLogFile(filePath?: string): void {
+    if (!filePath) {
+        return;
+    }
+
+    fse.ensureFileSync(filePath);
+}
+
 export function makeLogger() {
     let loggerBackend;
 
@@ -30,7 +38,7 @@ export function makeLogger() {
             showSrc,
             logFile,
             prettyPrint,
-            noConsoleLogs: env.noConsoleLog(),
+            noConsoleLogs: env.noConsoleLog()
         };
 
         console.log(`Initializing logger: pino.Logger level: ${logLevel} settings: ${JSON.stringify(settings)}`);
@@ -39,12 +47,4 @@ export function makeLogger() {
     }
 
     return new Logger(loggerBackend);
-}
-
-function createLogFile(filePath?: string): void {
-    if (!filePath) {
-        return;
-    }
-
-    fse.ensureFileSync(filePath);
 }

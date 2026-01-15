@@ -69,7 +69,7 @@ export class MenuComponent implements OnInit {
   }
 
   private subscribeFragmentChange(): void {
-    this.route.fragment.subscribe(fragment => {
+    this.route.fragment.subscribe((fragment) => {
       this.fragment = fragment;
       this.findActiveItem(fragment);
     });
@@ -79,7 +79,6 @@ export class MenuComponent implements OnInit {
     if (!fragment) {
       return;
     }
-    this.activeMenuItem =
-      this.items?.find(item => item.fragment === fragment) || this.activeMenuItem;
+    this.activeMenuItem = this.items?.find((item) => item.fragment === fragment) || this.activeMenuItem;
   }
 }

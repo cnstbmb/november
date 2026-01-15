@@ -7,12 +7,14 @@ services:
     networks:
       - app-network
     volumes:
-      - configs:/home/app/server/configs
-      - logs:/home/app/server/logs
+      - ./configs:/home/app/server/configs
+      - ./logs:/home/app/server/logs
     depends_on:
       - postgres-db
     env_file:
       - database.env
+    environment:
+      - NODE_ENV=dev
   angular-app:
     image: "cnstbmb/khimenkov-angular-app:latest"
     restart: always
@@ -24,7 +26,7 @@ services:
     depends_on:
       - nodejs-server
   postgres-db:
-    image: postgres
+    image: postgres:17
     restart: always
     container_name: postgres-db
     ports:
@@ -43,16 +45,20 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "9443:9443"
+      - "10443:10443"
     volumes:
       - web-root:/var/www/html
       - ./nginx-conf:/etc/nginx/conf.d
-    #   - certbot-etc:/etc/letsencrypt
-    #   - certbot-var:/var/lib/letsencrypt
-    #   - dhparam:/etc/ssl/certs
+      # - certbot-etc:/etc/letsencrypt
+      # - certbot-var:/var/lib/letsencrypt
+      # - dhparam:/etc/ssl/certs
+      # - /root/cert:/root/cert:ro
     depends_on:
       - nodejs-server
     networks:
       - app-network
+  #     - remnawave-network
   # certbot:
   #   image: certbot/certbot
   #   container_name: certbot
@@ -62,56 +68,47 @@ services:
   #     - web-root:/var/www/html
   #   depends_on:
   #     - webserver
-  #   command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d himenkov.ru -d www.himenkov.ru
+  #   command: certonly --webroot --webroot-path=/var/www/html --email cnstbmb@gmail.com --agree-tos --no-eff-email --force-renewal -d konstantin.himenkov.ru
 volumes:
-  certbot-etc:
-    driver: local
-    driver_opts:
-      type: none
-      device: /srv/certbot/etc
-      o: bind
-  certbot-var:
-    driver: local
-    driver_opts:
-      type: none
-      device: /srv/certbot/var
-      o: bind
+  # certbot-etc:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: ./certbot/etc
+  #     o: bind
+  # certbot-var:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     device: ./certbot/var
+  #     o: bind
   web-root:
     driver: local
     driver_opts:
       type: none
-      device: /srv/views
+      device: ./views
       o: bind
   dhparam:
     driver: local
     driver_opts:
       type: none
-      device: /srv/dhparam/
-      o: bind
-  configs:
-    driver: local
-    driver_opts:
-      type: none
-      device: /srv/configs
+      device: ./dhparam
       o: bind
   pg-data:
     driver: local
     driver_opts:
       type: none
-      device: /srv/pg-data
-      o: bind
-  logs:
-    driver: local
-    driver_opts:
-      type: none
-      device: /srv/logs
+      device: ./pg-data
       o: bind
   postgres_init:
     driver: local
     driver_opts:
       type: none
-      device: /srv/postgres/init
+      device: ./postgres/init
       o: bind
 networks:
   app-network:
     driver: bridge
+  # remnawave-network:
+  #   name: remnawave-network
+  #   external: true

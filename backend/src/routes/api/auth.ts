@@ -10,7 +10,7 @@ export class Auth extends ApplicationRoutes {
         logger: ILogger,
         application: express.Express,
         webTokenGuard: WebTokenGuard,
-        private readonly usersController: UsersController,
+        private readonly usersController: UsersController
     ) {
         super(logger, application, webTokenGuard);
     }
@@ -29,7 +29,7 @@ export class Auth extends ApplicationRoutes {
     private async loginRoute(req: Request, res: Response) {
         const { login, password } = req.body;
 
-        //FIXME: если БД недоступна, ответа от сервера не поступает на клиент.
+        // FIXME: если БД недоступна, ответа от сервера не поступает на клиент.
         const isValidLoginPassword = await this.validateLoginAndPassword(login, password);
         if (!isValidLoginPassword) {
             this.logger.info(`invalid login|password for "${login}"`);
@@ -45,7 +45,7 @@ export class Auth extends ApplicationRoutes {
             return;
         }
 
-        this.webTokenGuard.addJwtTokenCookie(res, login, {userId})
+        this.webTokenGuard.addJwtTokenCookie(res, login, { userId });
         this.logger.info('JWT Token done');
         res.status(HttpStatusCode.OK);
         res.send();
@@ -59,7 +59,7 @@ export class Auth extends ApplicationRoutes {
         const user = await this.usersController.getUserByLogin(login);
         if (!user) {
             this.logger.error(`Failed. User "${login}" not found`);
-            return;
+            return undefined;
         }
 
         this.logger.info(`User ${login} found`);

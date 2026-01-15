@@ -1,4 +1,6 @@
-import { Component, ChangeDetectionStrategy, Input, Output, EventEmitter } from '@angular/core';
+import {
+  Component, ChangeDetectionStrategy, Input, Output, EventEmitter
+} from '@angular/core';
 import { BlogPostFullData } from '@app/shared/blog/types';
 import { AuthService } from '@lib/auth/auth.service';
 
@@ -10,10 +12,10 @@ import { AuthService } from '@lib/auth/auth.service';
 })
 export class PostComponent {
   @Input()
-  postData!: BlogPostFullData;
+    postData!: BlogPostFullData;
 
   @Output()
-  deletePost = new EventEmitter();
+    deletePost = new EventEmitter();
 
   mouseOvered: boolean = false;
 

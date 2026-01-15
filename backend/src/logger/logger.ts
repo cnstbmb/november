@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { ProxyLogger } from './proxy-logger';
 import {
-    IAppLogger, IChildLoggerSupport, ILogger, IMultistreamLoggerSupport,
+    IAppLogger, IChildLoggerSupport, ILogger, IMultistreamLoggerSupport
 } from './types';
 
 export class Logger extends ProxyLogger implements IAppLogger, IChildLoggerSupport {

@@ -1,19 +1,21 @@
 {
+    "root": true,
     "env": {
-        "browser": true,
         "es2021": true,
         "node": true
     },
     "extends": [
-        "airbnb-base"
+        "airbnb-base",
+        "airbnb-typescript/base"
     ],
     "parser": "@typescript-eslint/parser",
     "parserOptions": { "project": ["./tsconfig.json"] },
     "plugins": [
-        "@typescript-eslint",
-        "prettier"
+        "@typescript-eslint"
     ],
     "rules": {
+        "@typescript-eslint/comma-dangle": ["error", "never"],
+        "@typescript-eslint/indent": ["error", 4],
         "indent": [
             "error",
             4
@@ -24,18 +26,35 @@
         ],
         "quotes": [
             "error",
-            "single"
+            "single",
+            { "avoidEscape": true }
         ],
-        "no-unused-vars": "off",
-        "no-empty-function": "off",
-        "no-use-before-define": "off",
-        "no-useless-constructor": "off",
-        "no-console": "off",
-        "func-names": "off",
-        "class-methods-use-this": "off",
-        "import/extensions": "off",
+        "@typescript-eslint/no-unused-vars": [
+            "error",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_",
+                "caughtErrorsIgnorePattern": "^_"
+            }
+        ],
+        "comma-dangle": ["error", "never"],
+        "import/extensions": [
+            "error",
+            "ignorePackages",
+            {
+                "js": "never",
+                "ts": "never"
+            }
+        ],
         "import/prefer-default-export": "off",
-        "import/no-unresolved": "off",
-        "no-underscore-dangle": "off"
-    }
+        "class-methods-use-this": "off"
+    },
+    "overrides": [
+        {
+            "files": ["src/logger/**/*.ts"],
+            "rules": {
+                "no-console": "off"
+            }
+        }
+    ]
 }

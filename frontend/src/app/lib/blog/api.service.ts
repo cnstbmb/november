@@ -48,8 +48,6 @@ export class ApiService {
       errorMessage = `Error Code: ${error.status}\nMessage: ${error.message}`;
     }
     console.log(errorMessage);
-    return throwError(() => {
-      return errorMessage;
-    });
+    return throwError(() => errorMessage);
   }
 }

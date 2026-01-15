@@ -23,18 +23,18 @@ export function createPinoLogger(name: string, level: pino.LevelWithSilent, sett
         const stream = fs.createWriteStream(logFile, { flags: 'a' });
         streams.push({
             level: 'debug',
-            stream,
+            stream
         });
         streams.push({
             level: 'warn',
-            stream,
+            stream
         });
     }
 
     const multistream = pinoms.multistream(streams);
     let logger = pino({
         name,
-        level,
+        level
     // prettyPrint: settings && settings.prettyPrint
     }, multistream);
     // logger.multistream = multistream;

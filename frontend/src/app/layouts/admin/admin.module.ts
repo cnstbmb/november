@@ -5,7 +5,6 @@ import { TabMenuModule } from 'primeng/tabmenu';
 import { ButtonModule } from 'primeng/button';
 import { EditorModule } from 'primeng/editor';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { ChipsModule } from 'primeng/chips';
 import { InputTextModule } from 'primeng/inputtext';
 import { AdminRoutingModule } from './admin-routing.module';
 import { MenuComponent } from './menu/menu.component';
@@ -23,7 +22,6 @@ import { LinkShorterComponent } from './link-shorter/link-shorter.component';
     FormsModule,
     ReactiveFormsModule,
     ButtonModule,
-    ChipsModule,
     InputTextModule
   ]
 })

@@ -3,7 +3,7 @@ import * as util from 'util';
 import { ILogger } from '../logger/types';
 import { getRandomShortHexId } from '../utils/random';
 import {
-    PgAdapter, PgAdapterConfig, PgResult, QueryParams,
+    PgAdapter, PgAdapterConfig, PgResult, QueryParams
 } from './types';
 
 export class PgClient implements PgAdapter {
@@ -30,7 +30,7 @@ export class PgClient implements PgAdapter {
 
         const sanitized = {
             ...this.config,
-            password: this.config.password ? '********' : undefined,
+            password: this.config.password ? '********' : undefined
         };
         logger.info('Initialized PgClient with: \'%j\'', sanitized);
     }
@@ -43,7 +43,7 @@ export class PgClient implements PgAdapter {
             this.logger.info({ qid: queryId }, util.format(
                 '[PgClient.query] sql: \'%s\', params: \'%s\'',
                 this.queryForLog(query, this.config.maxSqlLogLength),
-                this.queryForLog(jsonParams, this.config.maxParamsLogLength),
+                this.queryForLog(jsonParams, this.config.maxParamsLogLength)
             ));
         }
 
@@ -70,7 +70,7 @@ export class PgClient implements PgAdapter {
             queryDuration = new Date().getTime() - queryStart.getTime();
             pgResult = {
                 rows: result.rows,
-                rowCount: result.rows?.length || 0,
+                rowCount: result.rows?.length || 0
             };
         } catch (err) {
             this.logger.error(err);
@@ -81,7 +81,7 @@ export class PgClient implements PgAdapter {
             this.logger.info({
                 qid: queryId,
                 duration: queryDuration,
-                rNums: pgResult.rowCount,
+                rNums: pgResult.rowCount
             },
             `[PgClient.query] done in ${queryDuration} ms.`);
         }

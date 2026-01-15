@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import express, {
-    NextFunction, Request, Response, Errback,
+    NextFunction, Request, Response, Errback
 } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { expressjwt, UnauthorizedError } from 'express-jwt';
@@ -9,7 +9,7 @@ import { JwtPayload } from 'jsonwebtoken';
 import { ILogger } from '../logger/types';
 import { isProd } from '../env';
 import { HttpStatusCode } from '../types/http-status-code';
-import { JWTTokenPayload } from './types';
+import { JWTTokenPayload } from './jwt-types';
 
 type AuthenticationMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
@@ -22,7 +22,7 @@ export class WebTokenGuard {
 
     private readonly rsaPublicKey: Buffer;
 
-    private readonly algorithm = 'RS512'// 'RS256'
+    private readonly algorithm = 'RS512';// 'RS256'
 
     private readonly tokenLifetime = '24h';
 
@@ -30,7 +30,7 @@ export class WebTokenGuard {
 
     constructor(
         private logger: ILogger,
-        private application: express.Express,
+        private application: express.Express
     ) {
         this.rsaPrivateKey = fs.readFileSync(this.rsaPrivateKeyPath);
         this.rsaPublicKey = fs.readFileSync(this.rsaPublicKeyPath);
@@ -43,8 +43,8 @@ export class WebTokenGuard {
             {
                 secret: this.rsaPublicKey,
                 algorithms: [this.algorithm],
-                getToken: (req: Request) => req.cookies.SESSIONID,
-            },
+                getToken: (req: Request) => req.cookies.SESSIONID
+            }
         );
     }
 
@@ -60,8 +60,8 @@ export class WebTokenGuard {
                         return undefined;
                     }
                     return authHeaderArr[1];
-                },
-            },
+                }
+            }
         ).unless({ path: unlessPath }));
         this.application.use((err: Errback, _req: Request, res: Response, next: NextFunction) => {
             if (err.name === UnauthorizedError.name) {
@@ -76,12 +76,12 @@ export class WebTokenGuard {
         const jwtBearerToken = jwt.sign(payload, this.rsaPrivateKey, {
             algorithm: this.algorithm,
             expiresIn: this.tokenLifetime,
-            subject,
+            subject
         });
 
         res.cookie('SESSIONID', jwtBearerToken, {
             secure: isProd(), // true,
-            maxAge: this.tokenLifeTimeMs,
+            maxAge: this.tokenLifeTimeMs
         });
     }
 

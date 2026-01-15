@@ -7,7 +7,7 @@ export interface PgResult<Response> {
 
 export interface PgAdapter {
     query<Response>(query: string,
-          params?: QueryParams[]
+        params?: QueryParams[]
     ): Promise<PgResult<Response>>;
 }
 

@@ -3,7 +3,7 @@ import pino from 'pino';
 const AVAILABLE_ENVS = {
     PROD: 'prod',
     DEV: 'dev',
-    TEST: 'test',
+    TEST: 'test'
 };
 
 export function serverPort(): number {

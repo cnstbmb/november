@@ -64,6 +64,6 @@ export function compose(): Root {
         usersStorage,
         usersController,
         routes,
-        server,
+        server
     };
 }

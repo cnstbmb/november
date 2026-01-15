@@ -8,8 +8,8 @@
     "build": "tools/scripts/build.sh",
     "build:docker:prod": "./tools/scripts/build_prod.sh",
     "build:docker:prod:yc": "./tools/scripts/build_prod_yc.sh",
-    "lint": "eslint --debug src/**/*.ts",
-    "lint:fix": "eslint --debug src/**/*.ts --fix",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "start": "PORT=3000 NODE_ENV=dev tools/scripts/run.sh",
     "migration:create": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json create",
     "migration:create:db": "node node_modules/db-migrate/bin/db-migrate --verbose --config ./configs/database.json db:create",
@@ -54,10 +54,8 @@
     "@typescript-eslint/parser": "^5.2.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-config-prettier": "^7.2.0",
+    "eslint-config-airbnb-typescript": "^17.1.0",
     "eslint-plugin-import": "^2.25.2",
-    "eslint-plugin-prettier": "^4.0.0",
-    "prettier-eslint": "^13.0.0",
     "typescript": "^4.4.4"
   }
 }

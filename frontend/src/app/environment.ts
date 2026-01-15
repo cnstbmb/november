@@ -1,4 +1,6 @@
-import { Inject, Injectable, InjectionToken, Optional } from '@angular/core';
+import {
+  Inject, Injectable, InjectionToken, Optional
+} from '@angular/core';
 
 export const ENVIRONMENT = new InjectionToken<{ [key: string]: string }>('environment');
 

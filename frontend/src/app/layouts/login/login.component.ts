@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, Validators } from '@angular/forms';
+import { UntypedFormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '@app/lib/auth/auth.service';
 import { MessageService } from 'primeng/api';
@@ -19,7 +19,7 @@ export class LoginComponent {
   });
 
   constructor(
-    private readonly fb: FormBuilder,
+    private readonly fb: UntypedFormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
     private readonly messageService: MessageService
@@ -42,11 +42,12 @@ export class LoginComponent {
       (error: { status: number }) => {
         console.log({ error });
         if (error.status === 401) {
-          return this.messageService.add({
+          this.messageService.add({
             severity: 'error',
             summary: 'Auth error',
             detail: 'Неверный логин/пароль'
           });
+          return;
         }
 
         this.messageService.add({

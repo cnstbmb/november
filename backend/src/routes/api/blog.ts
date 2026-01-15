@@ -1,13 +1,12 @@
 import express, { Request, Response } from 'express';
-import { ApplicationRoutes } from '../types';
 import cookieParser from 'cookie-parser';
+import { ApplicationRoutes } from '../types';
 import { WebTokenGuard } from '../web-token.guard';
 import { ILogger } from '../../logger/types';
 import { HttpStatusCode } from '../../types/http-status-code';
 import { BlogController } from '../../controllers/blog/controller';
 
 export class Blog extends ApplicationRoutes {
-
     private readonly route: string = '/api/blog';
 
     constructor(
@@ -21,7 +20,7 @@ export class Blog extends ApplicationRoutes {
 
     register(): void {
         this.logger.info(`Registering a blog route [${this.route}]`);
-    
+
         this.application.use(cookieParser());
         this.application.route('/api/blog').get(this.getBlogPosts.bind(this));
         this.application.route('/api/blog').post(this.webTokenGuard.protect(), this.createBlogPost.bind(this));
@@ -29,22 +28,22 @@ export class Blog extends ApplicationRoutes {
     }
 
     private async createBlogPost(req: Request, res: Response): Promise<void> {
-        const {title, content, hashtags} = req.body;
-        const {userId} = res.locals;
+        const { title, content, hashtags } = req.body;
+        const { userId } = res.locals;
         const blogPostId = await this.controller.savePost(userId, title, content, hashtags);
-        res.status(HttpStatusCode.CREATED).json({id: blogPostId})
+        res.status(HttpStatusCode.CREATED).json({ id: blogPostId });
     }
-    
-    private async getBlogPosts(req: Request, res: Response): Promise<void> {
-        const {rows, first} = req.query;
 
-        //TODO: парсер 
-        let limit = undefined;
+    private async getBlogPosts(req: Request, res: Response): Promise<void> {
+        const { rows, first } = req.query;
+
+        // TODO: парсер
+        let limit;
         if (typeof rows === 'string' || typeof rows === 'number') {
             limit = +rows;
         }
 
-        let offset = undefined;
+        let offset;
         if (typeof first === 'string' || typeof first === 'number') {
             offset = +first;
         }
@@ -54,8 +53,8 @@ export class Blog extends ApplicationRoutes {
     }
 
     private async removeBlogPost(req: Request, res: Response): Promise<void> {
-        const {id} =  req.params;
+        const { id } = req.params;
         const removedPostId = await this.controller.deletePost(id);
-        res.status(HttpStatusCode.OK).json({id: removedPostId});
+        res.status(HttpStatusCode.OK).json({ id: removedPostId });
     }
 }

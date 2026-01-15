@@ -1,4 +1,5 @@
 {
+    "root": true,
     "env": {
       "browser": true,
       "es2021": true,
@@ -7,22 +8,26 @@
     },
     "extends": [
       "plugin:@angular-eslint/recommended",
-      "airbnb-base",
-      "plugin:prettier/recommended",
-      "prettier/@typescript-eslint",
-      "prettier"
+      "airbnb-base"
     ],
     "parser": "@typescript-eslint/parser",
     "parserOptions": { "project": ["./tsconfig.json"] },
     "plugins": [
       "@typescript-eslint",
-      "prettier",
       "jest"
     ],
     "rules": {
-      "consistent-return":  "off",
       "comma-dangle": ["error", "never"],
       "@typescript-eslint/comma-dangle": ["error", "never"],
+      "@typescript-eslint/indent": ["error", 4],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_",
+          "caughtErrorsIgnorePattern": "^_"
+        }
+      ],
       "indent": [
         "error",
         4
@@ -31,21 +36,25 @@
         "error",
         "unix"
       ],
+      "class-methods-use-this": "off",
+      "import/prefer-default-export": "off",
+      "max-len": [
+        "error",
+        {
+          "code": 120,
+          "ignoreComments": true,
+          "ignoreStrings": true,
+          "ignoreTemplateLiterals": true,
+          "ignoreUrls": true
+        }
+      ],
+      "no-console": "off",
+      "no-continue": "off",
       "quotes": [
         "error",
-        "single"
-      ],
-      "no-unused-vars": "off",
-      "no-empty-function": "off",
-      "no-use-before-define": "off",
-      "no-useless-constructor": "off",
-      "no-console": "off",
-      "func-names": "off",
-      "class-methods-use-this": "off",
-      "import/extensions": "off",
-      "import/prefer-default-export": "off",
-      "import/no-unresolved": "off",
-      "no-continue": "off"
+        "single",
+        { "avoidEscape": true }
+      ]
     },
     "overrides": [
       {
@@ -53,16 +62,13 @@
         "parser": "@typescript-eslint/parser",
         "parserOptions": {
           "project": [
-            "tsconfig.*?.json"
+            "tsconfig.json"
           ],
           "createDefaultProgram": true
         },
         "extends": [
           "plugin:@angular-eslint/recommended",
-          "airbnb-typescript/base",
-          "prettier/@typescript-eslint",
-          "plugin:prettier/recommended",
-          "prettier"
+          "airbnb-typescript/base"
         ],
         "rules": {
           "comma-dangle": ["error", "never"],
@@ -76,28 +82,26 @@
         "extends": [
           "plugin:@angular-eslint/template/recommended",
           "plugin:@typescript-eslint/recommended",
-          "plugin:@angular-eslint/recommended",
-          "plugin:prettier/recommended"
+          "plugin:@angular-eslint/recommended"
         ],
         "plugins": [
-          "@angular-eslint/template",
-          "prettier"
+          "@angular-eslint/template"
         ],
         "parserOptions": {
           "project": [
-            "tsconfig.*?.json"
+            "tsconfig.json"
           ]
         },
         "rules": {
+          "indent": "off",
+          "@typescript-eslint/indent": "off",
+          "max-len": "off",
           "@typescript-eslint/dot-notation": "off",
           "@typescript-eslint/no-implied-eval": "off",
           "@typescript-eslint/no-throw-literal": "off",
           "strict": "off",
           "import/first": "off",
           "lines-around-directive": "off"
-  //        "bracketSameLine": 0
-  //        "@angular-eslint/template/bracketSameLine": 2,
-  //        "@angular-eslint/template/first-prop-new-line": 2
         }
       },
       {
@@ -107,7 +111,7 @@
       {
         "files": ["src/**/*.spec.ts", "src/**/*.d.ts"],
         "parserOptions": {
-          "project": "./src/tsconfig.spec.json"
+          "project": "./tsconfig.spec.json"
         },
         "extends": ["plugin:jasmine/recommended"],
         "plugins": ["jasmine"],

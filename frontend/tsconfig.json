@@ -5,8 +5,12 @@
     "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "paths": {
-      "@assets/*": ["src/assets/*"],
-      "@lib/*": ["src/app/lib/*"],
+      "@assets/*": [
+        "src/assets/*"
+      ],
+      "@lib/*": [
+        "src/app/lib/*"
+      ],
       "@app/*": [
         "src/app/*"
       ],
@@ -24,7 +28,7 @@
     "experimentalDecorators": true,
     "moduleResolution": "node",
     "importHelpers": true,
-    "target": "es2017",
+    "target": "ES2022",
     "module": "es2020",
     "lib": [
       "es2018",
@@ -33,7 +37,8 @@
     "typeRoots": [
       "node_modules/@types"
     ],
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

@@ -14,7 +14,7 @@ export class Server {
     constructor(
         private logger: ILogger,
         private routes: Routes,
-        private application: express.Express,
+        private application: express.Express
     ) {
     }
 
@@ -58,7 +58,7 @@ export class Server {
             allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
             credentials: true,
             preflightContinue: true,
-            origin: '*',
+            origin: '*'
         }));
     }
 }

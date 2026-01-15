@@ -1,9 +1,9 @@
 import { Component, ChangeDetectionStrategy, OnDestroy } from '@angular/core';
-import { FormBuilder, Validators } from '@angular/forms';
+import { UntypedFormBuilder, Validators } from '@angular/forms';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ApiService as BlogApi } from '@lib/blog/api.service';
-import { Message, MessageService } from 'primeng/api';
+import { MessageService, ToastMessageOptions } from 'primeng/api';
 
 @Component({
   selector: 'app-new-post',
@@ -15,7 +15,7 @@ export class NewPostComponent implements OnDestroy {
   readonly postForm = this.fb.group({
     content: this.fb.control('', [Validators.required]),
     title: this.fb.control('', [Validators.required]),
-    hashtags: this.fb.control([])
+    hashtags: this.fb.control('')
   });
 
   private readonly destroy$ = new Subject<void>();
@@ -25,17 +25,24 @@ export class NewPostComponent implements OnDestroy {
   }
 
   constructor(
-    private readonly fb: FormBuilder,
+    private readonly fb: UntypedFormBuilder,
     private readonly api: BlogApi,
     private readonly messageService: MessageService
   ) {}
 
   submitPost(): void {
+    const formValue = this.postForm.value;
+    const hashtags = this.parseHashtags(formValue.hashtags);
+    const payload = {
+      ...formValue,
+      hashtags
+    };
+
     this.api
-      .savePost(this.postForm.value)
+      .savePost(payload)
       .pipe(takeUntil(this.destroy$))
-      .subscribe(response => {
-        let message: Message = {};
+      .subscribe((response) => {
+        let message: ToastMessageOptions = {};
         console.log(response);
         if (!response || typeof response !== 'object' || !response.id) {
           message = {
@@ -59,5 +66,20 @@ export class NewPostComponent implements OnDestroy {
 
   postContentChanged() {
     // Костыль, для срабатывания обновления формы.
+  }
+
+  private parseHashtags(value: string | string[] | null | undefined): string[] {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => item.trim()).filter(Boolean);
+    }
+
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 }

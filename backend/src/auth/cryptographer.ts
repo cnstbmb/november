@@ -41,7 +41,7 @@ export class Cryptographer {
         const encryptedStringBuffer = Buffer.from(encryptedString, 'base64');
         const decryptedStringBuffer = crypto.privateDecrypt(
             this.rsaPrivateKey,
-            encryptedStringBuffer,
+            encryptedStringBuffer
         );
 
         return decryptedStringBuffer.toString('utf-8');

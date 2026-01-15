@@ -7,30 +7,29 @@ const routes: Routes = [
   { path: Route.root, redirectTo: Route.contacts, pathMatch: 'full' },
   {
     path: Route.contacts,
-    loadChildren: () => import('./layouts/contacts/contacts.module').then(m => m.ContactsModule)
+    loadChildren: () => import('./layouts/contacts/contacts.module').then((m) => m.ContactsModule)
   },
   {
     path: Route.letscode,
     canActivate: [AuthGuard],
-    loadChildren: () => import('./layouts/lets-code/lets-code.module').then(m => m.LetsCodeModule)
+    loadChildren: () => import('./layouts/lets-code/lets-code.module').then((m) => m.LetsCodeModule)
   },
   {
     path: Route.login,
-    loadChildren: () => import('./layouts/login/login.module').then(m => m.LoginModule)
+    loadChildren: () => import('./layouts/login/login.module').then((m) => m.LoginModule)
   },
   {
     path: Route.admin,
     canActivate: [AuthGuard],
-    loadChildren: () => import('./layouts/admin/admin.module').then(m => m.AdminModule)
+    loadChildren: () => import('./layouts/admin/admin.module').then((m) => m.AdminModule)
   },
   {
     path: Route.blog,
-    loadChildren: () => import('./layouts/blog/blog.module').then(m => m.BlogModule)
+    loadChildren: () => import('./layouts/blog/blog.module').then((m) => m.BlogModule)
   },
   {
     path: Route.notFound,
-    loadChildren: () =>
-      import('./layouts/page-not-found/page-not-found.module').then(m => m.PageNotFoundModule)
+    loadChildren: () => import('./layouts/page-not-found/page-not-found.module').then((m) => m.PageNotFoundModule)
   },
   { path: Route.notMatch, redirectTo: Route.notFound, pathMatch: 'full' }
 ];

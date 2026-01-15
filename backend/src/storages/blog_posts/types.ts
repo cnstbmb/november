@@ -1,4 +1,4 @@
-import { UUID } from "../../types/uuid";
+import { UUID } from '../../types/uuid';
 
 export interface BlogPost {
     id: UUID;
@@ -8,10 +8,10 @@ export interface BlogPost {
     hashtags: string[];
     content: string;
     author: string;
-  };
+}
 
 export interface BlogPostFilters {
-  title?: string;
-  hashtags?: string[];
-  author?: string;
+    title?: string;
+    hashtags?: string[];
+    author?: string;
 }

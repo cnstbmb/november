@@ -6,6 +6,4 @@ const { selectAll } = blogPostsAdapter.getSelectors();
 
 const selectBlogPostsState = createFeatureSelector<any, BlogPostsState>(blogFeatureKey);
 
-export const selectBlogPosts = createSelector(selectBlogPostsState, state =>
-  selectAll(state.posts)
-);
+export const selectBlogPosts = createSelector(selectBlogPostsState, (state) => selectAll(state.posts));

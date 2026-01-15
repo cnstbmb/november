@@ -1,6 +1,6 @@
-FROM node:16.0.0-alpine AS build
+FROM node:20.19.6-alpine AS build
 WORKDIR /app
-COPY . . 
+COPY . .
 RUN npm install
 RUN npm run build:prod
 

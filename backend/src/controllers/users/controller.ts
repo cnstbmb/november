@@ -4,12 +4,12 @@ import { Cryptographer } from '../../auth/cryptographer';
 import { User } from '../../storages/users/types';
 
 export class UsersController {
-    private readonly loggerPrefix = '[User controller]'
+    private readonly loggerPrefix = '[User controller]';
 
     constructor(
         private readonly logger: ILogger,
         private readonly storage: UsersStorage,
-        private readonly crypto: Cryptographer,
+        private readonly crypto: Cryptographer
     ) {
     }
 

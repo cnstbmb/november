@@ -6,14 +6,10 @@ export abstract class ApplicationRoutes {
     protected constructor(
         protected logger: ILogger,
         protected application: express.Express,
-        protected webTokenGuard: WebTokenGuard,
+        protected webTokenGuard: WebTokenGuard
     ) {
 
     }
 
-    abstract register(): void
-}
-
-export interface JWTTokenPayload {
-    userId: string;
+    abstract register(): void;
 }

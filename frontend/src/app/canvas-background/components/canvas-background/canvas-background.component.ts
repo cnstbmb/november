@@ -143,7 +143,7 @@ export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewIn
     this.context.clearRect(0, 0, canvasWidth, canvasHeight);
     this.drawLight();
 
-    this.boxes.forEach(box => {
+    this.boxes.forEach((box) => {
       box.rotate();
       box.drawShadow();
     });

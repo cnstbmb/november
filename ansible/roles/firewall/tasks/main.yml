@@ -1,0 +1,32 @@
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Set default UFW policies
+  ansible.builtin.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Allow outgoing by default
+  ansible.builtin.ufw:
+    state: enabled
+    policy: allow
+    direction: outgoing
+
+- name: Allow SSH
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ ansible_port }}"
+    proto: tcp
+
+- name: Allow HTTP/HTTPS on master
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 80
+    - 443
+  when: allow_http_https | bool

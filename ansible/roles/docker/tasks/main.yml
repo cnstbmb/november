@@ -1,0 +1,22 @@
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose-plugin
+    state: present
+  when: install_docker | bool
+
+- name: Ensure Docker service is enabled
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  when: install_docker | bool
+
+- name: Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users | default([]) }}"
+  when: install_docker | bool

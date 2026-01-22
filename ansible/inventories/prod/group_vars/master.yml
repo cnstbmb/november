@@ -1,0 +1,10 @@
+allow_http_https: true
+enable_nginx: false # set true only if nginx runs on host, not in compose
+enable_certbot: false # set true only if certbot runs on host, not in compose
+enable_monitoring: true
+enable_backups: true
+
+# Optional: override compose for master
+# compose_src: "########" # local path to master compose file
+# compose_dest_dir: "########"
+# compose_dest_file: "########"

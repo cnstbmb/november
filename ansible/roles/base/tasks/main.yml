@@ -1,0 +1,50 @@
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Upgrade packages
+  ansible.builtin.apt:
+    upgrade: dist
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - unattended-upgrades
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    state: present
+
+- name: Set timezone
+  ansible.builtin.timezone:
+    name: "{{ timezone }}"
+
+- name: Create swap file if needed
+  when:
+    - swap_size_mb is defined
+    - swap_size_mb | int > 0
+    - (ansible_facts.swaptotal_mb | default(0)) | int == 0
+  block:
+    - name: Allocate swap file
+      ansible.builtin.command: "fallocate -l {{ swap_size_mb }}M /swapfile"
+      args:
+        creates: /swapfile
+
+    - name: Set swapfile permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Make swap
+      ansible.builtin.command: "mkswap /swapfile"
+
+    - name: Enable swap
+      ansible.builtin.command: "swapon /swapfile"
+
+    - name: Persist swap in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        create: true

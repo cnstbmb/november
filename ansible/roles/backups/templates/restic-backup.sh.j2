@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+export RESTIC_REPOSITORY="{{ backup_target }}"
+export RESTIC_PASSWORD_FILE=/etc/restic/credentials
+
+backup_paths="{{ backup_paths | join(' ') }}"
+
+restic backup ${backup_paths} {% for ex in backup_exclude | default([]) %}--exclude {{ ex }} {% endfor %}
+
+restic forget --prune \
+  --keep-daily {{ backup_keep_daily }} \
+  --keep-weekly {{ backup_keep_weekly }} \
+  --keep-monthly {{ backup_keep_monthly }}

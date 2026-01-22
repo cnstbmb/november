@@ -1,0 +1,10 @@
+- name: Base setup for all hosts
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - base
+    - ssh_hardening
+    - firewall
+    - fail2ban
+    - docker

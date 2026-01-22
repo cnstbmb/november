@@ -1,0 +1,26 @@
+- name: Ensure monitoring directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Render monitoring configs
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ monitoring_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
+    mode: "0644"
+  loop:
+    - prometheus.yml.j2
+    - loki-config.yml.j2
+    - promtail-config.yml.j2
+
+- name: Render monitoring compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start monitoring stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ monitoring_dir }}"

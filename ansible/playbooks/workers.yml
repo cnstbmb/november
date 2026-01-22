@@ -1,0 +1,5 @@
+- name: Worker nodes setup
+  hosts: workers
+  become: true
+  roles:
+    - remnawave_node

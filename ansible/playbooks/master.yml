@@ -1,0 +1,13 @@
+- name: Master node setup
+  hosts: master
+  become: true
+  roles:
+    - remnawave_master
+    - role: nginx
+      when: enable_nginx | bool
+    - role: certbot
+      when: enable_certbot | bool
+    - role: monitoring
+      when: enable_monitoring | bool
+    - role: backups
+      when: enable_backups | bool

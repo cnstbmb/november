@@ -1,0 +1,46 @@
+- name: Ensure AdGuard Home directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ adguard_dir }}"
+    - "{{ adguard_conf_dir }}"
+    - "{{ adguard_work_dir }}"
+  when: enable_adguard | bool
+
+- name: Write AdGuard Home compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ adguard_dir }}/docker-compose.yml"
+    mode: "0644"
+  when: enable_adguard | bool
+
+- name: Allow AdGuard Home DNS (TCP)
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: tcp
+  when: enable_adguard | bool
+
+- name: Allow AdGuard Home DNS (UDP)
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: udp
+  when: enable_adguard | bool
+
+- name: Allow AdGuard Home web UI
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_web_port }}"
+    proto: tcp
+  when: enable_adguard | bool
+
+- name: Run AdGuard Home via docker compose
+  ansible.builtin.command: >
+    docker compose -f {{ adguard_dir }}/docker-compose.yml
+    up -d
+  args:
+    chdir: "{{ adguard_dir }}"
+  when: enable_adguard | bool

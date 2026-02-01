@@ -3,6 +3,7 @@
   become: true
   roles:
     - remnawave_master
+    - adguard_home
     - role: nginx
       when: enable_nginx | bool
     - role: certbot

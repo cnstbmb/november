@@ -1,0 +1,9 @@
+enable_adguard: false
+adguard_image: "adguard/adguardhome:latest"
+adguard_container_name: "adguardhome"
+adguard_dir: "/opt/adguardhome"
+adguard_conf_dir: "/opt/adguardhome/conf"
+adguard_work_dir: "/opt/adguardhome/work"
+adguard_web_port: 3000
+adguard_dns_port: 53
+adguard_timezone: "UTC"

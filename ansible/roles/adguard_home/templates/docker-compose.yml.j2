@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  adguardhome:
+    image: "{{ adguard_image }}"
+    container_name: "{{ adguard_container_name }}"
+    restart: unless-stopped
+    ports:
+      - "{{ adguard_web_port }}:3000/tcp"
+      - "{{ adguard_dns_port }}:53/tcp"
+      - "{{ adguard_dns_port }}:53/udp"
+    volumes:
+      - "{{ adguard_conf_dir }}:/opt/adguardhome/conf"
+      - "{{ adguard_work_dir }}:/opt/adguardhome/work"
+    environment:
+      TZ: "{{ adguard_timezone }}"

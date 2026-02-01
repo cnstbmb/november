@@ -122,3 +122,22 @@ and schedules a cron job. Make sure:
 - Missing SSH public key file on the control machine
 - Ports 80/443 already in use by Docker and host nginx enabled
 - `backup_target` requires network access not permitted on the server
+
+## 8) AdGuard Home (optional)
+
+If you want AdGuard Home on the master node, set in:
+
+- `ansible/inventories/prod/group_vars/master.yml`
+
+```
+enable_adguard: true
+```
+
+Defaults:
+
+- Web UI on port 3000
+- DNS on port 53 TCP/UDP
+- Data in `/opt/adguardhome`
+
+If port 53 is already in use on the master, change `adguard_dns_port` or
+disable the conflicting service.

@@ -1,0 +1,8 @@
+# Optional: worker-specific compose file (node agent)
+# node_compose_src: "########" # local path to worker compose file
+# node_compose_dest_dir: "########"
+# node_compose_dest_file: "########"
+
+# Optional resource limits for node containers (if needed in compose)
+# node_cpu_limit: "########"
+# node_mem_limit: "########"

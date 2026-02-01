@@ -1,0 +1,28 @@
+- name: Ensure compose destination directory exists
+  ansible.builtin.file:
+    path: "{{ compose_dest_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy docker-compose file
+  ansible.builtin.copy:
+    src: "{{ compose_src }}"
+    dest: "{{ compose_dest_file }}"
+    mode: "0644"
+
+- name: Copy env file if provided
+  ansible.builtin.copy:
+    src: "{{ env_src }}"
+    dest: "{{ env_dest }}"
+    mode: "0600"
+  when: env_src is defined and env_src | length > 0
+
+- name: Run docker compose up
+  ansible.builtin.command: >
+    docker compose -f {{ compose_dest_file }}
+    {% if compose_project_name is defined and compose_project_name | length > 0 %}
+    --project-name {{ compose_project_name }}
+    {% endif %}
+    up -d
+  args:
+    chdir: "{{ compose_dest_dir }}"

@@ -1,0 +1,17 @@
+allow_http_https: true
+enable_nginx: false # set true only if nginx runs on host, not in compose
+enable_certbot: false # set true only if certbot runs on host, not in compose
+enable_monitoring: true
+enable_backups: true
+enable_adguard: false # set true to deploy AdGuard Home on master
+
+# Optional AdGuard overrides:
+# adguard_dir: "/opt/adguardhome"
+# adguard_web_port: 3000
+# adguard_dns_port: 53
+# adguard_timezone: "UTC"
+
+# Optional: override compose for master
+# compose_src: "########" # local path to master compose file
+# compose_dest_dir: "########"
+# compose_dest_file: "########"

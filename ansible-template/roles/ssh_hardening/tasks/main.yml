@@ -1,0 +1,19 @@
+- name: Harden SSH configuration
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }} {{ item.value }}"
+  loop:
+    - { key: "Port", value: "{{ ansible_port }}" }
+    - { key: "PermitRootLogin", value: "no" }
+    - { key: "PasswordAuthentication", value: "no" }
+    - { key: "PubkeyAuthentication", value: "yes" }
+    - { key: "MaxAuthTries", value: "3" }
+    - { key: "ClientAliveInterval", value: "300" }
+  notify: Restart sshd
+
+- name: Ensure authorized_keys present for user
+  ansible.builtin.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ lookup('file', ssh_public_key_path) }}"
+  when: ssh_public_key_path is defined

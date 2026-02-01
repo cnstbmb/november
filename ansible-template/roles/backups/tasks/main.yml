@@ -1,0 +1,48 @@
+- name: Install restic
+  ansible.builtin.apt:
+    name: restic
+    state: present
+
+- name: Ensure restic config directory exists
+  ansible.builtin.file:
+    path: /etc/restic
+    state: directory
+    mode: "0700"
+
+- name: Write restic credentials
+  ansible.builtin.copy:
+    dest: /etc/restic/credentials
+    content: "{{ backup_password }}"
+    mode: "0600"
+
+- name: Check restic repository
+  ansible.builtin.command: restic snapshots
+  register: restic_snapshots
+  changed_when: false
+  failed_when: false
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_target }}"
+    RESTIC_PASSWORD_FILE: /etc/restic/credentials
+
+- name: Initialize restic repository
+  ansible.builtin.command: restic init
+  when: restic_snapshots.rc != 0
+  environment:
+    RESTIC_REPOSITORY: "{{ backup_target }}"
+    RESTIC_PASSWORD_FILE: /etc/restic/credentials
+
+- name: Install backup script
+  ansible.builtin.template:
+    src: restic-backup.sh.j2
+    dest: /usr/local/bin/restic-backup.sh
+    mode: "0750"
+
+- name: Schedule backup cron
+  ansible.builtin.cron:
+    name: "restic-backup"
+    minute: "{{ backup_cron_minute }}"
+    hour: "{{ backup_cron_hour }}"
+    day: "{{ backup_cron_day }}"
+    month: "{{ backup_cron_month }}"
+    weekday: "{{ backup_cron_weekday }}"
+    job: "/usr/local/bin/restic-backup.sh"

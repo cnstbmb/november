@@ -1,0 +1,13 @@
+- name: Resolve worker compose paths
+  ansible.builtin.set_fact:
+    worker_compose_src: "{{ node_compose_src | default(compose_src) }}"
+    worker_compose_dest_dir: "{{ node_compose_dest_dir | default(compose_dest_dir) }}"
+    worker_compose_dest_file: "{{ node_compose_dest_file | default(compose_dest_file) }}"
+
+- name: Deploy worker compose stack
+  ansible.builtin.import_role:
+    name: docker_compose
+  vars:
+    compose_src: "{{ worker_compose_src }}"
+    compose_dest_dir: "{{ worker_compose_dest_dir }}"
+    compose_dest_file: "{{ worker_compose_dest_file }}"

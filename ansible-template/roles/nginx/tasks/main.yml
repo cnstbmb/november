@@ -1,0 +1,24 @@
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Configure nginx site
+  ansible.builtin.template:
+    src: remnawave.conf.j2
+    dest: /etc/nginx/sites-available/remnawave.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/remnawave.conf
+    dest: /etc/nginx/sites-enabled/remnawave.conf
+    state: link
+  notify: Reload nginx
+
+- name: Disable default site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx

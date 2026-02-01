@@ -1,0 +1,23 @@
+- name: Install certbot packages
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-dns-cloudflare
+    state: present
+  when: enable_certbot | bool
+
+- name: Create certbot credentials file
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: "{{ certbot_credentials_path }}"
+    mode: "0600"
+  when: enable_certbot | bool
+
+- name: Obtain certificate via DNS-01
+  ansible.builtin.command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials {{ certbot_credentials_path }}
+    --non-interactive --agree-tos
+    -m {{ letsencrypt_email }}
+    -d {{ panel_domain }}
+  when: enable_certbot | bool

@@ -1,0 +1,62 @@
+# Common settings for all hosts
+ansible_user: "########" # SSH user, e.g. ubuntu or root
+ansible_port: ######## # SSH port, e.g. 22
+ssh_public_key_path: "########" # local path to public key, delete if unused
+
+timezone: "########" # e.g. Europe/Amsterdam
+swap_size_mb: ######## # e.g. 2048
+
+# Docker
+install_docker: true
+docker_users:
+  - "########" # add user(s) to docker group, remove list if unused
+
+# Compose paths (local on controller -> remote on host)
+repo_root: "########" # local path to repo root on controller
+compose_project_name: "########" # docker compose project name
+compose_src: "########" # local path to master compose file
+compose_dest_dir: "########" # remote dir, e.g. /opt/remnawave
+compose_dest_file: "########" # remote file, e.g. /opt/remnawave/docker-compose.yml
+
+env_src: "########" # local path to .env, set empty or delete if unused
+env_dest: "########" # remote path for .env, set empty or delete if unused
+
+# Firewall
+allow_http_https: false # set true on master via group_vars
+
+# Certbot
+enable_nginx: false # set true if nginx runs on host
+enable_certbot: false # set true on master if using certbot
+letsencrypt_email: "########" # email for Let's Encrypt
+panel_domain: "########" # e.g. panel.example.com
+remnawave_upstream_port: ######## # local port for panel/api upstream, e.g. 8080
+cloudflare_api_token: "########" # Cloudflare API token for DNS-01
+certbot_credentials_path: "########" # e.g. /etc/letsencrypt/cloudflare.ini
+
+# Monitoring and backups
+enable_monitoring: false
+enable_backups: false
+monitoring_dir: "########" # e.g. /opt/monitoring
+monitoring_prometheus_port: ######## # e.g. 9090
+monitoring_grafana_port: ######## # e.g. 3000
+monitoring_loki_port: ######## # e.g. 3100
+monitoring_grafana_admin_user: "########" # Grafana admin user
+monitoring_grafana_admin_password: "########" # Grafana admin password
+monitoring_node_targets:
+  - "localhost:9100"
+  - "########" # add worker targets like 10.0.0.2:9100
+
+backup_target: "########" # e.g. s3://bucket/path or /mnt/backup
+backup_password: "########" # restic password
+backup_paths:
+  - "########" # add paths like /srv/pg-data /srv/logs /etc
+backup_exclude:
+  - "########" # optional exclude paths
+backup_keep_daily: ######## # e.g. 7
+backup_keep_weekly: ######## # e.g. 4
+backup_keep_monthly: ######## # e.g. 3
+backup_cron_minute: "########" # e.g. 0
+backup_cron_hour: "########" # e.g. 2
+backup_cron_day: "########" # e.g. *
+backup_cron_month: "########" # e.g. *
+backup_cron_weekday: "########" # e.g. *

@@ -3,7 +3,7 @@ enable_nginx: false # set true only if nginx runs on host, not in compose
 enable_certbot: false # set true only if certbot runs on host, not in compose
 enable_monitoring: true
 enable_backups: true
-enable_adguard: false # set true to deploy AdGuard Home on master
+enable_adguard: true # deploy AdGuard Home on master
 
 # Optional AdGuard overrides:
 # adguard_dir: "/opt/adguardhome"

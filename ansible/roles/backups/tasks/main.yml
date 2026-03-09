@@ -3,6 +3,15 @@
     name: restic
     state: present
 
+- name: Ensure backup target is external
+  ansible.builtin.assert:
+    that:
+      - backup_target is match(backup_external_target_regex)
+    fail_msg: >-
+      backup_target must point to external storage (for example s3://... or /mnt/...).
+      Current value: {{ backup_target }}
+  when: backup_require_external_target | bool
+
 - name: Ensure restic config directory exists
   ansible.builtin.file:
     path: /etc/restic

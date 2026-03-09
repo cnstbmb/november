@@ -20,3 +20,31 @@
     append: true
   loop: "{{ docker_users | default([]) }}"
   when: install_docker | bool
+
+- name: Ensure docker config directory exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: "0755"
+  when:
+    - install_docker | bool
+    - docker_configure_log_rotation | bool
+
+- name: Configure docker daemon log rotation
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    mode: "0644"
+  register: docker_daemon_config
+  when:
+    - install_docker | bool
+    - docker_configure_log_rotation | bool
+
+- name: Restart docker to apply daemon settings
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  when:
+    - install_docker | bool
+    - docker_configure_log_rotation | bool
+    - docker_daemon_config is changed

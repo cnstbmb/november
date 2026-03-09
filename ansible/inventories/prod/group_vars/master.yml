@@ -7,6 +7,9 @@ enable_adguard: true # deploy AdGuard Home on master
 enable_remnashop: true
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
+monitoring_prometheus_retention: "7d"
+monitoring_loki_retention: "168h"
+backup_target: "/mnt/backup/november" # mount external disk or use remote target like s3://bucket/path
 
 # Optional AdGuard overrides:
 # adguard_dir: "/opt/adguardhome"

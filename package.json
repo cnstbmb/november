@@ -28,6 +28,10 @@
     "ansible:workers:check": "tools/ansible/run_prod_private.sh --playbook workers --check",
     "ansible:site": "tools/ansible/run_prod_private.sh --playbook site",
     "ansible:site:check": "tools/ansible/run_prod_private.sh --playbook site --check",
+    "landing:up": "docker compose -f deployments/landing-lite/docker-compose.yml up -d",
+    "landing:down": "docker compose -f deployments/landing-lite/docker-compose.yml down",
+    "landing:logs": "docker compose -f deployments/landing-lite/docker-compose.yml logs -f",
+    "landing:open": "open http://localhost",
     "pg:docker:win": "docker run --rm -P -p 127.0.0.1:5432:5432 -v %cd%/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD=\"88005553535\" --name pg postgres:alpine",
     "pg:docker:linux": "docker run --rm -P -p 127.0.0.1:5432:5432 -v $(pwd)/pg-data:/var/lib/postgresql/data -d -e POSTGRES_PASSWORD=\"88005553535\" --name pg postgres:alpine"
   },

@@ -1,0 +1,14 @@
+services:
+  landing:
+    image: nginx:mainline-alpine
+    container_name: landing-lite
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

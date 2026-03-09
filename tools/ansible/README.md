@@ -18,6 +18,13 @@ tools/ansible/bootstrap_private_vars.sh
 tools/ansible/run_prod_private.sh
 ```
 
+`bootstrap_private_vars.sh` поддерживает формат хостов:
+- `name` (например `test.beer.ru`)
+- `name=ip` (например `test.beer.ru=8.80.55.35`)
+
+Во втором случае в inventory будет добавлен `ansible_host`, так что можно
+использовать красивое имя хоста даже до настройки DNS.
+
 Выбрать playbook интерактивно:
 
 ```bash

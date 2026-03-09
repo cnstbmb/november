@@ -51,10 +51,36 @@ prompt_bool() {
   done
 }
 
+parse_host_entry() {
+  local raw="$1"
+  local trimmed name target
+
+  trimmed="$(echo "${raw}" | xargs)"
+  if [ -z "${trimmed}" ]; then
+    return 1
+  fi
+
+  if [[ "${trimmed}" == *=* ]]; then
+    name="$(echo "${trimmed%%=*}" | xargs)"
+    target="$(echo "${trimmed#*=}" | xargs)"
+  else
+    name="${trimmed}"
+    target="${trimmed}"
+  fi
+
+  if [ -z "${name}" ] || [ -z "${target}" ]; then
+    return 1
+  fi
+
+  PARSED_HOST_NAME="${name}"
+  PARSED_HOST_TARGET="${target}"
+  return 0
+}
+
 echo "=== Bootstrap private Ansible vars (.private/ansible/prod) ==="
 
-prompt master_host "IP/hostname master"
-prompt worker_hosts_csv "IP/hostname workers (через запятую, можно пусто)" ""
+prompt master_entry "Master host (name или name=ip)"
+prompt worker_hosts_csv "Workers (name или name=ip, через запятую, можно пусто)" ""
 prompt ansible_user "SSH user" "root"
 prompt ansible_port "SSH port" "22"
 prompt ssh_public_key_path "Путь к публичному SSH ключу на control-node" "${HOME}/.ssh/id_ed25519.pub"
@@ -68,13 +94,27 @@ prompt env_src "Локальный путь к .env (пусто если не к
 prompt env_dest "Путь .env на target (пусто если не копировать)" ""
 prompt docker_users_csv "Пользователи для docker group (через запятую)" "${ansible_user}"
 
+if ! parse_host_entry "${master_entry}"; then
+  echo "Некорректный master host: ${master_entry}"
+  echo "Используй формат: name или name=ip"
+  exit 1
+fi
+master_host_name="${PARSED_HOST_NAME}"
+master_host_target="${PARSED_HOST_TARGET}"
+
 worker_count=0
 declare -a worker_hosts=()
+declare -a worker_targets=()
 if [ -n "${worker_hosts_csv}" ]; then
-  IFS=',' read -r -a worker_hosts <<< "${worker_hosts_csv}"
-  for host in "${worker_hosts[@]}"; do
-    host_trimmed="$(echo "${host}" | xargs)"
-    [ -z "${host_trimmed}" ] && continue
+  IFS=',' read -r -a worker_entries <<< "${worker_hosts_csv}"
+  for entry in "${worker_entries[@]}"; do
+    if ! parse_host_entry "${entry}"; then
+      echo "Некорректный worker host: ${entry}"
+      echo "Используй формат: name или name=ip"
+      exit 1
+    fi
+    worker_hosts+=("${PARSED_HOST_NAME}")
+    worker_targets+=("${PARSED_HOST_TARGET}")
     worker_count=$((worker_count + 1))
   done
 fi
@@ -124,28 +164,46 @@ all:
   children:
     master:
       hosts:
-        ${master_host}: {}
+EOF
+
+if [ "${master_host_name}" = "${master_host_target}" ]; then
+  cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
+        ${master_host_name}: {}
+EOF
+else
+  cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
+        ${master_host_name}:
+          ansible_host: "${master_host_target}"
+EOF
+fi
+
+cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
     workers:
       hosts:
 EOF
 
 if [ "${worker_count}" -gt 0 ]; then
-  for host in "${worker_hosts[@]}"; do
-    host_trimmed="$(echo "${host}" | xargs)"
-    [ -z "${host_trimmed}" ] && continue
-    cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
-        ${host_trimmed}: {}
+  for i in "${!worker_hosts[@]}"; do
+    host_name="${worker_hosts[$i]}"
+    host_target="${worker_targets[$i]}"
+    if [ "${host_name}" = "${host_target}" ]; then
+      cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
+        ${host_name}: {}
 EOF
+    else
+      cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
+        ${host_name}:
+          ansible_host: "${host_target}"
+EOF
+    fi
   done
 fi
 
 monitoring_targets_yaml=$'\n  - "localhost:9100"'
 if [ "${worker_count}" -gt 0 ]; then
-  for host in "${worker_hosts[@]}"; do
-    host_trimmed="$(echo "${host}" | xargs)"
-    [ -z "${host_trimmed}" ] && continue
+  for host_target in "${worker_targets[@]}"; do
     monitoring_targets_yaml="${monitoring_targets_yaml}
-  - \"${host_trimmed}:9100\""
+  - \"${host_target}:9100\""
   done
 fi
 

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#081325" />
+      <stop offset="100%" stop-color="#0b1f35" />
+    </linearGradient>
+    <linearGradient id="line" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#53d1ff" />
+      <stop offset="100%" stop-color="#89e5ff" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <circle cx="1060" cy="120" r="220" fill="#13375a" opacity="0.5" />
+  <circle cx="120" cy="560" r="220" fill="#114332" opacity="0.4" />
+
+  <rect x="80" y="96" width="1040" height="438" rx="24" fill="#0a1d31" opacity="0.85" stroke="#3d83c5" stroke-opacity="0.45" />
+
+  <text x="130" y="190" fill="#cbe9ff" font-family="Sora, Arial, sans-serif" font-size="30" letter-spacing="2">
+    KONSTANTIN KHIMENKOV
+  </text>
+  <text x="130" y="268" fill="#edf4ff" font-family="Space Grotesk, Arial, sans-serif" font-size="58" font-weight="700">
+    Frontend • Chinese • Procurement
+  </text>
+  <rect x="130" y="305" width="760" height="3" fill="url(#line)" />
+  <text x="130" y="370" fill="#aecdde" font-family="Sora, Arial, sans-serif" font-size="28">
+    Frontend-разработка, обучение китайскому, переводы,
+  </text>
+  <text x="130" y="414" fill="#aecdde" font-family="Sora, Arial, sans-serif" font-size="28">
+    сопровождение закупок товаров из Китая
+  </text>
+  <text x="130" y="488" fill="#89e5ff" font-family="Sora, Arial, sans-serif" font-size="30" font-weight="700">
+    konstantin@himenkov.ru
+  </text>
+</svg>

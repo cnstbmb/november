@@ -109,7 +109,8 @@ dist
 .idea/
 
 configs
-ansible/
+/ansible/
+.private/
 
 .vscode
 

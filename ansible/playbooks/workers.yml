@@ -1,4 +1,6 @@
 - name: Worker nodes setup
   hosts: workers
   become: true
-  tasks: []
+  roles:
+    - role: remnawave_node
+      when: enable_remnawave_node | default(true) | bool

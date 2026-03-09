@@ -3,6 +3,8 @@
     worker_compose_src: "{{ node_compose_src | default(compose_src) }}"
     worker_compose_dest_dir: "{{ node_compose_dest_dir | default(compose_dest_dir) }}"
     worker_compose_dest_file: "{{ node_compose_dest_file | default(compose_dest_file) }}"
+    worker_env_src: "{{ node_env_src | default(env_src | default('')) }}"
+    worker_env_dest: "{{ node_env_dest | default(env_dest | default('')) }}"
 
 - name: Deploy worker compose stack
   ansible.builtin.import_role:
@@ -11,3 +13,5 @@
     compose_src: "{{ worker_compose_src }}"
     compose_dest_dir: "{{ worker_compose_dest_dir }}"
     compose_dest_file: "{{ worker_compose_dest_file }}"
+    env_src: "{{ worker_env_src }}"
+    env_dest: "{{ worker_env_dest }}"

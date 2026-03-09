@@ -1,7 +1,13 @@
-# Optional: worker-specific compose file (node agent)
-# node_compose_src: "########" # local path to worker compose file
-# node_compose_dest_dir: "########"
-# node_compose_dest_file: "########"
+enable_remnawave_node: true
+
+# Worker-specific compose file for remnawave node agent
+node_compose_src: "########" # e.g. /Users/konstantin/november/deployments/prod/remnawave-node/docker-compose.yml
+node_compose_dest_dir: "/opt/remnawave-node"
+node_compose_dest_file: "/opt/remnawave-node/docker-compose.yml"
+
+# Optional .env for worker compose
+node_env_src: "########" # e.g. /Users/konstantin/november/deployments/prod/remnawave-node/.env
+node_env_dest: "/opt/remnawave-node/.env"
 
 # Optional resource limits for node containers (if needed in compose)
 # node_cpu_limit: "########"

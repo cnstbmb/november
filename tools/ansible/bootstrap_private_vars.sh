@@ -68,6 +68,31 @@ prompt env_src "Локальный путь к .env (пусто если не к
 prompt env_dest "Путь .env на target (пусто если не копировать)" ""
 prompt docker_users_csv "Пользователи для docker group (через запятую)" "${ansible_user}"
 
+worker_count=0
+declare -a worker_hosts=()
+if [ -n "${worker_hosts_csv}" ]; then
+  IFS=',' read -r -a worker_hosts <<< "${worker_hosts_csv}"
+  for host in "${worker_hosts[@]}"; do
+    host_trimmed="$(echo "${host}" | xargs)"
+    [ -z "${host_trimmed}" ] && continue
+    worker_count=$((worker_count + 1))
+  done
+fi
+
+if [ "${worker_count}" -gt 0 ]; then
+  prompt_bool enable_remnawave_node "Включить deploy remnawave_node на workers?" "true"
+else
+  enable_remnawave_node="false"
+fi
+
+if [ "${enable_remnawave_node}" = "true" ]; then
+  prompt node_compose_src "Локальный путь к worker compose файлу" "${ROOT_DIR}/deployments/prod/remnawave-node/docker-compose.yml"
+  prompt node_compose_dest_dir "Директория worker compose на target" "/opt/remnawave-node"
+  prompt node_compose_dest_file "Полный путь worker docker-compose.yml на target" "/opt/remnawave-node/docker-compose.yml"
+  prompt node_env_src "Локальный путь к worker .env (пусто если не копировать)" ""
+  prompt node_env_dest "Путь worker .env на target (пусто если не копировать)" "/opt/remnawave-node/.env"
+fi
+
 prompt_bool enable_monitoring "Включить monitoring на master?" "true"
 prompt_bool enable_backups "Включить backups на master?" "true"
 prompt_bool enable_adguard "Включить AdGuard на master?" "true"
@@ -104,14 +129,23 @@ all:
       hosts:
 EOF
 
-if [ -n "${worker_hosts_csv}" ]; then
-  IFS=',' read -r -a worker_hosts <<< "${worker_hosts_csv}"
+if [ "${worker_count}" -gt 0 ]; then
   for host in "${worker_hosts[@]}"; do
     host_trimmed="$(echo "${host}" | xargs)"
     [ -z "${host_trimmed}" ] && continue
     cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
         ${host_trimmed}: {}
 EOF
+  done
+fi
+
+monitoring_targets_yaml=$'\n  - "localhost:9100"'
+if [ "${worker_count}" -gt 0 ]; then
+  for host in "${worker_hosts[@]}"; do
+    host_trimmed="$(echo "${host}" | xargs)"
+    [ -z "${host_trimmed}" ] && continue
+    monitoring_targets_yaml="${monitoring_targets_yaml}
+  - \"${host_trimmed}:9100\""
   done
 fi
 
@@ -137,6 +171,10 @@ swap_size_mb: ${swap_size_mb}
 
 install_docker: true
 docker_users:${docker_users_yaml}
+docker_configure_log_rotation: true
+docker_log_driver: "json-file"
+docker_log_max_size: "10m"
+docker_log_max_file: "5"
 
 repo_root: "${ROOT_DIR}"
 compose_project_name: "${compose_project_name}"
@@ -165,8 +203,7 @@ monitoring_grafana_port: 3000
 monitoring_loki_port: 3100
 monitoring_grafana_admin_user: "admin"
 monitoring_grafana_admin_password: ""
-monitoring_node_targets:
-  - "localhost:9100"
+monitoring_node_targets:${monitoring_targets_yaml}
 
 backup_target: "/mnt/backup/november"
 backup_password: ""
@@ -180,6 +217,7 @@ backup_cron_hour: "2"
 backup_cron_day: "*"
 backup_cron_month: "*"
 backup_cron_weekday: "*"
+backup_require_external_target: true
 EOF
 
 cat > "${GROUP_VARS_DIR}/master.yml" <<EOF
@@ -251,8 +289,18 @@ EOF
 fi
 
 cat > "${GROUP_VARS_DIR}/workers.yml" <<EOF
-# Optional worker-specific overrides
+enable_remnawave_node: ${enable_remnawave_node}
 EOF
+
+if [ "${enable_remnawave_node}" = "true" ]; then
+  cat >> "${GROUP_VARS_DIR}/workers.yml" <<EOF
+node_compose_src: "${node_compose_src}"
+node_compose_dest_dir: "${node_compose_dest_dir}"
+node_compose_dest_file: "${node_compose_dest_file}"
+node_env_src: "${node_env_src}"
+node_env_dest: "${node_env_dest}"
+EOF
+fi
 
 echo
 echo "Private inventory/vars created:"

@@ -25,6 +25,12 @@ tools/ansible/run_prod_private.sh
 Во втором случае в inventory будет добавлен `ansible_host`, так что можно
 использовать красивое имя хоста даже до настройки DNS.
 
+Скрипт также спрашивает опциональные SSH overrides для каждого хоста:
+- `ansible_user` для конкретного master/worker
+- `ansible_port` для конкретного master/worker
+
+Если поле оставить пустым, используется глобальный `ansible_user`/`ansible_port`.
+
 Выбрать playbook интерактивно:
 
 ```bash

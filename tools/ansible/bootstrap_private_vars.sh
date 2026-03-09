@@ -77,6 +77,43 @@ parse_host_entry() {
   return 0
 }
 
+append_host_inventory_entry() {
+  local file="$1"
+  local host_name="$2"
+  local host_target="$3"
+  local host_user="$4"
+  local host_port="$5"
+
+  if [ "${host_name}" = "${host_target}" ] && [ -z "${host_user}" ] && [ -z "${host_port}" ]; then
+    cat >> "${file}" <<EOF
+        ${host_name}: {}
+EOF
+    return
+  fi
+
+  cat >> "${file}" <<EOF
+        ${host_name}:
+EOF
+
+  if [ "${host_name}" != "${host_target}" ]; then
+    cat >> "${file}" <<EOF
+          ansible_host: "${host_target}"
+EOF
+  fi
+
+  if [ -n "${host_user}" ]; then
+    cat >> "${file}" <<EOF
+          ansible_user: "${host_user}"
+EOF
+  fi
+
+  if [ -n "${host_port}" ]; then
+    cat >> "${file}" <<EOF
+          ansible_port: ${host_port}
+EOF
+  fi
+}
+
 echo "=== Bootstrap private Ansible vars (.private/ansible/prod) ==="
 
 prompt master_entry "Master host (name или name=ip)"
@@ -105,6 +142,8 @@ master_host_target="${PARSED_HOST_TARGET}"
 worker_count=0
 declare -a worker_hosts=()
 declare -a worker_targets=()
+declare -a worker_user_overrides=()
+declare -a worker_port_overrides=()
 if [ -n "${worker_hosts_csv}" ]; then
   IFS=',' read -r -a worker_entries <<< "${worker_hosts_csv}"
   for entry in "${worker_entries[@]}"; do
@@ -116,6 +155,34 @@ if [ -n "${worker_hosts_csv}" ]; then
     worker_hosts+=("${PARSED_HOST_NAME}")
     worker_targets+=("${PARSED_HOST_TARGET}")
     worker_count=$((worker_count + 1))
+  done
+fi
+
+prompt master_ansible_user_override "SSH user для master ${master_host_name} (пусто = ${ansible_user})" ""
+prompt master_ansible_port_override "SSH port для master ${master_host_name} (пусто = ${ansible_port})" ""
+
+if [ "${master_ansible_user_override}" = "${ansible_user}" ]; then
+  master_ansible_user_override=""
+fi
+if [ "${master_ansible_port_override}" = "${ansible_port}" ]; then
+  master_ansible_port_override=""
+fi
+
+if [ "${worker_count}" -gt 0 ]; then
+  for i in "${!worker_hosts[@]}"; do
+    worker_name="${worker_hosts[$i]}"
+    prompt worker_ansible_user_override "SSH user для worker ${worker_name} (пусто = ${ansible_user})" ""
+    prompt worker_ansible_port_override "SSH port для worker ${worker_name} (пусто = ${ansible_port})" ""
+
+    if [ "${worker_ansible_user_override}" = "${ansible_user}" ]; then
+      worker_ansible_user_override=""
+    fi
+    if [ "${worker_ansible_port_override}" = "${ansible_port}" ]; then
+      worker_ansible_port_override=""
+    fi
+
+    worker_user_overrides+=("${worker_ansible_user_override}")
+    worker_port_overrides+=("${worker_ansible_port_override}")
   done
 fi
 
@@ -166,16 +233,12 @@ all:
       hosts:
 EOF
 
-if [ "${master_host_name}" = "${master_host_target}" ]; then
-  cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
-        ${master_host_name}: {}
-EOF
-else
-  cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
-        ${master_host_name}:
-          ansible_host: "${master_host_target}"
-EOF
-fi
+append_host_inventory_entry \
+  "${PRIVATE_DIR}/hosts.yml" \
+  "${master_host_name}" \
+  "${master_host_target}" \
+  "${master_ansible_user_override}" \
+  "${master_ansible_port_override}"
 
 cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
     workers:
@@ -186,16 +249,14 @@ if [ "${worker_count}" -gt 0 ]; then
   for i in "${!worker_hosts[@]}"; do
     host_name="${worker_hosts[$i]}"
     host_target="${worker_targets[$i]}"
-    if [ "${host_name}" = "${host_target}" ]; then
-      cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
-        ${host_name}: {}
-EOF
-    else
-      cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
-        ${host_name}:
-          ansible_host: "${host_target}"
-EOF
-    fi
+    host_user="${worker_user_overrides[$i]}"
+    host_port="${worker_port_overrides[$i]}"
+    append_host_inventory_entry \
+      "${PRIVATE_DIR}/hosts.yml" \
+      "${host_name}" \
+      "${host_target}" \
+      "${host_user}" \
+      "${host_port}"
   done
 fi
 

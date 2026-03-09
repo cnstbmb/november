@@ -4,6 +4,9 @@ enable_certbot: false # set true only if certbot runs on host, not in compose
 enable_monitoring: true
 enable_backups: true
 enable_adguard: true # deploy AdGuard Home on master
+enable_remnashop: true
+remnashop_dir: "/opt/remnashop"
+remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
 
 # Optional AdGuard overrides:
 # adguard_dir: "/opt/adguardhome"

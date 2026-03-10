@@ -70,6 +70,7 @@ npm run test:algorithms
 ### Ansible (private bootstrap + run)
 
 - `npm run ansible:bootstrap` — интерактивно создаёт private inventory и vars в `.private/ansible/prod/` (`hosts.yml`, `group_vars/all.yml`, `group_vars/master.yml`, `group_vars/workers.yml`).
+- `npm run ansible:warmup` — последовательный SSH-прогрев хостов (`ssh ... exit` по каждому).
 - `npm run ansible:run` — запуск `site.yml`.
 - `npm run ansible:run:check` — dry-run `site.yml`.
 - `npm run ansible:run:menu` — интерактивный выбор playbook.

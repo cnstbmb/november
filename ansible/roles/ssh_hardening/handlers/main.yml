@@ -2,3 +2,4 @@
   ansible.builtin.service:
     name: ssh
     state: restarted
+  when: not ansible_check_mode

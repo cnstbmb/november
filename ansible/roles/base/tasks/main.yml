@@ -26,6 +26,7 @@
     - swap_size_mb is defined
     - swap_size_mb | int > 0
     - (ansible_facts.swaptotal_mb | default(0)) | int == 0
+    - not ansible_check_mode
   block:
     - name: Allocate swap file
       ansible.builtin.command: "fallocate -l {{ swap_size_mb }}M /swapfile"

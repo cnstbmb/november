@@ -18,6 +18,12 @@ tools/ansible/bootstrap_private_vars.sh
 tools/ansible/run_prod_private.sh
 ```
 
+Прогрев SSH-сессий по всем хостам (по очереди, `ssh ... exit`):
+
+```bash
+tools/ansible/warmup_prod_private.sh
+```
+
 `bootstrap_private_vars.sh` поддерживает формат хостов:
 - `name` (например `test.beer.ru`)
 - `name=ip` (например `test.beer.ru=8.80.55.35`)
@@ -30,6 +36,7 @@ tools/ansible/run_prod_private.sh
 - `ansible_port` для конкретного master/worker
 
 Если поле оставить пустым, используется глобальный `ansible_user`/`ansible_port`.
+По умолчанию `enable_remnawave_node` для `workers` выключен.
 
 Выбрать playbook интерактивно:
 
@@ -41,6 +48,14 @@ tools/ansible/run_prod_private.sh --menu
 
 ```bash
 tools/ansible/run_prod_private.sh --check
+```
+
+Запуск только для части инвентаря:
+
+```bash
+tools/ansible/run_prod_private.sh --limit workers
+tools/ansible/run_prod_private.sh --check --limit serb.himenkov.ru
+tools/ansible/warmup_prod_private.sh --limit workers
 ```
 
 Явный выбор playbook:

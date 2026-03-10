@@ -1,4 +1,4 @@
-enable_remnawave_node: true
+enable_remnawave_node: false
 
 # Worker-specific compose file for remnawave node agent
 node_compose_src: "########" # e.g. /Users/konstantin/november/deployments/prod/remnawave-node/docker-compose.yml

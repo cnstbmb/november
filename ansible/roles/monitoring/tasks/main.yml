@@ -3,6 +3,7 @@
     path: "{{ monitoring_dir }}"
     state: directory
     mode: "0755"
+  when: not ansible_check_mode
 
 - name: Render monitoring configs
   ansible.builtin.template:
@@ -13,14 +14,17 @@
     - prometheus.yml.j2
     - loki-config.yml.j2
     - promtail-config.yml.j2
+  when: not ansible_check_mode
 
 - name: Render monitoring compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_dir }}/docker-compose.yml"
     mode: "0644"
+  when: not ansible_check_mode
 
 - name: Start monitoring stack
   ansible.builtin.command: docker compose up -d
   args:
     chdir: "{{ monitoring_dir }}"
+  when: not ansible_check_mode

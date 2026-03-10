@@ -1,8 +1,31 @@
+- name: Detect available Docker Compose package
+  ansible.builtin.shell: |
+    set -e
+    for pkg in docker-compose-plugin docker-compose-v2 docker-compose; do
+      if apt-cache show "${pkg}" >/dev/null 2>&1; then
+        echo "${pkg}"
+        exit 0
+      fi
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  check_mode: false
+  register: docker_compose_pkg_detect
+  changed_when: false
+  failed_when: docker_compose_pkg_detect.rc != 0
+  when: install_docker | bool
+
+- name: Set Docker Compose package name
+  ansible.builtin.set_fact:
+    docker_compose_package_name: "{{ docker_compose_pkg_detect.stdout | trim }}"
+  when: install_docker | bool
+
 - name: Install Docker packages
   ansible.builtin.apt:
     name:
       - docker.io
-      - docker-compose-plugin
+      - "{{ docker_compose_package_name }}"
     state: present
   when: install_docker | bool
 
@@ -11,7 +34,17 @@
     name: docker
     state: started
     enabled: true
-  when: install_docker | bool
+  when:
+    - install_docker | bool
+    - not ansible_check_mode
+
+- name: Ensure docker group exists
+  ansible.builtin.group:
+    name: docker
+    state: present
+  when:
+    - install_docker | bool
+    - not ansible_check_mode
 
 - name: Add users to docker group
   ansible.builtin.user:
@@ -19,7 +52,9 @@
     groups: docker
     append: true
   loop: "{{ docker_users | default([]) }}"
-  when: install_docker | bool
+  when:
+    - install_docker | bool
+    - not ansible_check_mode
 
 - name: Ensure docker config directory exists
   ansible.builtin.file:
@@ -48,3 +83,4 @@
     - install_docker | bool
     - docker_configure_log_rotation | bool
     - docker_daemon_config is changed
+    - not ansible_check_mode

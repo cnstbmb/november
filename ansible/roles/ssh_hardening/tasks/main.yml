@@ -5,7 +5,7 @@
     line: "{{ item.key }} {{ item.value }}"
   loop:
     - { key: "Port", value: "{{ ansible_port }}" }
-    - { key: "PermitRootLogin", value: "no" }
+    - { key: "PermitRootLogin", value: "{{ 'prohibit-password' if ansible_user == 'root' else 'no' }}" }
     - { key: "PasswordAuthentication", value: "no" }
     - { key: "PubkeyAuthentication", value: "yes" }
     - { key: "MaxAuthTries", value: "3" }

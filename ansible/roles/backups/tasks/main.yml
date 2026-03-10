@@ -17,12 +17,14 @@
     path: /etc/restic
     state: directory
     mode: "0700"
+  when: not ansible_check_mode
 
 - name: Write restic credentials
   ansible.builtin.copy:
     dest: /etc/restic/credentials
     content: "{{ backup_password }}"
     mode: "0600"
+  when: not ansible_check_mode
 
 - name: Check restic repository
   ansible.builtin.command: restic snapshots
@@ -32,10 +34,13 @@
   environment:
     RESTIC_REPOSITORY: "{{ backup_target }}"
     RESTIC_PASSWORD_FILE: /etc/restic/credentials
+  when: not ansible_check_mode
 
 - name: Initialize restic repository
   ansible.builtin.command: restic init
-  when: restic_snapshots.rc != 0
+  when:
+    - not ansible_check_mode
+    - restic_snapshots.rc != 0
   environment:
     RESTIC_REPOSITORY: "{{ backup_target }}"
     RESTIC_PASSWORD_FILE: /etc/restic/credentials
@@ -45,6 +50,7 @@
     src: restic-backup.sh.j2
     dest: /usr/local/bin/restic-backup.sh
     mode: "0750"
+  when: not ansible_check_mode
 
 - name: Schedule backup cron
   ansible.builtin.cron:
@@ -55,3 +61,4 @@
     month: "{{ backup_cron_month }}"
     weekday: "{{ backup_cron_weekday }}"
     job: "/usr/local/bin/restic-backup.sh"
+  when: not ansible_check_mode

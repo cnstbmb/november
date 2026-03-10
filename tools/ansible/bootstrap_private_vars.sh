@@ -187,7 +187,7 @@ if [ "${worker_count}" -gt 0 ]; then
 fi
 
 if [ "${worker_count}" -gt 0 ]; then
-  prompt_bool enable_remnawave_node "Включить deploy remnawave_node на workers?" "true"
+  prompt_bool enable_remnawave_node "Включить deploy remnawave_node на workers?" "false"
 else
   enable_remnawave_node="false"
 fi

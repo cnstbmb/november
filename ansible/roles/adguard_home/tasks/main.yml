@@ -7,35 +7,45 @@
     - "{{ adguard_dir }}"
     - "{{ adguard_conf_dir }}"
     - "{{ adguard_work_dir }}"
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
 
 - name: Write AdGuard Home compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ adguard_dir }}/docker-compose.yml"
     mode: "0644"
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
 
 - name: Allow AdGuard Home DNS (TCP)
   ansible.builtin.ufw:
     rule: allow
     port: "{{ adguard_dns_port }}"
     proto: tcp
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
 
 - name: Allow AdGuard Home DNS (UDP)
   ansible.builtin.ufw:
     rule: allow
     port: "{{ adguard_dns_port }}"
     proto: udp
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
 
 - name: Allow AdGuard Home web UI
   ansible.builtin.ufw:
     rule: allow
     port: "{{ adguard_web_port }}"
     proto: tcp
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
 
 - name: Run AdGuard Home via docker compose
   ansible.builtin.command: >
@@ -43,4 +53,6 @@
     up -d
   args:
     chdir: "{{ adguard_dir }}"
-  when: enable_adguard | bool
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode

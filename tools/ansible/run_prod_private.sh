@@ -10,6 +10,8 @@ LOCAL_TMP_DEFAULT="${ROOT_DIR}/.tmp/ansible-local"
 SSH_COMMON_ARGS_DEFAULT="-o BatchMode=no -o KbdInteractiveAuthentication=yes"
 CHECK_MODE=false
 MENU_MODE=false
+ASK_BECOME_PASS=false
+LIMIT_TARGET=""
 
 detect_pkcs11_provider() {
   if [ -n "${ANSIBLE_PKCS11_PROVIDER:-}" ]; then
@@ -23,7 +25,7 @@ detect_pkcs11_provider() {
 }
 
 preload_yubikey_key() {
-  if [ "${ANSIBLE_YUBIKEY_PRELOAD:-true}" != "true" ]; then
+  if [ "${ANSIBLE_YUBIKEY_PRELOAD:-false}" != "true" ]; then
     return
   fi
 
@@ -64,6 +66,8 @@ Options:
   --menu                 Интерактивный выбор playbook (site/master/workers)
   --playbook <value>     site | master | workers | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
+  --ask-become-pass      Запросить sudo пароль
+  --limit <pattern>      Ограничить запуск по хостам/группам
   -h, --help             Показать помощь
 EOF
 }
@@ -103,6 +107,18 @@ while [ "$#" -gt 0 ]; do
     --check)
       CHECK_MODE=true
       shift
+      ;;
+    --ask-become-pass)
+      ASK_BECOME_PASS=true
+      shift
+      ;;
+    --limit)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for --limit"
+        exit 1
+      fi
+      LIMIT_TARGET="$2"
+      shift 2
       ;;
     --playbook)
       if [ "$#" -lt 2 ]; then
@@ -179,6 +195,14 @@ fi
 
 if [ "${CHECK_MODE}" = "true" ]; then
   cmd+=(--check)
+fi
+
+if [ -n "${LIMIT_TARGET}" ]; then
+  cmd+=(--limit "${LIMIT_TARGET}")
+fi
+
+if [ "${ASK_BECOME_PASS}" = "true" ]; then
+  cmd+=(--ask-become-pass)
 fi
 
 echo "Running: ${cmd[*]}"

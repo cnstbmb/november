@@ -19,6 +19,7 @@
     "build:prod": "tools/scripts/build_prod.sh",
     "build:prod:yc": "tools/scripts/build_prod_yc.sh",
     "ansible:bootstrap": "tools/ansible/bootstrap_private_vars.sh",
+    "ansible:node-env": "tools/ansible/bootstrap_remnawave_node_env.sh",
     "ansible:warmup": "tools/ansible/warmup_prod_private.sh",
     "ansible:run": "tools/ansible/run_prod_private.sh",
     "ansible:run:check": "tools/ansible/run_prod_private.sh --check",

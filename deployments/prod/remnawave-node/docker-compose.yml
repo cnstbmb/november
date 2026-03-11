@@ -1,0 +1,9 @@
+version: "3.8"
+services:
+  remnawave-node:
+    image: remnawave/node:latest
+    container_name: remnawave-node
+    restart: unless-stopped
+    env_file:
+      - .env
+    network_mode: host

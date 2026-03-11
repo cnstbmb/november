@@ -116,11 +116,23 @@ EOF
 
 echo "=== Bootstrap private Ansible vars (.private/ansible/prod) ==="
 
+default_ssh_public_key_path="${HOME}/.ssh/id_ed25519.pub"
+for candidate in "${HOME}/.ssh/yubikey_9a.pub" "${HOME}/.ssh/id_ed25519.pub" "${HOME}/.ssh/id_rsa.pub"; do
+  if [ -f "${candidate}" ]; then
+    default_ssh_public_key_path="${candidate}"
+    break
+  fi
+done
+
 prompt master_entry "Master host (name или name=ip)"
 prompt worker_hosts_csv "Workers (name или name=ip, через запятую, можно пусто)" ""
 prompt ansible_user "SSH user" "root"
 prompt ansible_port "SSH port" "22"
-prompt ssh_public_key_path "Путь к публичному SSH ключу на control-node" "${HOME}/.ssh/id_ed25519.pub"
+prompt ssh_public_key_path "Путь к публичному SSH ключу на control-node" "${default_ssh_public_key_path}"
+if [ ! -f "${ssh_public_key_path}" ]; then
+  echo "SSH public key file not found: ${ssh_public_key_path}"
+  exit 1
+fi
 prompt timezone "Timezone" "Europe/Moscow"
 prompt swap_size_mb "Swap size MB" "2048"
 prompt compose_project_name "Docker compose project name" "november"
@@ -430,3 +442,10 @@ echo "  ${GROUP_VARS_DIR}/workers.yml"
 echo
 echo "Run:"
 echo "  tools/ansible/run_prod_private.sh"
+
+if [ "${enable_remnawave_node}" = "true" ] && [ -z "${node_env_src:-}" ]; then
+  echo
+  echo "remnawave_node is enabled, but node_env_src is empty."
+  echo "Before ansible run, generate worker env files:"
+  echo "  tools/ansible/bootstrap_remnawave_node_env.sh"
+fi

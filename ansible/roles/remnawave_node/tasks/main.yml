@@ -6,6 +6,43 @@
     worker_env_src: "{{ node_env_src | default(env_src | default('')) }}"
     worker_env_dest: "{{ node_env_dest | default(env_dest | default('')) }}"
 
+- name: Validate worker env source is configured
+  ansible.builtin.assert:
+    that:
+      - worker_env_src is defined
+      - worker_env_src | length > 0
+    fail_msg: >-
+      node_env_src is empty for {{ inventory_hostname }}.
+      Run tools/ansible/bootstrap_remnawave_node_env.sh and provide node secrets from Remnawave panel.
+
+- name: Ensure worker compose file exists on control-node
+  ansible.builtin.stat:
+    path: "{{ worker_compose_src }}"
+  delegate_to: localhost
+  become: false
+  register: worker_compose_src_stat
+
+- name: Validate worker compose file exists on control-node
+  ansible.builtin.assert:
+    that:
+      - worker_compose_src_stat.stat.exists
+      - worker_compose_src_stat.stat.isreg
+    fail_msg: "Worker compose file not found: {{ worker_compose_src }}"
+
+- name: Ensure worker env file exists on control-node
+  ansible.builtin.stat:
+    path: "{{ worker_env_src }}"
+  delegate_to: localhost
+  become: false
+  register: worker_env_src_stat
+
+- name: Validate worker env file exists on control-node
+  ansible.builtin.assert:
+    that:
+      - worker_env_src_stat.stat.exists
+      - worker_env_src_stat.stat.isreg
+    fail_msg: "Worker env file not found: {{ worker_env_src }}"
+
 - name: Deploy worker compose stack
   ansible.builtin.import_role:
     name: docker_compose

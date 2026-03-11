@@ -17,6 +17,18 @@
     mode: "0600"
   when: env_src is defined and env_src | length > 0
 
+- name: Ensure empty env file exists when env_src is not provided
+  ansible.builtin.copy:
+    dest: "{{ env_dest }}"
+    content: ""
+    mode: "0600"
+    force: false
+  when:
+    - env_dest is defined
+    - env_dest | length > 0
+    - env_src is not defined or env_src | length == 0
+    - not ansible_check_mode
+
 - name: Run docker compose up
   ansible.builtin.command: >
     docker compose -f {{ compose_dest_file }}

@@ -18,6 +18,15 @@ tools/ansible/bootstrap_private_vars.sh
 tools/ansible/run_prod_private.sh
 ```
 
+Подготовка боевых `.env` для remnawave-node на workers (интерактивно):
+
+```bash
+tools/ansible/bootstrap_remnawave_node_env.sh
+```
+
+Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы
+`node_env_src` для каждого worker был задан и файл существовал локально на control-node.
+
 Прогрев SSH-сессий по всем хостам (по очереди, `ssh ... exit`):
 
 ```bash
@@ -37,6 +46,13 @@ tools/ansible/warmup_prod_private.sh
 
 Если поле оставить пустым, используется глобальный `ansible_user`/`ansible_port`.
 По умолчанию `enable_remnawave_node` для `workers` выключен.
+`bootstrap_private_vars.sh` также подставляет первый найденный публичный ключ
+из `${HOME}/.ssh/yubikey_9a.pub`, `${HOME}/.ssh/id_ed25519.pub`, `${HOME}/.ssh/id_rsa.pub`
+и валидирует, что файл существует.
+Для `enable_remnawave_node=true` используется `deployments/prod/remnawave-node/docker-compose.yml`,
+а реальные переменные лучше хранить в приватном `node_env_src`.
+`bootstrap_remnawave_node_env.sh` создаёт `node_env_src` автоматически в
+`.private/ansible/prod/remnawave-node/<worker>.env` и host vars для каждого worker.
 
 Выбрать playbook интерактивно:
 

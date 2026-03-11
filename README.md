@@ -70,6 +70,7 @@ npm run test:algorithms
 ### Ansible (private bootstrap + run)
 
 - `npm run ansible:bootstrap` — интерактивно создаёт private inventory и vars в `.private/ansible/prod/` (`hosts.yml`, `group_vars/all.yml`, `group_vars/master.yml`, `group_vars/workers.yml`).
+- `npm run ansible:node-env` — интерактивно создаёт private `.env` для `remnawave_node` на workers.
 - `npm run ansible:warmup` — последовательный SSH-прогрев хостов (`ssh ... exit` по каждому).
 - `npm run ansible:run` — запуск `site.yml`.
 - `npm run ansible:run:check` — dry-run `site.yml`.
@@ -77,6 +78,9 @@ npm run test:algorithms
 - `npm run ansible:master` / `npm run ansible:master:check`
 - `npm run ansible:workers` / `npm run ansible:workers:check`
 - `npm run ansible:site` / `npm run ansible:site:check`
+
+Для реального deploy `remnawave_node` на workers сначала выполните
+`npm run ansible:node-env` (создаст private env-файлы на control-node для каждой worker-ноды).
 
 Поддержка хостов в bootstrap:
 

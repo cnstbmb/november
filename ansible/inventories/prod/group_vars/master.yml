@@ -4,9 +4,12 @@ enable_certbot: false # set true only if certbot runs on host, not in compose
 enable_monitoring: true
 enable_backups: true
 enable_adguard: true # deploy AdGuard Home on master
-enable_remnashop: true
+enable_remnashop: false # deploy remnashop bot/shop on master (disabled by default)
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
+remnashop_validate_env: true # fail if .env contains placeholders like change_me
+# remnashop_env_src: "########" # local private path on controller, e.g. /Users/you/november/.private/ansible/prod/remnashop/.env
+# remnashop_env_dest: "/opt/remnashop/.env"
 monitoring_prometheus_retention: "7d"
 monitoring_loki_retention: "168h"
 backup_target: "/mnt/backup/november" # mount external disk or use remote target like s3://bucket/path

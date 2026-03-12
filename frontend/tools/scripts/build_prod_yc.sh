@@ -1,27 +1,38 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-# TODO: get from env cr.yandex id
+SCRIPTPATH="$(cd "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
+ROOT_DIR="$(cd "$SCRIPTPATH/../.." >/dev/null 2>&1; pwd -P)"
 
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+if [ -z "${YC_REGISTRY_ID:-}" ]; then
+  echo "YC_REGISTRY_ID is required"
+  exit 1
+fi
 
-env
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+TIMESTAMP="$(date +%s)"
+IMAGE_NAME="cr.yandex/${YC_REGISTRY_ID}/khimenkov-angular-app"
+TAG_NEW="${IMAGE_NAME}:${TIMESTAMP}"
+TAG_LATEST="${IMAGE_NAME}:latest"
 
-SCRIPT_START_TIME=`date +%s`
-echo "start building frontend production docker image"
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "docker buildx is required. Install Docker Buildx first."
+  exit 1
+fi
 
-cd $SCRIPTPATH/../..
+if ! docker buildx inspect >/dev/null 2>&1; then
+  docker buildx create --name november-builder --use >/dev/null
+fi
 
-TIMESTAMP=$(date +%s)
-IMAGE_NAME="cr.yandex/$YC_REGISTRY_ID/khimenkov-angular-app"
-TAG_NEW="$IMAGE_NAME:$TIMESTAMP"
-TAG_LATEST="$IMAGE_NAME:latest"
+docker buildx inspect --bootstrap >/dev/null
 
-docker build --no-cache -t $TAG_LATEST -t $TAG_NEW .
+echo "Building and pushing ${TAG_LATEST} and ${TAG_NEW} for platform(s): ${DOCKER_PLATFORM}"
+cd "${ROOT_DIR}"
+docker buildx build --no-cache \
+  --platform "${DOCKER_PLATFORM}" \
+  --tag "${TAG_LATEST}" \
+  --tag "${TAG_NEW}" \
+  --push \
+  .
 
-docker push $TAG_LATEST
-docker push $TAG_NEW
-
-SCRIPT_END_TIME=`date +%s`
-
-RUNTIME=$((SCRIPT_END_TIME-SCRIPT_START_TIME))
-echo "Building docker image and push time $((RUNTIME / 60)) minutes and $((RUNTIME % 60)) seconds."
+echo "Done: ${TAG_LATEST}, ${TAG_NEW}"

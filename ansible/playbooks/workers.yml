@@ -2,5 +2,6 @@
   hosts: workers
   become: true
   roles:
+    - stubby
     - role: remnawave_node
       when: enable_remnawave_node | default(true) | bool

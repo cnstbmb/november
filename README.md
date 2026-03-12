@@ -64,8 +64,15 @@ npm run test:algorithms
 
 ### Production build scripts
 
-- `npm run build:prod`
-- `npm run build:prod:yc`
+- `npm run build:prod` — сборка и push Docker Hub образов для `linux/amd64` (по умолчанию).
+- `npm run build:prod:yc` — сборка и push Yandex Container Registry образов для `linux/amd64` (нужен `YC_REGISTRY_ID`).
+- `npm run build:prod:local:mac` — локальная сборка образов для macOS (`linux/arm64`) без push.
+
+Полезные переменные:
+
+- `DOCKER_PLATFORM=linux/amd64` (по умолчанию, для прод-хостов).
+- `DOCKER_PLATFORM=linux/amd64,linux/arm64` (multi-arch push, если нужно).
+- `LOCAL_DOCKER_PLATFORM=linux/arm64` (по умолчанию для локальной mac-сборки).
 
 ### Ansible (private bootstrap + run)
 
@@ -81,6 +88,10 @@ npm run test:algorithms
 
 Для реального deploy `remnawave_node` на workers сначала выполните
 `npm run ansible:node-env` (создаст private env-файлы на control-node для каждой worker-ноды).
+
+Для `remnashop` на master укажите private путь `remnashop_env_src` в
+`.private/ansible/prod/group_vars/master.yml` (локальный `.env` на control-node).
+Bootstrap по умолчанию создаёт `.private/ansible/prod/remnashop/.env`.
 
 Поддержка хостов в bootstrap:
 

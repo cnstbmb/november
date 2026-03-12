@@ -8,6 +8,7 @@
     "build": "tools/scripts/build.sh",
     "build:docker:prod": "./tools/scripts/build_prod.sh",
     "build:docker:prod:yc": "./tools/scripts/build_prod_yc.sh",
+    "build:docker:local:mac": "./tools/scripts/build_local_mac.sh",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "start": "PORT=3000 NODE_ENV=dev tools/scripts/run.sh",

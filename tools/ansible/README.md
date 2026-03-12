@@ -27,6 +27,23 @@ tools/ansible/bootstrap_remnawave_node_env.sh
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы
 `node_env_src` для каждого worker был задан и файл существовал локально на control-node.
 
+Для `enable_remnashop=true` можно задать private env-файл через
+`remnashop_env_src` в `.private/ansible/prod/group_vars/master.yml`.
+Если `remnashop_env_src` пустой, на target остаётся `.env.example`, и при
+`remnashop_validate_env=true` плейбук остановится на placeholder `change_me`.
+По умолчанию remnashop в bootstrap выключен. Если включить remnashop, bootstrap
+предложит и создаст файл:
+`.private/ansible/prod/remnashop/.env`.
+Если одновременно включены `monitoring` и `AdGuard`, bootstrap по умолчанию
+предложит `adguard_web_port=3001`, чтобы избежать конфликта с Grafana (`3000`).
+
+Если `enable_backups=true`, bootstrap отдельно спросит, нужны ли S3-ключи.
+При выборе S3 он запросит `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
+(и опционально `AWS_DEFAULT_REGION`) и запишет их в `backup_env` в
+`.private/ansible/prod/group_vars/master.yml`.
+Если target введён как `https://...`, скрипт автоматически преобразует его в
+формат restic `s3:https://...`.
+
 Прогрев SSH-сессий по всем хостам (по очереди, `ssh ... exit`):
 
 ```bash
@@ -77,7 +94,16 @@ tools/ansible/warmup_prod_private.sh --limit workers
 Явный выбор playbook:
 
 ```bash
+tools/ansible/run_prod_private.sh --playbook base --limit master
 tools/ansible/run_prod_private.sh --playbook master
 tools/ansible/run_prod_private.sh --playbook workers --check
 tools/ansible/run_prod_private.sh --playbook /Users/konstantin/november/ansible/playbooks/master.yml
+```
+
+После переустановки ОС на master сначала прогоните `base` (установка Docker/UFW и базовой настройки),
+затем `master`:
+
+```bash
+npm run ansible:base
+npm run ansible:master
 ```

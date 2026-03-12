@@ -3,6 +3,9 @@ set -eu
 
 export RESTIC_REPOSITORY="{{ backup_target }}"
 export RESTIC_PASSWORD_FILE=/etc/restic/credentials
+{% for env_name, env_value in (backup_env | default({})).items() %}
+export {{ env_name }}={{ env_value | quote }}
+{% endfor %}
 
 backup_paths="{{ backup_paths | join(' ') }}"
 

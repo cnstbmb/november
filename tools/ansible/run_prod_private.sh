@@ -63,8 +63,8 @@ Usage:
   tools/ansible/run_prod_private.sh [options]
 
 Options:
-  --menu                 Интерактивный выбор playbook (site/master/workers)
-  --playbook <value>     site | master | workers | /abs/path/to/playbook.yml
+  --menu                 Интерактивный выбор playbook (site/base/master/workers)
+  --playbook <value>     site | base | master | workers | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -76,6 +76,7 @@ resolve_playbook() {
   local value="$1"
   case "${value}" in
     site) echo "${ROOT_DIR}/ansible/playbooks/site.yml" ;;
+    base) echo "${ROOT_DIR}/ansible/playbooks/base.yml" ;;
     master) echo "${ROOT_DIR}/ansible/playbooks/master.yml" ;;
     workers) echo "${ROOT_DIR}/ansible/playbooks/workers.yml" ;;
     *) echo "${value}" ;;
@@ -86,14 +87,16 @@ choose_playbook_menu() {
   local choice
   echo "Выбери playbook:"
   echo "  1) site"
-  echo "  2) master"
-  echo "  3) workers"
-  read -r -p "Введите номер [1-3, default: 1]: " choice
+  echo "  2) base"
+  echo "  3) master"
+  echo "  4) workers"
+  read -r -p "Введите номер [1-4, default: 1]: " choice
   choice="${choice:-1}"
   case "${choice}" in
     1) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/site.yml" ;;
-    2) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/master.yml" ;;
-    3) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/workers.yml" ;;
+    2) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/base.yml" ;;
+    3) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/master.yml" ;;
+    4) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/workers.yml" ;;
     *) echo "Некорректный выбор: ${choice}"; exit 1 ;;
   esac
 }

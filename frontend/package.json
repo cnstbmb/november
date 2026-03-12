@@ -7,6 +7,7 @@
     "build": "ng build",
     "build:docker:prod": "./tools/scripts/build_prod.sh",
     "build:docker:prod:yc": "./tools/scripts/build_prod_yc.sh",
+    "build:docker:local:mac": "./tools/scripts/build_local_mac.sh",
     "build:prod": "ng build --configuration=production --deploy-url=/",
     "watch": "ng build --watch --configuration development",
     "lint": "eslint \"src\"",

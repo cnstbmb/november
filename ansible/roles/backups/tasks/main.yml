@@ -8,7 +8,8 @@
     that:
       - backup_target is match(backup_external_target_regex)
     fail_msg: >-
-      backup_target must point to external storage (for example s3://... or /mnt/...).
+      backup_target must point to external storage (for example s3:https://endpoint/bucket
+      or /mnt/...).
       Current value: {{ backup_target }}
   when: backup_require_external_target | bool
 
@@ -31,9 +32,13 @@
   register: restic_snapshots
   changed_when: false
   failed_when: false
-  environment:
-    RESTIC_REPOSITORY: "{{ backup_target }}"
-    RESTIC_PASSWORD_FILE: /etc/restic/credentials
+  environment: >-
+    {{
+      {
+        'RESTIC_REPOSITORY': backup_target,
+        'RESTIC_PASSWORD_FILE': '/etc/restic/credentials'
+      } | combine(backup_env | default({}))
+    }}
   when: not ansible_check_mode
 
 - name: Initialize restic repository
@@ -41,9 +46,13 @@
   when:
     - not ansible_check_mode
     - restic_snapshots.rc != 0
-  environment:
-    RESTIC_REPOSITORY: "{{ backup_target }}"
-    RESTIC_PASSWORD_FILE: /etc/restic/credentials
+  environment: >-
+    {{
+      {
+        'RESTIC_REPOSITORY': backup_target,
+        'RESTIC_PASSWORD_FILE': '/etc/restic/credentials'
+      } | combine(backup_env | default({}))
+    }}
 
 - name: Install backup script
   ansible.builtin.template:

@@ -1,3 +1,39 @@
+- name: Ensure remnawave external network exists
+  ansible.builtin.command: docker network create {{ remnawave_network_name | default('remnawave-network') }}
+  register: remnawave_master_network_create
+  changed_when: remnawave_master_network_create.rc == 0
+  failed_when:
+    - remnawave_master_network_create.rc != 0
+    - "'already exists' not in remnawave_master_network_create.stderr"
+  when:
+    - remnawave_master_create_network | default(true) | bool
+    - not ansible_check_mode
+
+- name: Ensure master bind directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ remnawave_master_required_dirs | default(['/srv/certbot/etc', '/srv/certbot/var', '/srv/views', '/srv/dhparam', '/srv/configs', '/srv/pg-data', '/srv/logs', '/srv/postgres', '/srv/postgres/init', '/root/cert']) }}"
+
+- name: Ensure nginx config directory exists in compose path
+  ansible.builtin.file:
+    path: "{{ remnawave_master_nginx_conf_dest | default(compose_dest_dir ~ '/nginx-conf/') }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy nginx config to master compose path
+  ansible.builtin.copy:
+    src: "{{ remnawave_master_nginx_conf_src | default(repo_root ~ '/deployments/prod/nginx-conf/') }}"
+    dest: "{{ remnawave_master_nginx_conf_dest | default(compose_dest_dir ~ '/nginx-conf/') }}"
+    mode: "0644"
+
+- name: Copy postgres init scripts to master data path
+  ansible.builtin.copy:
+    src: "{{ remnawave_master_postgres_init_src | default(repo_root ~ '/deployments/prod/postgres/init/') }}"
+    dest: "{{ remnawave_master_postgres_init_dest | default('/srv/postgres/init/') }}"
+    mode: "0644"
+
 - name: Deploy master compose stack
   ansible.builtin.import_role:
     name: docker_compose

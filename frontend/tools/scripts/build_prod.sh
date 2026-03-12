@@ -1,17 +1,29 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+SCRIPTPATH="$(cd "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
+ROOT_DIR="$(cd "$SCRIPTPATH/../.." >/dev/null 2>&1; pwd -P)"
 
-env
+IMAGE_NAME="${IMAGE_NAME:-cnstbmb/khimenkov-angular-app}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 
-script_start_time=`date +%s`
-echo "start building frontend production docker image"
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "docker buildx is required. Install Docker Buildx first."
+  exit 1
+fi
 
-build_backend_start_time=`date +%s`
-cd $SCRIPTPATH/../..
-docker build --no-cache -t cnstbmb/khimenkov-angular-app .
-docker push cnstbmb/khimenkov-angular-app:latest
-script_end_time=`date +%s`
+if ! docker buildx inspect >/dev/null 2>&1; then
+  docker buildx create --name november-builder --use >/dev/null
+fi
 
-runtime=$((script_end_time-script_start_time))
-echo "Building docker image and push time $((runtime / 60)) minutes and $((runtime % 60)) seconds."
+docker buildx inspect --bootstrap >/dev/null
+
+echo "Building and pushing ${IMAGE_NAME}:latest for platform(s): ${DOCKER_PLATFORM}"
+cd "${ROOT_DIR}"
+docker buildx build --no-cache \
+  --platform "${DOCKER_PLATFORM}" \
+  --tag "${IMAGE_NAME}:latest" \
+  --push \
+  .
+
+echo "Done: ${IMAGE_NAME}:latest"

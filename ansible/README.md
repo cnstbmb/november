@@ -26,6 +26,7 @@ Edit these files and replace all `########` placeholders:
 - `repo_root`, `compose_src`, `compose_dest_dir`, `compose_dest_file`, `compose_project_name`
 - `backup_target`, `backup_password`, `backup_paths`, `backup_keep_*`, `backup_cron_*` (if backups enabled)
 - `monitoring_*` values (if monitoring enabled)
+- `remnashop_env_src` in `group_vars/master.yml` if `enable_remnashop: true` (recommended)
 
 ## 3) Decide nginx/certbot strategy
 
@@ -122,6 +123,7 @@ and schedules a cron job. Make sure:
 - Missing SSH public key file on the control machine
 - Ports 80/443 already in use by Docker and host nginx enabled
 - `backup_target` requires network access not permitted on the server
+- `remnashop` enabled, but `.env` still has `change_me` placeholders
 
 ## 8) AdGuard Home (optional)
 

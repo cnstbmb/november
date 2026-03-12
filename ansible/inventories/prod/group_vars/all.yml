@@ -48,6 +48,10 @@ monitoring_node_targets:
 
 backup_target: "########" # e.g. s3://bucket/path or /mnt/backup
 backup_password: "########" # restic password
+# backup_env: # optional backend-specific env vars, e.g. for S3
+#   AWS_ACCESS_KEY_ID: "########"
+#   AWS_SECRET_ACCESS_KEY: "########"
+#   AWS_DEFAULT_REGION: "########"
 backup_paths:
   - "########" # add paths like /srv/pg-data /srv/logs /etc
 backup_exclude:

@@ -47,6 +47,68 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Validate AdGuard and Grafana host ports do not conflict
+  ansible.builtin.assert:
+    that:
+      - not (
+          enable_monitoring | default(false) | bool and
+          (monitoring_grafana_port | default(-1) | int == adguard_web_port | int)
+        )
+    fail_msg: >-
+      adguard_web_port ({{ adguard_web_port }}) conflicts with
+      monitoring_grafana_port ({{ monitoring_grafana_port | default('undefined') }}).
+      Set one of these host ports to a different value.
+  when:
+    - enable_adguard | bool
+
+- name: Gather service facts for DNS listener conflict checks
+  ansible.builtin.service_facts:
+  when:
+    - enable_adguard | bool
+    - adguard_manage_systemd_resolved | bool
+    - adguard_dns_port | int == 53
+    - not ansible_check_mode
+
+- name: Disable systemd-resolved DNS stub listener when AdGuard binds :53
+  ansible.builtin.ini_file:
+    path: /etc/systemd/resolved.conf
+    section: Resolve
+    option: DNSStubListener
+    value: "no"
+    no_extra_spaces: true
+  register: adguard_resolved_stub
+  when:
+    - enable_adguard | bool
+    - adguard_manage_systemd_resolved | bool
+    - adguard_dns_port | int == 53
+    - "'systemd-resolved.service' in ansible_facts.services"
+    - not ansible_check_mode
+
+- name: Restart systemd-resolved when DNS stub listener config changed
+  ansible.builtin.service:
+    name: systemd-resolved
+    state: restarted
+  when:
+    - enable_adguard | bool
+    - adguard_manage_systemd_resolved | bool
+    - adguard_dns_port | int == 53
+    - "'systemd-resolved.service' in ansible_facts.services"
+    - adguard_resolved_stub is changed
+    - not ansible_check_mode
+
+- name: Ensure /etc/resolv.conf points to non-stub systemd-resolved config
+  ansible.builtin.file:
+    src: /run/systemd/resolve/resolv.conf
+    dest: /etc/resolv.conf
+    state: link
+    force: true
+  when:
+    - enable_adguard | bool
+    - adguard_manage_systemd_resolved | bool
+    - adguard_dns_port | int == 53
+    - "'systemd-resolved.service' in ansible_facts.services"
+    - not ansible_check_mode
+
 - name: Run AdGuard Home via docker compose
   ansible.builtin.command: >
     docker compose -f {{ adguard_dir }}/docker-compose.yml

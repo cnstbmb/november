@@ -26,12 +26,16 @@ allow_http_https: false # set true on master via group_vars
 
 # Certbot
 enable_nginx: false # set true if nginx runs on host
-enable_certbot: false # set true on master if using certbot
-letsencrypt_email: "########" # email for Let's Encrypt
-panel_domain: "########" # e.g. panel.example.com
+certbot_install: true # install certbot packages on hosts where certbot role runs
+enable_certbot: true # issue/renew certificates via Cloudflare DNS-01
+letsencrypt_email: "########" # required when enable_certbot=true
+panel_domain: "########" # optional legacy var for nginx role
 remnawave_upstream_port: ######## # local port for panel/api upstream, e.g. 8080
-cloudflare_api_token: "########" # Cloudflare API token for DNS-01
-certbot_credentials_path: "########" # e.g. /etc/letsencrypt/cloudflare.ini
+cloudflare_api_token: "########" # Cloudflare API token (Zone:Read + DNS:Edit)
+certbot_credentials_path: "/etc/letsencrypt/cloudflare.ini"
+# per-host domains are set via host_vars/<host>/certbot.yml:
+# certbot_domains:
+#   - "host.example.com"
 
 # Monitoring and backups
 enable_monitoring: false

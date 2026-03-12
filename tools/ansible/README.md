@@ -36,6 +36,22 @@ tools/ansible/bootstrap_remnawave_node_env.sh
 `.private/ansible/prod/remnashop/.env`.
 Если одновременно включены `monitoring` и `AdGuard`, bootstrap по умолчанию
 предложит `adguard_web_port=3001`, чтобы избежать конфликта с Grafana (`3000`).
+Bootstrap также обязательно спросит путь к `database.json` для `nodejs-server`
+и запишет его в `remnawave_master_database_json_src` (`group_vars/master.yml`),
+чтобы файл автоматически копировался в `/srv/configs/database.json` на master.
+Если файл не указан или отсутствует, деплой прервётся заранее с понятной ошибкой.
+По умолчанию bootstrap также включает certbot для всех хостов (`master` + `workers`),
+спрашивает `letsencrypt_email` и `cloudflare_api_token`.
+Домены для certbot берутся автоматически из host names, которые вы вводите в первом шаге
+(`domain=ip`), и сохраняются в:
+`.private/ansible/prod/host_vars/<host>/certbot.yml`.
+Опционально bootstrap может сразу создать/обновить A/AAAA записи в Cloudflare по этим
+парам `domain=ip`.
+
+Для workers bootstrap по умолчанию включает `landing-lite`:
+- `enable_worker_landing: true`
+- открытие `80/443` через `allow_http_https: true`
+- HTTPS через certbot-сертификат соответствующего worker-домена
 
 Если `enable_backups=true`, bootstrap отдельно спросит, нужны ли S3-ключи.
 При выборе S3 он запросит `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
@@ -70,6 +86,8 @@ tools/ansible/warmup_prod_private.sh
 а реальные переменные лучше хранить в приватном `node_env_src`.
 `bootstrap_remnawave_node_env.sh` создаёт `node_env_src` автоматически в
 `.private/ansible/prod/remnawave-node/<worker>.env` и host vars для каждого worker.
+При деплое `remnawave_node` Ansible автоматически читает `NODE_PORT`/`APP_PORT`
+из этого `.env` и открывает соответствующий TCP-порт в UFW на worker.
 
 Выбрать playbook интерактивно:
 

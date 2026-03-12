@@ -21,12 +21,10 @@
     port: "{{ ansible_port }}"
     proto: tcp
 
-- name: Allow HTTP/HTTPS on master
+- name: Allow ingress ports on master
   ansible.builtin.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
-  loop:
-    - 80
-    - 443
+  loop: "{{ firewall_master_tcp_ports | default([80, 443, 9443, 10443]) }}"
   when: allow_http_https | bool

@@ -4,20 +4,45 @@
       - certbot
       - python3-certbot-dns-cloudflare
     state: present
-  when: enable_certbot | bool
+  when: certbot_install | default(true) | bool
+
+- name: Resolve certbot domains
+  ansible.builtin.set_fact:
+    certbot_domains_effective: >-
+      {{
+        certbot_domains
+        if (certbot_domains is defined and certbot_domains is sequence and certbot_domains is not string)
+        else ([certbot_domains] if (certbot_domains is defined and certbot_domains | length > 0) else [inventory_hostname])
+      }}
+  when: enable_certbot | default(false) | bool
+
+- name: Validate certbot settings
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_email | default('') | length > 0
+      - cloudflare_api_token | default('') | length > 0
+      - certbot_domains_effective | length > 0
+    fail_msg: >-
+      Certbot is enabled, but required vars are missing for {{ inventory_hostname }}.
+      Required: letsencrypt_email, cloudflare_api_token, certbot_domains.
+  when: enable_certbot | default(false) | bool
 
 - name: Create certbot credentials file
   ansible.builtin.template:
     src: cloudflare.ini.j2
     dest: "{{ certbot_credentials_path }}"
     mode: "0600"
-  when: enable_certbot | bool
+  when: enable_certbot | default(false) | bool
 
 - name: Obtain certificate via DNS-01
   ansible.builtin.command: >
     certbot certonly --dns-cloudflare
     --dns-cloudflare-credentials {{ certbot_credentials_path }}
-    --non-interactive --agree-tos
+    --non-interactive --agree-tos --keep-until-expiring
     -m {{ letsencrypt_email }}
-    -d {{ panel_domain }}
-  when: enable_certbot | bool
+    {% for domain in certbot_domains_effective %}
+    -d {{ domain }}
+    {% endfor %}
+  when:
+    - enable_certbot | default(false) | bool
+    - not ansible_check_mode

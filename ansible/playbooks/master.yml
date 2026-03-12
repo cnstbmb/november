@@ -8,8 +8,7 @@
     - adguard_home
     - role: nginx
       when: enable_nginx | bool
-    - role: certbot
-      when: enable_certbot | bool
+    - certbot
     - role: monitoring
       when: enable_monitoring | bool
     - role: backups

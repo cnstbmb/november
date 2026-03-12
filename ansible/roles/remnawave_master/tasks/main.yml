@@ -16,6 +16,54 @@
     mode: "0755"
   loop: "{{ remnawave_master_required_dirs | default(['/srv/certbot/etc', '/srv/certbot/var', '/srv/views', '/srv/dhparam', '/srv/configs', '/srv/pg-data', '/srv/logs', '/srv/postgres', '/srv/postgres/init', '/root/cert']) }}"
 
+- name: Resolve remnawave database config paths
+  ansible.builtin.set_fact:
+    remnawave_master_database_json_src_effective: "{{ remnawave_master_database_json_src | default(repo_root ~ '/deployments/prod/configs/database.json') }}"
+    remnawave_master_database_json_dest_effective: "{{ remnawave_master_database_json_dest | default('/srv/configs/database.json') }}"
+    remnawave_master_database_json_mode_effective: "{{ remnawave_master_database_json_mode | default('0644') }}"
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Ensure remnawave database config source is configured
+  ansible.builtin.assert:
+    that:
+      - remnawave_master_database_json_src_effective | length > 0
+    fail_msg: >-
+      remnawave_master_database_json_src is empty. Set local path to database.json in
+      group_vars/master.yml (or disable remnawave_master_copy_database_json explicitly).
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Ensure remnawave database config exists on control node
+  ansible.builtin.stat:
+    path: "{{ remnawave_master_database_json_src_effective }}"
+  register: remnawave_master_database_json_src_stat
+  delegate_to: localhost
+  become: false
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Validate remnawave database config source file
+  ansible.builtin.assert:
+    that:
+      - remnawave_master_database_json_src_stat.stat.exists
+      - remnawave_master_database_json_src_stat.stat.isreg
+    fail_msg: >-
+      database.json source file not found on control node:
+      {{ remnawave_master_database_json_src_effective }}
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Ensure destination directory for remnawave database config exists
+  ansible.builtin.file:
+    path: "{{ remnawave_master_database_json_dest_effective | dirname }}"
+    state: directory
+    mode: "0755"
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Copy remnawave database config to master
+  ansible.builtin.copy:
+    src: "{{ remnawave_master_database_json_src_effective }}"
+    dest: "{{ remnawave_master_database_json_dest_effective }}"
+    mode: "{{ remnawave_master_database_json_mode_effective }}"
+  when: remnawave_master_copy_database_json | default(true) | bool
+
 - name: Ensure nginx config directory exists in compose path
   ansible.builtin.file:
     path: "{{ remnawave_master_nginx_conf_dest | default(compose_dest_dir ~ '/nginx-conf/') }}"

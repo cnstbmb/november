@@ -94,6 +94,131 @@ parse_host_entry() {
   return 0
 }
 
+default_certbot_domain_for_host() {
+  local host_name="$1"
+  if [[ "${host_name}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || [[ "${host_name}" == *:* ]]; then
+    echo ""
+  else
+    echo "${host_name}"
+  fi
+}
+
+cloudflare_upsert_dns_records() {
+  local cloudflare_token="$1"
+  shift
+  python3 - "${cloudflare_token}" "$@" <<'PY'
+import ipaddress
+import json
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+token = sys.argv[1]
+pairs = sys.argv[2:]
+if len(pairs) % 2 != 0:
+    raise SystemExit("Internal error: invalid host/ip pairs for Cloudflare DNS sync")
+
+headers = {
+    "Authorization": f"Bearer {token}",
+    "Content-Type": "application/json",
+}
+base_url = "https://api.cloudflare.com/client/v4"
+
+
+def api(method, path, query=None, payload=None):
+    url = base_url + path
+    if query:
+        url += "?" + urllib.parse.urlencode(query)
+
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Cloudflare HTTP {exc.code} {method} {path}: {body}") from exc
+
+    parsed = json.loads(body)
+    if not parsed.get("success"):
+        errors = "; ".join(err.get("message", "unknown error") for err in parsed.get("errors", []))
+        raise RuntimeError(f"Cloudflare API {method} {path} failed: {errors}")
+    return parsed.get("result", [])
+
+
+def find_zone_id(hostname):
+    labels = hostname.split(".")
+    if len(labels) < 2:
+        raise RuntimeError(f"Host '{hostname}' is not a valid FQDN for Cloudflare zone lookup")
+
+    # Try progressively shorter suffixes: a.b.c.tld -> a.b.c.tld, b.c.tld, c.tld
+    for idx in range(0, len(labels) - 1):
+        candidate = ".".join(labels[idx:])
+        if candidate.count(".") < 1:
+            continue
+        zones = api("GET", "/zones", {
+            "name": candidate,
+            "status": "active",
+            "match": "all",
+            "per_page": "1",
+        })
+        if zones and zones[0].get("name") == candidate:
+            return zones[0]["id"], candidate
+
+    raise RuntimeError(f"Cloudflare zone not found for host '{hostname}'")
+
+
+for i in range(0, len(pairs), 2):
+    hostname = pairs[i].strip().lower()
+    target_ip = pairs[i + 1].strip()
+    try:
+        ipaddress.ip_address(target_ip)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Cannot create DNS record for '{hostname}': target '{target_ip}' is not an IP. "
+            "Use host format name=ip in bootstrap."
+        ) from exc
+
+    record_type = "AAAA" if ":" in target_ip else "A"
+    zone_id, zone_name = find_zone_id(hostname)
+
+    records = api("GET", f"/zones/{zone_id}/dns_records", {
+        "type": record_type,
+        "name": hostname,
+        "per_page": "1",
+    })
+
+    payload = {
+        "type": record_type,
+        "name": hostname,
+        "content": target_ip,
+        "ttl": 1,
+        "proxied": False,
+    }
+
+    if records:
+        record = records[0]
+        record_id = record.get("id")
+        if (
+            record.get("type") == record_type
+            and record.get("content") == target_ip
+            and record.get("proxied") is False
+        ):
+            print(f"[cloudflare] OK   {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+            continue
+
+        api("PATCH", f"/zones/{zone_id}/dns_records/{record_id}", payload=payload)
+        print(f"[cloudflare] UPD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+    else:
+        api("POST", f"/zones/{zone_id}/dns_records", payload=payload)
+        print(f"[cloudflare] ADD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+PY
+}
+
 append_host_inventory_entry() {
   local file="$1"
   local host_name="$2"
@@ -162,6 +287,24 @@ if [ -f "${ROOT_DIR}/deployments/prod/database.env" ]; then
 fi
 prompt env_src "Локальный путь к .env (пусто если не копировать)" "${default_env_src}"
 prompt env_dest "Путь .env на target (пусто если не копировать)" "/opt/november/database.env"
+
+default_database_json_src=""
+for candidate in "${ROOT_DIR}/.private/ansible/prod/database.json" "${ROOT_DIR}/deployments/prod/configs/database.json"; do
+  if [ -f "${candidate}" ]; then
+    default_database_json_src="${candidate}"
+    break
+  fi
+done
+prompt remnawave_master_database_json_src "Локальный путь к database.json для nodejs-server" "${default_database_json_src}"
+if [ -z "${remnawave_master_database_json_src}" ]; then
+  echo "database.json path is required for master deploy."
+  exit 1
+fi
+if [ ! -f "${remnawave_master_database_json_src}" ]; then
+  echo "database.json file not found: ${remnawave_master_database_json_src}"
+  exit 1
+fi
+
 prompt docker_users_csv "Пользователи для docker group (через запятую)" "${ansible_user}"
 
 if ! parse_host_entry "${master_entry}"; then
@@ -217,6 +360,99 @@ if [ "${worker_count}" -gt 0 ]; then
     worker_user_overrides+=("${worker_ansible_user_override}")
     worker_port_overrides+=("${worker_ansible_port_override}")
   done
+fi
+
+prompt_bool enable_certbot "Включить certbot (Cloudflare DNS-01) на всех хостах?" "true"
+certbot_install="true"
+certbot_credentials_path="/etc/letsencrypt/cloudflare.ini"
+letsencrypt_email=""
+cloudflare_api_token=""
+cloudflare_manage_dns="false"
+master_certbot_domain="$(default_certbot_domain_for_host "${master_host_name}")"
+declare -a worker_certbot_domains=()
+
+for i in "${!worker_hosts[@]}"; do
+  worker_name="${worker_hosts[$i]}"
+  worker_certbot_domain="$(default_certbot_domain_for_host "${worker_name}")"
+  worker_certbot_domains+=("${worker_certbot_domain}")
+done
+
+if [ "${enable_certbot}" = "true" ]; then
+  if [ -z "${master_certbot_domain}" ]; then
+    echo "Master host name '${master_host_name}' is not a domain."
+    echo "Use host format domain=ip for master when certbot is enabled."
+    exit 1
+  fi
+  for i in "${!worker_hosts[@]}"; do
+    worker_name="${worker_hosts[$i]}"
+    worker_certbot_domain="${worker_certbot_domains[$i]}"
+    if [ -z "${worker_certbot_domain}" ]; then
+      echo "Worker host name '${worker_name}' is not a domain."
+      echo "Use worker format domain=ip when certbot is enabled."
+      exit 1
+    fi
+  done
+
+  prompt letsencrypt_email "Email для Let's Encrypt"
+  if [ -z "${letsencrypt_email}" ]; then
+    echo "Let's Encrypt email is required when certbot is enabled."
+    exit 1
+  fi
+  prompt_secret cloudflare_api_token "Cloudflare API token (Zone:Read + DNS:Edit)"
+  if [ -z "${cloudflare_api_token}" ]; then
+    echo "Cloudflare API token is required when certbot is enabled."
+    exit 1
+  fi
+  prompt certbot_credentials_path "Путь credentials файла certbot на target" "/etc/letsencrypt/cloudflare.ini"
+  prompt_bool cloudflare_manage_dns "Обновлять A/AAAA записи в Cloudflare из host=ip автоматически?" "true"
+  if [ "${cloudflare_manage_dns}" = "true" ]; then
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "python3 is required for automatic Cloudflare DNS updates."
+      exit 1
+    fi
+    dns_pairs=("${master_certbot_domain}" "${master_host_target}")
+    if [ "${worker_count}" -gt 0 ]; then
+      for i in "${!worker_hosts[@]}"; do
+        dns_pairs+=("${worker_certbot_domains[$i]}" "${worker_targets[$i]}")
+      done
+    fi
+    cloudflare_upsert_dns_records "${cloudflare_api_token}" "${dns_pairs[@]}"
+  fi
+fi
+
+if [ "${worker_count}" -gt 0 ]; then
+  prompt_bool enable_worker_landing "Деплоить landing-lite на workers?" "true"
+else
+  enable_worker_landing="false"
+fi
+
+worker_landing_src_dir=""
+worker_landing_dest_dir="/opt/landing-lite"
+worker_landing_http_port="80"
+worker_landing_https_port="443"
+worker_landing_enable_https="false"
+workers_allow_http_https="false"
+if [ "${enable_worker_landing}" = "true" ]; then
+  prompt worker_landing_src_dir "Локальный путь к worker landing site dir" "${ROOT_DIR}/deployments/landing-lite/site"
+  if [ ! -d "${worker_landing_src_dir}" ]; then
+    echo "Worker landing site dir not found: ${worker_landing_src_dir}"
+    exit 1
+  fi
+  prompt worker_landing_dest_dir "Директория landing на worker target" "/opt/landing-lite"
+  prompt worker_landing_http_port "HTTP порт landing на worker" "80"
+  if [ "${enable_certbot}" = "true" ]; then
+    prompt_bool worker_landing_enable_https "Включить HTTPS для landing на workers?" "true"
+  else
+    prompt_bool worker_landing_enable_https "Включить HTTPS для landing на workers?" "false"
+  fi
+  if [ "${worker_landing_enable_https}" = "true" ] && [ "${enable_certbot}" != "true" ]; then
+    echo "HTTPS landing requires certbot to be enabled."
+    exit 1
+  fi
+  if [ "${worker_landing_enable_https}" = "true" ]; then
+    prompt worker_landing_https_port "HTTPS порт landing на worker" "443"
+  fi
+  workers_allow_http_https="true"
 fi
 
 if [ "${worker_count}" -gt 0 ]; then
@@ -398,12 +634,13 @@ env_dest: "${env_dest}"
 allow_http_https: false
 
 enable_nginx: false
-enable_certbot: false
-letsencrypt_email: ""
-panel_domain: ""
+enable_certbot: ${enable_certbot}
+certbot_install: ${certbot_install}
+letsencrypt_email: "${letsencrypt_email}"
+panel_domain: "${master_certbot_domain}"
 remnawave_upstream_port: 8080
-cloudflare_api_token: ""
-certbot_credentials_path: "/etc/letsencrypt/cloudflare.ini"
+cloudflare_api_token: "${cloudflare_api_token}"
+certbot_credentials_path: "${certbot_credentials_path}"
 
 enable_monitoring: false
 enable_backups: false
@@ -432,8 +669,13 @@ EOF
 
 cat > "${GROUP_VARS_DIR}/master.yml" <<EOF
 allow_http_https: true
+firewall_master_tcp_ports:
+  - 80
+  - 443
+  - 9443
+  - 10443
 enable_nginx: false
-enable_certbot: false
+enable_certbot: ${enable_certbot}
 enable_monitoring: ${enable_monitoring}
 enable_backups: ${enable_backups}
 enable_adguard: ${enable_adguard}
@@ -443,6 +685,9 @@ remnashop_mode: "internal"
 remnashop_env_src: "${remnashop_env_src}"
 remnashop_env_dest: "${remnashop_env_dest}"
 remnashop_validate_env: ${remnashop_validate_env}
+remnawave_master_copy_database_json: true
+remnawave_master_database_json_src: "${remnawave_master_database_json_src}"
+remnawave_master_database_json_dest: "/srv/configs/database.json"
 EOF
 
 if [ "${enable_adguard}" = "true" ]; then
@@ -521,6 +766,16 @@ EOF
 fi
 
 cat > "${GROUP_VARS_DIR}/workers.yml" <<EOF
+allow_http_https: ${workers_allow_http_https}
+firewall_master_tcp_ports:
+  - 80
+  - 443
+enable_worker_landing: ${enable_worker_landing}
+worker_landing_src_dir: "${worker_landing_src_dir}"
+worker_landing_dest_dir: "${worker_landing_dest_dir}"
+worker_landing_http_port: ${worker_landing_http_port}
+worker_landing_https_port: ${worker_landing_https_port}
+worker_landing_enable_https: ${worker_landing_enable_https}
 enable_remnawave_node: ${enable_remnawave_node}
 EOF
 
@@ -534,12 +789,36 @@ node_env_dest: "${node_env_dest}"
 EOF
 fi
 
+if [ "${enable_certbot}" = "true" ]; then
+  mkdir -p "${PRIVATE_DIR}/host_vars/${master_host_name}"
+  cat > "${PRIVATE_DIR}/host_vars/${master_host_name}/certbot.yml" <<EOF
+certbot_domains:
+  - "${master_certbot_domain}"
+EOF
+
+  if [ "${worker_count}" -gt 0 ]; then
+    for i in "${!worker_hosts[@]}"; do
+      worker_name="${worker_hosts[$i]}"
+      worker_certbot_domain="${worker_certbot_domains[$i]}"
+      mkdir -p "${PRIVATE_DIR}/host_vars/${worker_name}"
+      cat > "${PRIVATE_DIR}/host_vars/${worker_name}/certbot.yml" <<EOF
+certbot_domains:
+  - "${worker_certbot_domain}"
+worker_landing_domain: "${worker_certbot_domain}"
+EOF
+    done
+  fi
+fi
+
 echo
 echo "Private inventory/vars created:"
 echo "  ${PRIVATE_DIR}/hosts.yml"
 echo "  ${GROUP_VARS_DIR}/all.yml"
 echo "  ${GROUP_VARS_DIR}/master.yml"
 echo "  ${GROUP_VARS_DIR}/workers.yml"
+if [ "${enable_certbot}" = "true" ]; then
+  echo "  ${PRIVATE_DIR}/host_vars/<host>/certbot.yml"
+fi
 echo
 echo "Run:"
 echo "  tools/ansible/run_prod_private.sh"

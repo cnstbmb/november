@@ -1,6 +1,11 @@
 allow_http_https: true
+firewall_master_tcp_ports:
+  - 80
+  - 443
+  - 9443
+  - 10443
 enable_nginx: false # set true only if nginx runs on host, not in compose
-enable_certbot: false # set true only if certbot runs on host, not in compose
+enable_certbot: true # enable cert issuance on master via certbot role
 enable_monitoring: true
 enable_backups: true
 enable_adguard: true # deploy AdGuard Home on master
@@ -24,3 +29,7 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # compose_src: "########" # local path to master compose file
 # compose_dest_dir: "########"
 # compose_dest_file: "########"
+
+# Required for nodejs-server startup (mounted to /srv/configs/database.json):
+# remnawave_master_database_json_src: "########" # local private path on controller
+# remnawave_master_database_json_dest: "/srv/configs/database.json"

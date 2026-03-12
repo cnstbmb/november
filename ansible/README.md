@@ -24,20 +24,28 @@ Edit these files and replace all `########` placeholders:
 - `ansible_user`, `ansible_port`, `ssh_public_key_path`
 - `timezone`, `swap_size_mb`
 - `repo_root`, `compose_src`, `compose_dest_dir`, `compose_dest_file`, `compose_project_name`
+- `remnawave_master_database_json_src` in `group_vars/master.yml` (required for `nodejs-server`)
+- `letsencrypt_email`, `cloudflare_api_token` in `group_vars/all.yml` (if `enable_certbot: true`)
+- `worker_landing_src_dir` in `group_vars/workers.yml` (if `enable_worker_landing: true`)
 - `backup_target`, `backup_password`, `backup_paths`, `backup_keep_*`, `backup_cron_*` (if backups enabled)
 - `monitoring_*` values (if monitoring enabled)
 - `remnashop_env_src` in `group_vars/master.yml` if `enable_remnashop: true` (recommended)
 
 ## 3) Decide nginx/certbot strategy
 
-Your current `deployments/prod/docker-compose.yml` already runs `webserver` (nginx) and `certbot`.
-If you keep them in Docker, set these variables in `ansible/inventories/prod/group_vars/master.yml`:
+Certbot role now runs on both `master` and `workers` playbooks.
+By default it:
 
-- `enable_nginx: false`
-- `enable_certbot: false`
+- installs `certbot` and `python3-certbot-dns-cloudflare`
+- issues/renews certs via DNS-01 when `enable_certbot: true`
 
-If you want host-level nginx/certbot instead, set both to `true` and make sure ports 80/443
-are not used by Docker containers.
+Per-host domains are read from `host_vars/<host>/certbot.yml` (`certbot_domains` list),
+or fallback to `inventory_hostname`.
+In bootstrap flow, these domains are generated automatically from host names
+entered as `domain=ip`.
+
+When `allow_http_https: true`, firewall role opens TCP ports from `firewall_master_tcp_ports`
+(by default: `80`, `443`, `9443`, `10443`).
 
 ## 4) Run the playbooks (local control machine)
 
@@ -99,7 +107,24 @@ ansible-playbook -i ansible/inventories/prod/hosts.yml ansible/playbooks/master.
 ansible-playbook -i ansible/inventories/prod/hosts.yml ansible/playbooks/workers.yml
 ```
 
-## 5) Monitoring (optional)
+## 5) Worker landing (optional)
+
+If `enable_worker_landing: true` in `group_vars/workers.yml`, workers deploy a dedicated
+`landing-lite` nginx container from `worker_landing_src_dir`.
+
+Defaults:
+
+- HTTP on port `80`
+- HTTPS on port `443`
+- Redirect HTTP -> HTTPS when `worker_landing_enable_https: true`
+
+For HTTPS mode, certbot certificate must exist for worker domain
+(`worker_landing_domain` or first value from `certbot_domains`).
+
+If `enable_remnawave_node: true`, worker node port is opened in UFW automatically from
+`NODE_PORT`/`APP_PORT` in worker `.env` (fallback: `node_firewall_port`, default `2222`).
+
+## 6) Monitoring (optional)
 
 If `enable_monitoring: true`, a small monitoring stack is deployed in the `monitoring_dir` path:
 
@@ -109,7 +134,7 @@ If `enable_monitoring: true`, a small monitoring stack is deployed in the `monit
 
 By default, UFW does not open these ports. Access via SSH tunnel or update firewall rules.
 
-## 6) Backups (optional)
+## 7) Backups (optional)
 
 If `enable_backups: true`, the `backups` role installs `restic`, writes a backup script,
 and schedules a cron job. Make sure:
@@ -117,15 +142,19 @@ and schedules a cron job. Make sure:
 - `backup_target` is reachable from the master node
 - `backup_paths` includes your data directories (e.g. `/srv/pg-data`, `/srv/logs`, `/etc`)
 
-## 7) Common failure points
+## 8) Common failure points
 
 - Wrong SSH port or user in inventory
 - Missing SSH public key file on the control machine
 - Ports 80/443 already in use by Docker and host nginx enabled
+- Missing `database.json` for `nodejs-server` (`remnawave_master_database_json_src` not set or file absent)
+- Certbot enabled, but missing `letsencrypt_email` / `cloudflare_api_token`
+- Certbot enabled, but invalid or missing per-host domain in `host_vars/<host>/certbot.yml`
+- Certbot enabled, but inventory host is an IP instead of domain (use `domain=ip`)
 - `backup_target` requires network access not permitted on the server
 - `remnashop` enabled, but `.env` still has `change_me` placeholders
 
-## 8) AdGuard Home (optional)
+## 9) AdGuard Home (optional)
 
 If you want AdGuard Home on the master node, set in:
 

@@ -3,5 +3,8 @@
   become: true
   roles:
     - stubby
+    - certbot
+    - role: worker_landing
+      when: enable_worker_landing | default(true) | bool
     - role: remnawave_node
       when: enable_remnawave_node | default(true) | bool

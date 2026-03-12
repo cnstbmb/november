@@ -43,6 +43,31 @@
       - worker_env_src_stat.stat.isreg
     fail_msg: "Worker env file not found: {{ worker_env_src }}"
 
+- name: Read worker env file on control-node
+  ansible.builtin.slurp:
+    src: "{{ worker_env_src }}"
+  delegate_to: localhost
+  become: false
+  register: worker_env_src_content
+
+- name: Resolve remnawave node listen port from env
+  ansible.builtin.set_fact:
+    remnawave_node_listen_port: >-
+      {{
+        (
+          (worker_env_src_content.content | b64decode)
+          | regex_findall('(?m)^(?:NODE_PORT|APP_PORT)=([0-9]+)$')
+          | first
+        ) | default(node_firewall_port | default('2222'), true)
+      }}
+
+- name: Allow remnawave node listen port in UFW
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ remnawave_node_listen_port }}"
+    proto: tcp
+  when: remnawave_node_open_firewall | default(true) | bool
+
 - name: Deploy worker compose stack
   ansible.builtin.import_role:
     name: docker_compose

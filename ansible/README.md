@@ -38,6 +38,8 @@ By default it:
 
 - installs `certbot` and `python3-certbot-dns-cloudflare`
 - issues/renews certs via DNS-01 when `enable_certbot: true`
+- enables `certbot.timer` for automatic renewal
+- installs deploy hook that reloads nginx containers after renewal
 
 Per-host domains are read from `host_vars/<host>/certbot.yml` (`certbot_domains` list),
 or fallback to `inventory_hostname`.

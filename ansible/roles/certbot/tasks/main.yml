@@ -6,6 +6,39 @@
     state: present
   when: certbot_install | default(true) | bool
 
+- name: Resolve certbot reload containers
+  ansible.builtin.set_fact:
+    certbot_reload_containers_effective: >-
+      {{
+        certbot_reload_containers
+        if (certbot_reload_containers is defined)
+        else (
+          ['webserver']
+          if ('master' in group_names)
+          else (
+            [worker_landing_project_name]
+            if (
+              'workers' in group_names and
+              (enable_worker_landing | default(true) | bool) and
+              (worker_landing_project_name is defined and worker_landing_project_name | length > 0)
+            )
+            else (
+              ['landing-lite']
+              if ('workers' in group_names and (enable_worker_landing | default(true) | bool))
+              else []
+            )
+          )
+        )
+      }}
+  when: certbot_install | default(true) | bool
+
+- name: Ensure certbot timer is enabled
+  ansible.builtin.systemd_service:
+    name: certbot.timer
+    enabled: true
+    state: started
+  when: certbot_install | default(true) | bool
+
 - name: Resolve certbot domains
   ansible.builtin.set_fact:
     certbot_domains_effective: >-
@@ -32,6 +65,20 @@
     src: cloudflare.ini.j2
     dest: "{{ certbot_credentials_path }}"
     mode: "0600"
+  when: enable_certbot | default(false) | bool
+
+- name: Ensure certbot deploy hook directory exists
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/deploy
+    state: directory
+    mode: "0755"
+  when: enable_certbot | default(false) | bool
+
+- name: Install certbot deploy hook to reload containers
+  ansible.builtin.template:
+    src: reload-containers.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-containers.sh
+    mode: "0755"
   when: enable_certbot | default(false) | bool
 
 - name: Obtain certificate via DNS-01

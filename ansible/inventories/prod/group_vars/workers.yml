@@ -4,7 +4,7 @@ firewall_master_tcp_ports:
   - 443
 
 enable_worker_landing: true
-worker_landing_src_dir: "########" # e.g. /Users/konstantin/november/deployments/landing-lite/site
+worker_landing_src_dir: "########" # e.g. deployments/landing-lite/site
 worker_landing_dest_dir: "/opt/landing-lite"
 worker_landing_http_port: 80
 worker_landing_https_port: 443
@@ -15,12 +15,12 @@ worker_landing_enable_https: true
 enable_remnawave_node: false
 
 # Worker-specific compose file for remnawave node agent
-node_compose_src: "########" # e.g. /Users/konstantin/november/deployments/prod/remnawave-node/docker-compose.yml
+node_compose_src: "########" # e.g. deployments/prod/remnawave-node/docker-compose.yml
 node_compose_dest_dir: "/opt/remnawave-node"
 node_compose_dest_file: "/opt/remnawave-node/docker-compose.yml"
 
 # Optional .env for worker compose
-node_env_src: "########" # e.g. /Users/konstantin/november/deployments/prod/remnawave-node/.env
+node_env_src: "########" # e.g. deployments/prod/remnawave-node/.env
 node_env_dest: "/opt/remnawave-node/.env"
 # remnawave_node_open_firewall: true # auto-open NODE_PORT/APP_PORT from node env in UFW
 # node_firewall_port: 2222 # fallback if NODE_PORT/APP_PORT is missing in env

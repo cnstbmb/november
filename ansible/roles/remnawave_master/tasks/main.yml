@@ -14,11 +14,66 @@
     path: "{{ item }}"
     state: directory
     mode: "0755"
-  loop: "{{ remnawave_master_required_dirs | default(['/srv/certbot/etc', '/srv/certbot/var', '/srv/views', '/srv/dhparam', '/srv/configs', '/srv/pg-data', '/srv/logs', '/srv/postgres', '/srv/postgres/init', '/root/cert']) }}"
+  loop: "{{ remnawave_master_required_dirs | default(['/srv/views', '/srv/dhparam', '/srv/configs', '/srv/pg-data', '/srv/logs', '/srv/postgres', '/srv/postgres/init']) }}"
+
+- name: Resolve master nginx domains
+  ansible.builtin.set_fact:
+    remnawave_master_server_names_effective: >-
+      {{
+        remnawave_master_server_names
+        if (remnawave_master_server_names is defined and remnawave_master_server_names is sequence and remnawave_master_server_names is not string)
+        else (
+          [remnawave_master_server_names]
+          if (remnawave_master_server_names is defined and remnawave_master_server_names | length > 0)
+          else (
+            certbot_domains
+            if (certbot_domains is defined and certbot_domains is sequence and certbot_domains is not string)
+            else ([certbot_domains] if (certbot_domains is defined and certbot_domains | length > 0) else [inventory_hostname])
+          )
+        )
+      }}
+
+- name: Resolve master TLS domain
+  ansible.builtin.set_fact:
+    remnawave_master_tls_domain_effective: "{{ remnawave_master_tls_domain | default(remnawave_master_server_names_effective | first, true) }}"
+
+- name: Ensure master TLS certificate exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ remnawave_master_tls_domain_effective }}/fullchain.pem"
+  register: remnawave_master_fullchain_stat
+
+- name: Ensure master TLS private key exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ remnawave_master_tls_domain_effective }}/privkey.pem"
+  register: remnawave_master_privkey_stat
+
+- name: Validate master TLS files exist before starting compose
+  ansible.builtin.assert:
+    that:
+      - remnawave_master_fullchain_stat.stat.exists
+      - remnawave_master_privkey_stat.stat.exists
+    fail_msg: >-
+      TLS certificate files for {{ remnawave_master_tls_domain_effective }} are missing on master.
+      Ensure certbot issued the certificate before remnawave_master starts the webserver container.
 
 - name: Resolve remnawave database config paths
   ansible.builtin.set_fact:
-    remnawave_master_database_json_src_effective: "{{ remnawave_master_database_json_src | default(repo_root ~ '/deployments/prod/configs/database.json') }}"
+    remnawave_master_database_json_src_effective: >-
+      {{
+        remnawave_master_database_json_src
+        if (
+          remnawave_master_database_json_src is defined and
+          remnawave_master_database_json_src | regex_search('^/')
+        )
+        else (
+          (repo_root ~ '/' ~ remnawave_master_database_json_src)
+          if (
+            remnawave_master_database_json_src is defined and
+            remnawave_master_database_json_src | length > 0
+          )
+          else (repo_root ~ '/backend/configs/database.json')
+        )
+      }}
     remnawave_master_database_json_dest_effective: "{{ remnawave_master_database_json_dest | default('/srv/configs/database.json') }}"
     remnawave_master_database_json_mode_effective: "{{ remnawave_master_database_json_mode | default('0644') }}"
   when: remnawave_master_copy_database_json | default(true) | bool
@@ -70,10 +125,10 @@
     state: directory
     mode: "0755"
 
-- name: Copy nginx config to master compose path
-  ansible.builtin.copy:
-    src: "{{ remnawave_master_nginx_conf_src | default(repo_root ~ '/deployments/prod/nginx-conf/') }}"
-    dest: "{{ remnawave_master_nginx_conf_dest | default(compose_dest_dir ~ '/nginx-conf/') }}"
+- name: Render nginx config to master compose path
+  ansible.builtin.template:
+    src: "{{ remnawave_master_nginx_conf_template | default('nginx.conf.j2') }}"
+    dest: "{{ remnawave_master_nginx_conf_file | default((remnawave_master_nginx_conf_dest | default(compose_dest_dir ~ '/nginx-conf/')) ~ '/nginx.conf') }}"
     mode: "0644"
 
 - name: Copy postgres init scripts to master data path

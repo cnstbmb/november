@@ -34,6 +34,65 @@ prompt_secret() {
   printf -v "${var_name}" "%s" "${value}"
 }
 
+trim_whitespace() {
+  local value="$1"
+
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "${value}"
+}
+
+normalize_bearer_token() {
+  local value
+  value="$(trim_whitespace "${1//$'\r'/}")"
+  case "${value}" in
+    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+  esac
+  if [[ "${value}" =~ ^[Aa]uthorization:[[:space:]]*[Bb]earer[[:space:]]+(.+)$ ]]; then
+    value="${BASH_REMATCH[1]}"
+  elif [[ "${value}" =~ ^[Aa]uthorization:[[:space:]]+(.+)$ ]]; then
+    value="${BASH_REMATCH[1]}"
+  fi
+  case "${value}" in
+    [Bb]earer\ *) value="$(trim_whitespace "${value#* }")" ;;
+  esac
+  case "${value}" in
+    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+  esac
+  printf '%s' "$(trim_whitespace "${value}")"
+}
+
+validate_cloudflare_token() {
+  local value="$1"
+
+  if [ -z "${value}" ]; then
+    echo "Cloudflare API token is empty."
+    return 1
+  fi
+
+  if [[ "${value}" =~ [[:space:]] ]]; then
+    echo "Cloudflare API token contains whitespace."
+    echo "Paste raw token value from Cloudflare dashboard, without Authorization header or Bearer prefix."
+    return 1
+  fi
+
+  if [[ "${value}" == *:* ]]; then
+    echo "Cloudflare API token still contains ':' after normalization."
+    echo "Paste raw token value from Cloudflare dashboard, not a full Authorization header."
+    return 1
+  fi
+
+  if [[ "${value}" =~ ^[Aa]uthorization$|^[Bb]earer$ ]]; then
+    echo "Cloudflare API token is incomplete."
+    echo "Paste raw token value from Cloudflare dashboard."
+    return 1
+  fi
+
+  return 0
+}
+
 prompt_bool() {
   local var_name="$1"
   local message="$2"
@@ -115,6 +174,9 @@ import urllib.parse
 import urllib.request
 
 token = sys.argv[1]
+token = token.strip()
+if token.lower().startswith("bearer "):
+    token = token[7:].strip()
 pairs = sys.argv[2:]
 if len(pairs) % 2 != 0:
     raise SystemExit("Internal error: invalid host/ip pairs for Cloudflare DNS sync")
@@ -172,50 +234,54 @@ def find_zone_id(hostname):
     raise RuntimeError(f"Cloudflare zone not found for host '{hostname}'")
 
 
-for i in range(0, len(pairs), 2):
-    hostname = pairs[i].strip().lower()
-    target_ip = pairs[i + 1].strip()
-    try:
-        ipaddress.ip_address(target_ip)
-    except ValueError as exc:
-        raise RuntimeError(
-            f"Cannot create DNS record for '{hostname}': target '{target_ip}' is not an IP. "
-            "Use host format name=ip in bootstrap."
-        ) from exc
+try:
+    for i in range(0, len(pairs), 2):
+        hostname = pairs[i].strip().lower()
+        target_ip = pairs[i + 1].strip()
+        try:
+            ipaddress.ip_address(target_ip)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Cannot create DNS record for '{hostname}': target '{target_ip}' is not an IP. "
+                "Use host format name=ip in bootstrap."
+            ) from exc
 
-    record_type = "AAAA" if ":" in target_ip else "A"
-    zone_id, zone_name = find_zone_id(hostname)
+        record_type = "AAAA" if ":" in target_ip else "A"
+        zone_id, zone_name = find_zone_id(hostname)
 
-    records = api("GET", f"/zones/{zone_id}/dns_records", {
-        "type": record_type,
-        "name": hostname,
-        "per_page": "1",
-    })
+        records = api("GET", f"/zones/{zone_id}/dns_records", {
+            "type": record_type,
+            "name": hostname,
+            "per_page": "1",
+        })
 
-    payload = {
-        "type": record_type,
-        "name": hostname,
-        "content": target_ip,
-        "ttl": 1,
-        "proxied": False,
-    }
+        payload = {
+            "type": record_type,
+            "name": hostname,
+            "content": target_ip,
+            "ttl": 1,
+            "proxied": False,
+        }
 
-    if records:
-        record = records[0]
-        record_id = record.get("id")
-        if (
-            record.get("type") == record_type
-            and record.get("content") == target_ip
-            and record.get("proxied") is False
-        ):
-            print(f"[cloudflare] OK   {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
-            continue
+        if records:
+            record = records[0]
+            record_id = record.get("id")
+            if (
+                record.get("type") == record_type
+                and record.get("content") == target_ip
+                and record.get("proxied") is False
+            ):
+                print(f"[cloudflare] OK   {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+                continue
 
-        api("PATCH", f"/zones/{zone_id}/dns_records/{record_id}", payload=payload)
-        print(f"[cloudflare] UPD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
-    else:
-        api("POST", f"/zones/{zone_id}/dns_records", payload=payload)
-        print(f"[cloudflare] ADD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+            api("PATCH", f"/zones/{zone_id}/dns_records/{record_id}", payload=payload)
+            print(f"[cloudflare] UPD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+        else:
+            api("POST", f"/zones/{zone_id}/dns_records", payload=payload)
+            print(f"[cloudflare] ADD  {hostname} -> {target_ip} ({record_type}, zone {zone_name})")
+except Exception as exc:
+    print(str(exc), file=sys.stderr)
+    raise SystemExit(1)
 PY
 }
 
@@ -278,19 +344,37 @@ fi
 prompt timezone "Timezone" "Europe/Moscow"
 prompt swap_size_mb "Swap size MB" "2048"
 prompt compose_project_name "Docker compose project name" "november"
-prompt compose_src "Локальный путь к compose файлу на control-node" "${ROOT_DIR}/deployments/prod/docker-compose.yml"
+prompt compose_src "Локальный путь к compose файлу на control-node" "deployments/prod/docker-compose.yml"
 prompt compose_dest_dir "Директория на target хосте для compose" "/opt/november"
 prompt compose_dest_file "Полный путь docker-compose.yml на target" "/opt/november/docker-compose.yml"
+resolved_compose_src="${compose_src}"
+if [[ "${resolved_compose_src}" != /* ]]; then
+  resolved_compose_src="${ROOT_DIR}/${resolved_compose_src}"
+fi
+if [ ! -f "${resolved_compose_src}" ]; then
+  echo "Compose file not found: ${compose_src}"
+  exit 1
+fi
 default_env_src=""
 if [ -f "${ROOT_DIR}/deployments/prod/database.env" ]; then
-  default_env_src="${ROOT_DIR}/deployments/prod/database.env"
+  default_env_src="deployments/prod/database.env"
 fi
 prompt env_src "Локальный путь к .env (пусто если не копировать)" "${default_env_src}"
 prompt env_dest "Путь .env на target (пусто если не копировать)" "/opt/november/database.env"
+if [ -n "${env_src}" ]; then
+  resolved_env_src="${env_src}"
+  if [[ "${resolved_env_src}" != /* ]]; then
+    resolved_env_src="${ROOT_DIR}/${resolved_env_src}"
+  fi
+  if [ ! -f "${resolved_env_src}" ]; then
+    echo ".env file not found: ${env_src}"
+    exit 1
+  fi
+fi
 
-default_database_json_src=""
-for candidate in "${ROOT_DIR}/.private/ansible/prod/database.json" "${ROOT_DIR}/deployments/prod/configs/database.json"; do
-  if [ -f "${candidate}" ]; then
+default_database_json_src="backend/configs/database.json"
+for candidate in ".private/ansible/prod/database.json" "backend/configs/database.json"; do
+  if [ -f "${ROOT_DIR}/${candidate}" ]; then
     default_database_json_src="${candidate}"
     break
   fi
@@ -300,7 +384,11 @@ if [ -z "${remnawave_master_database_json_src}" ]; then
   echo "database.json path is required for master deploy."
   exit 1
 fi
-if [ ! -f "${remnawave_master_database_json_src}" ]; then
+resolved_database_json_src="${remnawave_master_database_json_src}"
+if [[ "${resolved_database_json_src}" != /* ]]; then
+  resolved_database_json_src="${ROOT_DIR}/${resolved_database_json_src}"
+fi
+if [ ! -f "${resolved_database_json_src}" ]; then
   echo "database.json file not found: ${remnawave_master_database_json_src}"
   exit 1
 fi
@@ -399,8 +487,8 @@ if [ "${enable_certbot}" = "true" ]; then
     exit 1
   fi
   prompt_secret cloudflare_api_token "Cloudflare API token (Zone:Read + DNS:Edit)"
-  if [ -z "${cloudflare_api_token}" ]; then
-    echo "Cloudflare API token is required when certbot is enabled."
+  cloudflare_api_token="$(normalize_bearer_token "${cloudflare_api_token}")"
+  if ! validate_cloudflare_token "${cloudflare_api_token}"; then
     exit 1
   fi
   prompt certbot_credentials_path "Путь credentials файла certbot на target" "/etc/letsencrypt/cloudflare.ini"
@@ -416,7 +504,13 @@ if [ "${enable_certbot}" = "true" ]; then
         dns_pairs+=("${worker_certbot_domains[$i]}" "${worker_targets[$i]}")
       done
     fi
-    cloudflare_upsert_dns_records "${cloudflare_api_token}" "${dns_pairs[@]}"
+    if ! cloudflare_upsert_dns_records "${cloudflare_api_token}" "${dns_pairs[@]}"; then
+      echo
+      echo "Cloudflare DNS sync failed."
+      echo "Most common cause: wrong token format. Paste raw API token value from Cloudflare, not 'Authorization: Bearer ...'."
+      echo "If you want to finish bootstrap without DNS API calls, rerun and answer 'n' to Cloudflare DNS auto-update."
+      exit 1
+    fi
   fi
 fi
 
@@ -433,8 +527,12 @@ worker_landing_https_port="443"
 worker_landing_enable_https="false"
 workers_allow_http_https="false"
 if [ "${enable_worker_landing}" = "true" ]; then
-  prompt worker_landing_src_dir "Локальный путь к worker landing site dir" "${ROOT_DIR}/deployments/landing-lite/site"
-  if [ ! -d "${worker_landing_src_dir}" ]; then
+  prompt worker_landing_src_dir "Локальный путь к worker landing site dir" "deployments/landing-lite/site"
+  resolved_worker_landing_src_dir="${worker_landing_src_dir}"
+  if [[ "${resolved_worker_landing_src_dir}" != /* ]]; then
+    resolved_worker_landing_src_dir="${ROOT_DIR}/${resolved_worker_landing_src_dir}"
+  fi
+  if [ ! -d "${resolved_worker_landing_src_dir}" ]; then
     echo "Worker landing site dir not found: ${worker_landing_src_dir}"
     exit 1
   fi
@@ -462,11 +560,29 @@ else
 fi
 
 if [ "${enable_remnawave_node}" = "true" ]; then
-  prompt node_compose_src "Локальный путь к worker compose файлу" "${ROOT_DIR}/deployments/prod/remnawave-node/docker-compose.yml"
+  prompt node_compose_src "Локальный путь к worker compose файлу" "deployments/prod/remnawave-node/docker-compose.yml"
+  resolved_node_compose_src="${node_compose_src}"
+  if [[ "${resolved_node_compose_src}" != /* ]]; then
+    resolved_node_compose_src="${ROOT_DIR}/${resolved_node_compose_src}"
+  fi
+  if [ ! -f "${resolved_node_compose_src}" ]; then
+    echo "Worker compose file not found: ${node_compose_src}"
+    exit 1
+  fi
   prompt node_compose_dest_dir "Директория worker compose на target" "/opt/remnawave-node"
   prompt node_compose_dest_file "Полный путь worker docker-compose.yml на target" "/opt/remnawave-node/docker-compose.yml"
   prompt node_env_src "Локальный путь к worker .env (пусто если не копировать)" ""
   prompt node_env_dest "Путь worker .env на target (пусто если не копировать)" "/opt/remnawave-node/.env"
+  if [ -n "${node_env_src}" ]; then
+    resolved_node_env_src="${node_env_src}"
+    if [[ "${resolved_node_env_src}" != /* ]]; then
+      resolved_node_env_src="${ROOT_DIR}/${resolved_node_env_src}"
+    fi
+    if [ ! -f "${resolved_node_env_src}" ]; then
+      echo "Worker .env file not found: ${node_env_src}"
+      exit 1
+    fi
+  fi
 fi
 
 prompt_bool enable_monitoring "Включить monitoring на master?" "true"

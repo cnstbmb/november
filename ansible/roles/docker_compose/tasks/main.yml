@@ -1,3 +1,18 @@
+- name: Resolve local compose paths on control-node
+  ansible.builtin.set_fact:
+    compose_src_effective: >-
+      {{
+        compose_src
+        if (compose_src is defined and compose_src | regex_search('^/'))
+        else ((repo_root ~ '/' ~ compose_src) if (compose_src is defined and compose_src | length > 0) else '')
+      }}
+    env_src_effective: >-
+      {{
+        env_src
+        if (env_src is defined and env_src | regex_search('^/'))
+        else ((repo_root ~ '/' ~ env_src) if (env_src is defined and env_src | length > 0) else '')
+      }}
+
 - name: Ensure compose destination directory exists
   ansible.builtin.file:
     path: "{{ compose_dest_dir }}"
@@ -6,13 +21,13 @@
 
 - name: Copy docker-compose file
   ansible.builtin.copy:
-    src: "{{ compose_src }}"
+    src: "{{ compose_src_effective }}"
     dest: "{{ compose_dest_file }}"
     mode: "0644"
 
 - name: Copy env file if provided
   ansible.builtin.copy:
-    src: "{{ env_src }}"
+    src: "{{ env_src_effective }}"
     dest: "{{ env_dest }}"
     mode: "0600"
   when: env_src is defined and env_src | length > 0

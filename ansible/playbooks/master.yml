@@ -2,13 +2,13 @@
   hosts: master
   become: true
   roles:
+    - certbot
     - remnawave_master
     - role: remnashop
       when: enable_remnashop | bool
     - adguard_home
     - role: nginx
       when: enable_nginx | bool
-    - certbot
     - role: monitoring
       when: enable_monitoring | bool
     - role: backups

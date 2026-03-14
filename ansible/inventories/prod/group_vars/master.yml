@@ -56,3 +56,8 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # node_env_dest: "/opt/remnawave-node/.env"
 # remnawave_node_open_firewall: true
 # node_firewall_port: 2222
+
+# Extra host-specific TCP ports can be stored in
+# .private/ansible/prod/host_vars/<host>/remnawave_topology.yml
+# firewall_extra_tcp_ports:
+#   - 9443

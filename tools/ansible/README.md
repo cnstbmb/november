@@ -24,6 +24,14 @@ tools/ansible/run_prod_private.sh
 tools/ansible/bootstrap_remnawave_node_env.sh
 ```
 
+Подготовка private topology vars и `Config Profile` JSON для расширяемой схемы
+`edge -> transit -> multiple exits` на `XHTTP`
+с optional direct client ingress на выбранных worker-нодах:
+
+```bash
+tools/ansible/bootstrap_remnawave_topology.sh
+```
+
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы
 `node_env_src` для каждого хоста, где включена нода, был задан и файл существовал
 локально на control-node.
@@ -90,6 +98,12 @@ tools/ansible/warmup_prod_private.sh
 `.private/ansible/prod/remnawave-node/<host>.env` и host vars для каждого выбранного host.
 При деплое `remnawave_node` Ansible автоматически читает `NODE_PORT`/`APP_PORT`
 из этого `.env` и открывает соответствующий TCP-порт в UFW на том host, где запускается нода.
+`deployments/prod/remnawave-node/docker-compose.yml` также монтирует
+`/etc/letsencrypt` в контейнер, чтобы XHTTP/TLS inbounds в custom profiles могли
+читать certbot-сертификаты с host.
+Для дополнительных портов topology-helper пишет `firewall_extra_tcp_ports` в
+`.private/ansible/prod/host_vars/<host>/remnawave_topology.yml`; роль `firewall`
+открывает их при следующем прогоне `base`/`site`.
 
 Выбрать playbook интерактивно:
 

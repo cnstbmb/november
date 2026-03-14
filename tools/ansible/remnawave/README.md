@@ -5,6 +5,10 @@
 - `entry_ru_to_de.profile.example.json`: шаблон `Config Profile` для entry-ноды:
 вход клиентов на RU entry (`inbounds`), локальный выход для RU (`outbound: DIRECT`), выход через DE node для всего остального (`outbound: DE_EXIT`).
 - `worker-node.docker-compose.example.yml`: пример compose для worker-ноды (`remnawave/node`).
+- `../bootstrap_remnawave_topology.sh`: интерактивный helper, который подготавливает
+  private JSON-профили для схемы `edge -> transit -> multiple exits` на `XHTTP`,
+  умеет включать optional direct client ingress на worker-нодах и пишет
+  `firewall_extra_tcp_ports` в host vars.
 
 ## Как применить
 

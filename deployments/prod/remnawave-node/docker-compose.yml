@@ -7,3 +7,5 @@ services:
     env_file:
       - .env
     network_mode: host
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro

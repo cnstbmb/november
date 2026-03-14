@@ -25,3 +25,8 @@ node_env_dest: "/opt/remnawave-node/.env"
 # Optional resource limits for node containers (if needed in compose)
 # node_cpu_limit: "########"
 # node_mem_limit: "########"
+
+# Extra host-specific TCP ports can be stored in
+# .private/ansible/prod/host_vars/<host>/remnawave_topology.yml
+# firewall_extra_tcp_ports:
+#   - 443

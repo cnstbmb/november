@@ -28,3 +28,13 @@
     proto: tcp
   loop: "{{ firewall_master_tcp_ports | default([80, 443, 9443, 10443]) }}"
   when: allow_http_https | bool
+
+- name: Allow extra ingress TCP ports
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ firewall_extra_tcp_ports | default([]) }}"
+  when:
+    - firewall_extra_tcp_ports is defined
+    - firewall_extra_tcp_ports | length > 0

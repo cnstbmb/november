@@ -37,6 +37,9 @@ tools/ansible/bootstrap_remnawave_node_env.sh
 `.private/ansible/prod/remnashop/.env`.
 Если одновременно включены `monitoring` и `AdGuard`, bootstrap по умолчанию
 предложит `adguard_web_port=3001`, чтобы избежать конфликта с Grafana (`3000`).
+Если нужно управлять самим `AdGuardHome.yaml` через Ansible, включайте это отдельно
+через `adguard_manage_config: true` в `.private/ansible/prod/group_vars/master.yml`
+и храните чувствительные поля (`adguard_users`, IP-ограничения и т.п.) только в `.private`.
 По умолчанию bootstrap также включает certbot для всех хостов (`master` + `workers`),
 спрашивает `letsencrypt_email` и `cloudflare_api_token`.
 Домены для certbot берутся автоматически из host names, которые вы вводите в первом шаге

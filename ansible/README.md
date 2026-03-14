@@ -167,5 +167,15 @@ Defaults:
 - DNS on port 53 TCP/UDP
 - Data in `/opt/adguardhome`
 
+If you want Ansible to manage `AdGuardHome.yaml` too, set:
+
+```yml
+adguard_manage_config: true
+```
+
+Keep sensitive values like `adguard_users` password hashes in `.private`, not in git.
+If TLS is enabled in AdGuard config, use cert paths from `/etc/letsencrypt/...` because
+the role mounts host Let's Encrypt certificates into the container.
+
 If port 53 is already in use on the master, change `adguard_dns_port` or
 disable the conflicting service.

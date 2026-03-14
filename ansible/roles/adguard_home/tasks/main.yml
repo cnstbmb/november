@@ -20,23 +20,36 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Render AdGuard Home config from template
+  ansible.builtin.template:
+    src: AdGuardHome.yaml.j2
+    dest: "{{ adguard_config_file }}"
+    mode: "0600"
+  register: adguard_home_config_template
+  when:
+    - enable_adguard | bool
+    - adguard_manage_config | bool
+    - not ansible_check_mode
+
 - name: Check existing AdGuard Home config
   ansible.builtin.stat:
-    path: "{{ adguard_conf_dir }}/AdGuardHome.yaml"
+    path: "{{ adguard_config_file }}"
   register: adguard_home_config_stat
   when:
     - enable_adguard | bool
+    - not (adguard_manage_config | bool)
     - not ansible_check_mode
 
 - name: Force AdGuard Home internal web port to configured value
   ansible.builtin.lineinfile:
-    path: "{{ adguard_conf_dir }}/AdGuardHome.yaml"
+    path: "{{ adguard_config_file }}"
     regexp: '^  address: .*$'
     line: "  address: 0.0.0.0:{{ adguard_internal_web_port }}"
     backrefs: false
   register: adguard_home_http_address
   when:
     - enable_adguard | bool
+    - not (adguard_manage_config | bool)
     - adguard_home_config_stat.stat.exists
     - not ansible_check_mode
 
@@ -58,6 +71,18 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Allow AdGuard Home DNS-over-TLS
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_tls_port_dns_over_tls }}"
+    proto: tcp
+  when:
+    - enable_adguard | bool
+    - adguard_manage_config | bool
+    - adguard_tls_enabled | bool
+    - adguard_tls_port_dns_over_tls | int > 0
+    - not ansible_check_mode
+
 - name: Allow AdGuard Home web UI
   ansible.builtin.ufw:
     rule: allow
@@ -65,6 +90,18 @@
     proto: tcp
   when:
     - enable_adguard | bool
+    - not ansible_check_mode
+
+- name: Allow AdGuard Home HTTPS UI
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_tls_port_https }}"
+    proto: tcp
+  when:
+    - enable_adguard | bool
+    - adguard_manage_config | bool
+    - adguard_tls_enabled | bool
+    - adguard_tls_port_https | int > 0
     - not ansible_check_mode
 
 - name: Validate AdGuard and Grafana host ports do not conflict
@@ -76,6 +113,23 @@
         )
     fail_msg: >-
       adguard_web_port ({{ adguard_web_port }}) conflicts with
+      monitoring_grafana_port ({{ monitoring_grafana_port | default('undefined') }}).
+      Set one of these host ports to a different value.
+  when:
+    - enable_adguard | bool
+
+- name: Validate AdGuard HTTPS UI and Grafana host ports do not conflict
+  ansible.builtin.assert:
+    that:
+      - not (
+          enable_monitoring | default(false) | bool and
+          adguard_manage_config | bool and
+          adguard_tls_enabled | bool and
+          adguard_tls_port_https | int > 0 and
+          (monitoring_grafana_port | default(-1) | int == adguard_tls_port_https | int)
+        )
+    fail_msg: >-
+      adguard_tls_port_https ({{ adguard_tls_port_https }}) conflicts with
       monitoring_grafana_port ({{ monitoring_grafana_port | default('undefined') }}).
       Set one of these host ports to a different value.
   when:
@@ -143,6 +197,13 @@
   ansible.builtin.command: docker restart {{ adguard_container_name }}
   when:
     - enable_adguard | bool
-    - adguard_home_http_address is defined
-    - adguard_home_http_address is changed
+    - (
+        (adguard_manage_config | bool) and
+        (adguard_home_config_template is defined) and
+        (adguard_home_config_template is changed)
+      ) or (
+        not (adguard_manage_config | bool) and
+        (adguard_home_http_address is defined) and
+        (adguard_home_http_address is changed)
+      )
     - not ansible_check_mode

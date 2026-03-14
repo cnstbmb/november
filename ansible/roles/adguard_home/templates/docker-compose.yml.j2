@@ -8,8 +8,15 @@ services:
       - "{{ adguard_web_port }}:{{ adguard_internal_web_port }}/tcp"
       - "{{ adguard_dns_port }}:53/tcp"
       - "{{ adguard_dns_port }}:53/udp"
+{% if adguard_tls_enabled | bool and (adguard_tls_port_https | int) > 0 %}
+      - "{{ adguard_tls_port_https }}:{{ adguard_tls_port_https }}/tcp"
+{% endif %}
+{% if adguard_tls_enabled | bool and (adguard_tls_port_dns_over_tls | int) > 0 %}
+      - "{{ adguard_tls_port_dns_over_tls }}:{{ adguard_tls_port_dns_over_tls }}/tcp"
+{% endif %}
     volumes:
       - "{{ adguard_conf_dir }}:/opt/adguardhome/conf"
       - "{{ adguard_work_dir }}:/opt/adguardhome/work"
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     environment:
       TZ: "{{ adguard_timezone }}"

@@ -21,7 +21,7 @@
     port: "{{ ansible_port }}"
     proto: tcp
 
-- name: Allow ingress ports on master
+- name: Allow configured ingress TCP ports
   ansible.builtin.ufw:
     rule: allow
     port: "{{ item }}"

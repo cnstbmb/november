@@ -13,18 +13,19 @@
         certbot_reload_containers
         if (certbot_reload_containers is defined)
         else (
-          ['webserver']
-          if ('master' in group_names)
-          else (
-            [worker_landing_project_name]
+          (
+            [remnawave_panel_proxy_container_name]
             if (
-              'workers' in group_names and
-              (enable_worker_landing | default(true) | bool) and
-              (worker_landing_project_name is defined and worker_landing_project_name | length > 0)
+              'master' in group_names and
+              (enable_remnawave_panel | default(false) | bool) and
+              (remnawave_panel_proxy_container_name is defined and remnawave_panel_proxy_container_name | length > 0)
             )
             else (
-              ['landing-lite']
-              if ('workers' in group_names and (enable_worker_landing | default(true) | bool))
+              ['remnawave-panel-proxy']
+              if (
+                'master' in group_names and
+                (enable_remnawave_panel | default(false) | bool)
+              )
               else []
             )
           )

@@ -23,10 +23,8 @@ Edit these files and replace all `########` placeholders:
 
 - `ansible_user`, `ansible_port`, `ssh_public_key_path`
 - `timezone`, `swap_size_mb`
-- `repo_root`, `compose_src`, `compose_dest_dir`, `compose_dest_file`, `compose_project_name`
-- `remnawave_master_database_json_src` in `group_vars/master.yml` (required for `nodejs-server`)
+- `repo_root`, `compose_project_name`
 - `letsencrypt_email`, `cloudflare_api_token` in `group_vars/all.yml` (if `enable_certbot: true`)
-- `worker_landing_src_dir` in `group_vars/workers.yml` (if `enable_worker_landing: true`)
 - `backup_target`, `backup_password`, `backup_paths`, `backup_keep_*`, `backup_cron_*` (if backups enabled)
 - `monitoring_*` values (if monitoring enabled)
 - `remnashop_env_src` in `group_vars/master.yml` if `enable_remnashop: true` (recommended)
@@ -48,7 +46,7 @@ In bootstrap flow, these domains are generated automatically from host names
 entered as `domain=ip`.
 
 When `allow_http_https: true`, firewall role opens TCP ports from `firewall_master_tcp_ports`
-(by default: `80`, `443`, `9443`, `10443`).
+(by default on master: `80`, `443`).
 
 ## 4) Run the playbooks (local control machine)
 
@@ -110,22 +108,19 @@ ansible-playbook -i ansible/inventories/prod/hosts.yml ansible/playbooks/master.
 ansible-playbook -i ansible/inventories/prod/hosts.yml ansible/playbooks/workers.yml
 ```
 
-## 5) Worker landing (optional)
+## 5) Remnawave Nodes
 
-If `enable_worker_landing: true` in `group_vars/workers.yml`, workers deploy a dedicated
-`landing-lite` nginx container from `worker_landing_src_dir`.
+If `enable_remnawave_node: true`, remnawave node is deployed on the selected host
+from `deployments/prod/remnawave-node/docker-compose.yml`.
 
-Defaults:
+Recommended flow:
 
-- HTTP on port `80`
-- HTTPS on port `443`
-- Redirect HTTP -> HTTPS when `worker_landing_enable_https: true`
+- use `tools/ansible/bootstrap_remnawave_node_env.sh` to generate per-host private `.env`
+- keep secrets in `.private/ansible/prod/remnawave-node/<host>.env`
+- store host override in `.private/ansible/prod/host_vars/<host>/remnawave_node.yml`
 
-For HTTPS mode, certbot certificate must exist for worker domain
-(`worker_landing_domain` or first value from `certbot_domains`).
-
-If `enable_remnawave_node: true`, worker node port is opened in UFW automatically from
-`NODE_PORT`/`APP_PORT` in worker `.env` (fallback: `node_firewall_port`, default `2222`).
+On deploy, Ansible opens node TCP port automatically from `NODE_PORT`/`APP_PORT`
+in host `.env` (fallback: `node_firewall_port`, default `2222`).
 
 ## 6) Monitoring (optional)
 
@@ -150,7 +145,6 @@ and schedules a cron job. Make sure:
 - Wrong SSH port or user in inventory
 - Missing SSH public key file on the control machine
 - Ports 80/443 already in use by Docker and host nginx enabled
-- Missing `database.json` for `nodejs-server` (`remnawave_master_database_json_src` not set or file absent)
 - Certbot enabled, but missing `letsencrypt_email` / `cloudflare_api_token`
 - Certbot enabled, but invalid or missing per-host domain in `host_vars/<host>/certbot.yml`
 - Certbot enabled, but inventory host is an IP instead of domain (use `domain=ip`)

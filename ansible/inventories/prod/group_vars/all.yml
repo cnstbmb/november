@@ -11,17 +11,11 @@ install_docker: true
 docker_users:
   - "########" # add user(s) to docker group, remove list if unused
 
-# Compose paths (local on controller -> remote on host)
+# Shared local repo settings
 repo_root: "########" # local path to repo root on controller
 compose_project_name: "########" # docker compose project name
-compose_src: "########" # local path to master compose file
-compose_dest_dir: "########" # remote dir, e.g. /opt/remnawave
-compose_dest_file: "########" # remote file, e.g. /opt/remnawave/docker-compose.yml
 # docker_compose_pull: true # pull fresh images on deploy (default true)
 # docker_compose_pull_policy: "always" # optional explicit policy for `docker compose up --pull`
-
-env_src: "########" # local path to .env, set empty or delete if unused
-env_dest: "########" # remote path for .env, set empty or delete if unused
 
 # Firewall
 allow_http_https: false # set true on master via group_vars
@@ -31,8 +25,6 @@ enable_nginx: false # set true if nginx runs on host
 certbot_install: true # install certbot packages on hosts where certbot role runs
 enable_certbot: true # issue/renew certificates via Cloudflare DNS-01
 letsencrypt_email: "########" # required when enable_certbot=true
-panel_domain: "########" # optional legacy var for nginx role
-remnawave_upstream_port: ######## # local port for panel/api upstream, e.g. 8080
 cloudflare_api_token: "########" # Cloudflare API token (Zone:Read + DNS:Edit)
 certbot_credentials_path: "/etc/letsencrypt/cloudflare.ini"
 certbot_dns_propagation_seconds: 60 # wait time for DNS-01 TXT propagation

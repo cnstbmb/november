@@ -5,7 +5,7 @@ services:
     container_name: "{{ adguard_container_name }}"
     restart: unless-stopped
     ports:
-      - "{{ adguard_web_port }}:3000/tcp"
+      - "{{ adguard_web_port }}:{{ adguard_internal_web_port }}/tcp"
       - "{{ adguard_dns_port }}:53/tcp"
       - "{{ adguard_dns_port }}:53/udp"
     volumes:

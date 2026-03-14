@@ -5,7 +5,8 @@
     - certbot
     - role: remnawave_panel
       when: enable_remnawave_panel | default(false) | bool
-    - remnawave_master
+    - role: remnawave_node
+      when: enable_remnawave_node | default(false) | bool
     - role: remnashop
       when: enable_remnashop | bool
     - adguard_home

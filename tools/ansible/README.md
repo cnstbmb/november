@@ -18,14 +18,15 @@ tools/ansible/bootstrap_private_vars.sh
 tools/ansible/run_prod_private.sh
 ```
 
-Подготовка боевых `.env` для remnawave-node на workers (интерактивно):
+Подготовка боевых `.env` для remnawave-node на выбранных hosts (`master` и/или `workers`) (интерактивно):
 
 ```bash
 tools/ansible/bootstrap_remnawave_node_env.sh
 ```
 
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы
-`node_env_src` для каждого worker был задан и файл существовал локально на control-node.
+`node_env_src` для каждого хоста, где включена нода, был задан и файл существовал
+локально на control-node.
 
 Для `enable_remnashop=true` можно задать private env-файл через
 `remnashop_env_src` в `.private/ansible/prod/group_vars/master.yml`.
@@ -36,10 +37,6 @@ tools/ansible/bootstrap_remnawave_node_env.sh
 `.private/ansible/prod/remnashop/.env`.
 Если одновременно включены `monitoring` и `AdGuard`, bootstrap по умолчанию
 предложит `adguard_web_port=3001`, чтобы избежать конфликта с Grafana (`3000`).
-Bootstrap также обязательно спросит путь к `database.json` для `nodejs-server`
-и запишет его в `remnawave_master_database_json_src` (`group_vars/master.yml`),
-чтобы файл автоматически копировался в `/srv/configs/database.json` на master.
-Если файл не указан или отсутствует, деплой прервётся заранее с понятной ошибкой.
 По умолчанию bootstrap также включает certbot для всех хостов (`master` + `workers`),
 спрашивает `letsencrypt_email` и `cloudflare_api_token`.
 Домены для certbot берутся автоматически из host names, которые вы вводите в первом шаге
@@ -49,12 +46,7 @@ Bootstrap также обязательно спросит путь к `database
 Опционально bootstrap может сразу создать/обновить A/AAAA записи в Cloudflare по этим
 парам `domain=ip`.
 После деплоя Ansible включает `certbot.timer`, а renew hook автоматически делает reload
-nginx-контейнеров (`webserver` на master, `landing-lite` на workers по умолчанию).
-
-Для workers bootstrap по умолчанию включает `landing-lite`:
-- `enable_worker_landing: true`
-- открытие `80/443` через `allow_http_https: true`
-- HTTPS через certbot-сертификат соответствующего worker-домена
+nginx-контейнеров (`remnawave-panel-proxy` на master, если panel включена).
 
 Если `enable_backups=true`, bootstrap отдельно спросит, нужны ли S3-ключи.
 При выборе S3 он запросит `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
@@ -81,16 +73,16 @@ tools/ansible/warmup_prod_private.sh
 - `ansible_port` для конкретного master/worker
 
 Если поле оставить пустым, используется глобальный `ansible_user`/`ansible_port`.
-По умолчанию `enable_remnawave_node` для `workers` выключен.
+По умолчанию `enable_remnawave_node` для `master` и `workers` выключен.
 `bootstrap_private_vars.sh` также подставляет первый найденный публичный ключ
 из `${HOME}/.ssh/yubikey_9a.pub`, `${HOME}/.ssh/id_ed25519.pub`, `${HOME}/.ssh/id_rsa.pub`
 и валидирует, что файл существует.
 Для `enable_remnawave_node=true` используется `deployments/prod/remnawave-node/docker-compose.yml`,
 а реальные переменные лучше хранить в приватном `node_env_src`.
 `bootstrap_remnawave_node_env.sh` создаёт `node_env_src` автоматически в
-`.private/ansible/prod/remnawave-node/<worker>.env` и host vars для каждого worker.
+`.private/ansible/prod/remnawave-node/<host>.env` и host vars для каждого выбранного host.
 При деплое `remnawave_node` Ansible автоматически читает `NODE_PORT`/`APP_PORT`
-из этого `.env` и открывает соответствующий TCP-порт в UFW на worker.
+из этого `.env` и открывает соответствующий TCP-порт в UFW на том host, где запускается нода.
 
 Выбрать playbook интерактивно:
 

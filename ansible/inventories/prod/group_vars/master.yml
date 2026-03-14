@@ -24,15 +24,6 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # adguard_dns_port: 53
 # adguard_timezone: "UTC"
 
-# Optional: override compose for master
-# compose_src: "########" # local path to master compose file
-# compose_dest_dir: "########"
-# compose_dest_file: "########"
-
-# Required for nodejs-server startup (mounted to /srv/configs/database.json):
-# remnawave_master_database_json_src: "########" # local private path on controller
-# remnawave_master_database_json_dest: "/srv/configs/database.json"
-
 # Optional Remnawave panel on separate domain (for example panel.example.com).
 # remnawave_panel_domain: "panel.example.com"
 # remnawave_panel_dir: "/opt/remnawave-panel"
@@ -46,9 +37,13 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # remnawave_panel_metrics_pass: "########"
 # remnawave_panel_webhook_secret: "64-char-secret"
 
-# Optional legacy Remnawave reverse proxy on 9443/10443.
-# Leave disabled unless an actual upstream service exists in your master stack.
-# remnawave_master_enable_proxy: false
-# remnawave_master_proxy_host: "remnawave"
-# remnawave_master_proxy_port: 3000
-# remnawave_master_proxy_secondary_port: 3001
+# Optional remnawave-node on master (for example if master should also be a transit/egress node).
+# Host-specific secrets are best stored in .private/ansible/prod/host_vars/<master>/remnawave_node.yml.
+# enable_remnawave_node: false
+# node_compose_src: "deployments/prod/remnawave-node/docker-compose.yml"
+# node_compose_dest_dir: "/opt/remnawave-node"
+# node_compose_dest_file: "/opt/remnawave-node/docker-compose.yml"
+# node_env_src: ""
+# node_env_dest: "/opt/remnawave-node/.env"
+# remnawave_node_open_firewall: true
+# node_firewall_port: 2222

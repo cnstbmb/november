@@ -1,16 +1,6 @@
-allow_http_https: true
+allow_http_https: false
 firewall_master_tcp_ports:
-  - 80
-  - 443
-
-enable_worker_landing: true
-worker_landing_src_dir: "########" # e.g. deployments/landing-lite/site
-worker_landing_dest_dir: "/opt/landing-lite"
-worker_landing_http_port: 80
-worker_landing_https_port: 443
-worker_landing_enable_https: true
-# Optional per-worker override in host_vars/<worker>/certbot.yml:
-# worker_landing_domain: "worker.example.com"
+  - 2222
 
 enable_remnawave_node: false
 

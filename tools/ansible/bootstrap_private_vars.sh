@@ -361,74 +361,6 @@ fi
 prompt timezone "Timezone" "Europe/Moscow"
 prompt swap_size_mb "Swap size MB" "2048"
 prompt compose_project_name "Docker compose project name" "november"
-prompt compose_src "Локальный путь к compose файлу на control-node" "deployments/prod/docker-compose.yml"
-prompt compose_dest_dir "Директория на target хосте для compose" "/opt/november"
-prompt compose_dest_file "Полный путь docker-compose.yml на target" "/opt/november/docker-compose.yml"
-resolved_compose_src="${compose_src}"
-if [[ "${resolved_compose_src}" != /* ]]; then
-  resolved_compose_src="${ROOT_DIR}/${resolved_compose_src}"
-fi
-if [ ! -f "${resolved_compose_src}" ]; then
-  echo "Compose file not found: ${compose_src}"
-  exit 1
-fi
-default_env_src=""
-if [ -f "${ROOT_DIR}/deployments/prod/database.env" ]; then
-  default_env_src="deployments/prod/database.env"
-fi
-prompt env_src "Локальный путь к .env (пусто если не копировать)" "${default_env_src}"
-prompt env_dest "Путь .env на target (пусто если не копировать)" "/opt/november/database.env"
-if [ -n "${env_src}" ]; then
-  resolved_env_src="${env_src}"
-  if [[ "${resolved_env_src}" != /* ]]; then
-    resolved_env_src="${ROOT_DIR}/${resolved_env_src}"
-  fi
-  if [ ! -f "${resolved_env_src}" ]; then
-    echo ".env file not found: ${env_src}"
-    exit 1
-  fi
-fi
-
-default_database_json_src="backend/configs/database.json"
-for candidate in ".private/ansible/prod/database.json" "backend/configs/database.json"; do
-  if [ -f "${ROOT_DIR}/${candidate}" ]; then
-    default_database_json_src="${candidate}"
-    break
-  fi
-done
-prompt remnawave_master_database_json_src "Локальный путь к database.json для nodejs-server" "${default_database_json_src}"
-if [ -z "${remnawave_master_database_json_src}" ]; then
-  echo "database.json path is required for master deploy."
-  exit 1
-fi
-resolved_database_json_src="${remnawave_master_database_json_src}"
-if [[ "${resolved_database_json_src}" != /* ]]; then
-  resolved_database_json_src="${ROOT_DIR}/${resolved_database_json_src}"
-fi
-if [ ! -f "${resolved_database_json_src}" ]; then
-  echo "database.json file not found: ${remnawave_master_database_json_src}"
-  exit 1
-fi
-resolved_backend_configs_dir="$(dirname "${resolved_database_json_src}")"
-required_backend_config_files=(
-  "database.json"
-  "bcrypt.config.json"
-  "crypto-pass.pem"
-  "crypto-pass-public.pem"
-  "auth.pem"
-  "auth-public.pem"
-)
-missing_backend_config_files=()
-for required_file in "${required_backend_config_files[@]}"; do
-  if [ ! -f "${resolved_backend_configs_dir}/${required_file}" ]; then
-    missing_backend_config_files+=("${required_file}")
-  fi
-done
-if [ "${#missing_backend_config_files[@]}" -gt 0 ]; then
-  echo "Required backend config files are missing in: ${resolved_backend_configs_dir}"
-  printf '  - %s\n' "${missing_backend_config_files[@]}"
-  exit 1
-fi
 
 prompt docker_users_csv "Пользователи для docker group (через запятую)" "${ansible_user}"
 
@@ -584,72 +516,36 @@ if [ "${enable_certbot}" = "true" ]; then
   fi
 fi
 
-if [ "${worker_count}" -gt 0 ]; then
-  prompt_bool enable_worker_landing "Деплоить landing-lite на workers?" "true"
-else
-  enable_worker_landing="false"
-fi
-
-worker_landing_src_dir=""
-worker_landing_dest_dir="/opt/landing-lite"
-worker_landing_http_port="80"
-worker_landing_https_port="443"
-worker_landing_enable_https="false"
 workers_allow_http_https="false"
-if [ "${enable_worker_landing}" = "true" ]; then
-  prompt worker_landing_src_dir "Локальный путь к worker landing site dir" "deployments/landing-lite/site"
-  resolved_worker_landing_src_dir="${worker_landing_src_dir}"
-  if [[ "${resolved_worker_landing_src_dir}" != /* ]]; then
-    resolved_worker_landing_src_dir="${ROOT_DIR}/${resolved_worker_landing_src_dir}"
-  fi
-  if [ ! -d "${resolved_worker_landing_src_dir}" ]; then
-    echo "Worker landing site dir not found: ${worker_landing_src_dir}"
-    exit 1
-  fi
-  prompt worker_landing_dest_dir "Директория landing на worker target" "/opt/landing-lite"
-  prompt worker_landing_http_port "HTTP порт landing на worker" "80"
-  if [ "${enable_certbot}" = "true" ]; then
-    prompt_bool worker_landing_enable_https "Включить HTTPS для landing на workers?" "true"
-  else
-    prompt_bool worker_landing_enable_https "Включить HTTPS для landing на workers?" "false"
-  fi
-  if [ "${worker_landing_enable_https}" = "true" ] && [ "${enable_certbot}" != "true" ]; then
-    echo "HTTPS landing requires certbot to be enabled."
-    exit 1
-  fi
-  if [ "${worker_landing_enable_https}" = "true" ]; then
-    prompt worker_landing_https_port "HTTPS порт landing на worker" "443"
-  fi
-  workers_allow_http_https="true"
-fi
+prompt_bool enable_remnawave_node_master "Включить deploy remnawave_node на master?" "false"
 
 if [ "${worker_count}" -gt 0 ]; then
-  prompt_bool enable_remnawave_node "Включить deploy remnawave_node на workers?" "false"
+  prompt_bool enable_remnawave_node_workers "Включить deploy remnawave_node на workers?" "false"
 else
-  enable_remnawave_node="false"
+  enable_remnawave_node_workers="false"
 fi
 
-if [ "${enable_remnawave_node}" = "true" ]; then
-  prompt node_compose_src "Локальный путь к worker compose файлу" "deployments/prod/remnawave-node/docker-compose.yml"
+if [ "${enable_remnawave_node_master}" = "true" ] || [ "${enable_remnawave_node_workers}" = "true" ]; then
+  prompt node_compose_src "Локальный путь к remnawave_node compose файлу" "deployments/prod/remnawave-node/docker-compose.yml"
   resolved_node_compose_src="${node_compose_src}"
   if [[ "${resolved_node_compose_src}" != /* ]]; then
     resolved_node_compose_src="${ROOT_DIR}/${resolved_node_compose_src}"
   fi
   if [ ! -f "${resolved_node_compose_src}" ]; then
-    echo "Worker compose file not found: ${node_compose_src}"
+    echo "Remnawave node compose file not found: ${node_compose_src}"
     exit 1
   fi
-  prompt node_compose_dest_dir "Директория worker compose на target" "/opt/remnawave-node"
-  prompt node_compose_dest_file "Полный путь worker docker-compose.yml на target" "/opt/remnawave-node/docker-compose.yml"
-  prompt node_env_src "Локальный путь к worker .env (пусто если не копировать)" ""
-  prompt node_env_dest "Путь worker .env на target (пусто если не копировать)" "/opt/remnawave-node/.env"
+  prompt node_compose_dest_dir "Директория remnawave_node compose на target" "/opt/remnawave-node"
+  prompt node_compose_dest_file "Полный путь remnawave_node docker-compose.yml на target" "/opt/remnawave-node/docker-compose.yml"
+  prompt node_env_src "Локальный путь к default remnawave_node .env (пусто если host-specific env будут в host_vars)" ""
+  prompt node_env_dest "Путь remnawave_node .env на target" "/opt/remnawave-node/.env"
   if [ -n "${node_env_src}" ]; then
     resolved_node_env_src="${node_env_src}"
     if [[ "${resolved_node_env_src}" != /* ]]; then
       resolved_node_env_src="${ROOT_DIR}/${resolved_node_env_src}"
     fi
     if [ ! -f "${resolved_node_env_src}" ]; then
-      echo "Worker .env file not found: ${node_env_src}"
+      echo "Remnawave node .env file not found: ${node_env_src}"
       exit 1
     fi
   fi
@@ -810,12 +706,6 @@ docker_log_max_file: "5"
 
 repo_root: "${ROOT_DIR}"
 compose_project_name: "${compose_project_name}"
-compose_src: "${compose_src}"
-compose_dest_dir: "${compose_dest_dir}"
-compose_dest_file: "${compose_dest_file}"
-
-env_src: "${env_src}"
-env_dest: "${env_dest}"
 
 allow_http_https: false
 
@@ -823,8 +713,6 @@ enable_nginx: false
 enable_certbot: ${enable_certbot}
 certbot_install: ${certbot_install}
 letsencrypt_email: "${letsencrypt_email}"
-panel_domain: "${master_certbot_domain}"
-remnawave_upstream_port: 8080
 cloudflare_api_token: "${cloudflare_api_token}"
 certbot_credentials_path: "${certbot_credentials_path}"
 certbot_dns_propagation_seconds: 60
@@ -864,6 +752,7 @@ enable_certbot: ${enable_certbot}
 enable_monitoring: ${enable_monitoring}
 enable_backups: ${enable_backups}
 enable_adguard: ${enable_adguard}
+enable_remnawave_node: ${enable_remnawave_node_master}
 enable_remnashop: ${enable_remnashop}
 enable_remnawave_panel: ${enable_remnawave_panel}
 remnashop_dir: "/opt/remnashop"
@@ -871,10 +760,17 @@ remnashop_mode: "internal"
 remnashop_env_src: "${remnashop_env_src}"
 remnashop_env_dest: "${remnashop_env_dest}"
 remnashop_validate_env: ${remnashop_validate_env}
-remnawave_master_copy_database_json: true
-remnawave_master_database_json_src: "${remnawave_master_database_json_src}"
-remnawave_master_database_json_dest: "/srv/configs/database.json"
 EOF
+
+if [ "${enable_remnawave_node_master}" = "true" ]; then
+  cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
+node_compose_src: "${node_compose_src}"
+node_compose_dest_dir: "${node_compose_dest_dir}"
+node_compose_dest_file: "${node_compose_dest_file}"
+node_env_src: "${node_env_src}"
+node_env_dest: "${node_env_dest}"
+EOF
+fi
 
 if [ "${enable_remnawave_panel}" = "true" ]; then
   cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
@@ -970,18 +866,11 @@ fi
 cat > "${GROUP_VARS_DIR}/workers.yml" <<EOF
 allow_http_https: ${workers_allow_http_https}
 firewall_master_tcp_ports:
-  - 80
-  - 443
-enable_worker_landing: ${enable_worker_landing}
-worker_landing_src_dir: "${worker_landing_src_dir}"
-worker_landing_dest_dir: "${worker_landing_dest_dir}"
-worker_landing_http_port: ${worker_landing_http_port}
-worker_landing_https_port: ${worker_landing_https_port}
-worker_landing_enable_https: ${worker_landing_enable_https}
-enable_remnawave_node: ${enable_remnawave_node}
+  - 2222
+enable_remnawave_node: ${enable_remnawave_node_workers}
 EOF
 
-if [ "${enable_remnawave_node}" = "true" ]; then
+if [ "${enable_remnawave_node_workers}" = "true" ]; then
   cat >> "${GROUP_VARS_DIR}/workers.yml" <<EOF
 node_compose_src: "${node_compose_src}"
 node_compose_dest_dir: "${node_compose_dest_dir}"
@@ -1011,7 +900,6 @@ EOF
       cat > "${PRIVATE_DIR}/host_vars/${worker_name}/certbot.yml" <<EOF
 certbot_domains:
   - "${worker_certbot_domain}"
-worker_landing_domain: "${worker_certbot_domain}"
 EOF
     done
   fi
@@ -1030,10 +918,10 @@ echo
 echo "Run:"
 echo "  tools/ansible/run_prod_private.sh"
 
-if [ "${enable_remnawave_node}" = "true" ] && [ -z "${node_env_src:-}" ]; then
+if { [ "${enable_remnawave_node_master}" = "true" ] || [ "${enable_remnawave_node_workers}" = "true" ]; } && [ -z "${node_env_src:-}" ]; then
   echo
   echo "remnawave_node is enabled, but node_env_src is empty."
-  echo "Before ansible run, generate worker env files:"
+  echo "Before ansible run, generate host-specific env files:"
   echo "  tools/ansible/bootstrap_remnawave_node_env.sh"
 fi
 

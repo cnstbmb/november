@@ -1,6 +1,6 @@
-- name: Resolve worker compose paths
+- name: Resolve remnawave node compose paths
   ansible.builtin.set_fact:
-    worker_compose_src: >-
+    remnawave_node_compose_src: >-
       {{
         node_compose_src
         if (
@@ -13,12 +13,12 @@
             node_compose_src is defined and
             node_compose_src | length > 0
           )
-          else compose_src
+          else (repo_root ~ '/deployments/prod/remnawave-node/docker-compose.yml')
         )
       }}
-    worker_compose_dest_dir: "{{ node_compose_dest_dir | default(compose_dest_dir) }}"
-    worker_compose_dest_file: "{{ node_compose_dest_file | default(compose_dest_file) }}"
-    worker_env_src: >-
+    remnawave_node_compose_dest_dir: "{{ node_compose_dest_dir | default('/opt/remnawave-node') }}"
+    remnawave_node_compose_dest_file: "{{ node_compose_dest_file | default('/opt/remnawave-node/docker-compose.yml') }}"
+    remnawave_node_env_src: >-
       {{
         node_env_src
         if (
@@ -31,61 +31,61 @@
             node_env_src is defined and
             node_env_src | length > 0
           )
-          else (env_src | default(''))
+          else ''
         )
       }}
-    worker_env_dest: "{{ node_env_dest | default(env_dest | default('')) }}"
+    remnawave_node_env_dest: "{{ node_env_dest | default('/opt/remnawave-node/.env') }}"
 
-- name: Validate worker env source is configured
+- name: Validate remnawave node env source is configured
   ansible.builtin.assert:
     that:
-      - worker_env_src is defined
-      - worker_env_src | length > 0
+      - remnawave_node_env_src is defined
+      - remnawave_node_env_src | length > 0
     fail_msg: >-
       node_env_src is empty for {{ inventory_hostname }}.
       Run tools/ansible/bootstrap_remnawave_node_env.sh and provide node secrets from Remnawave panel.
 
-- name: Ensure worker compose file exists on control-node
+- name: Ensure remnawave node compose file exists on control-node
   ansible.builtin.stat:
-    path: "{{ worker_compose_src }}"
+    path: "{{ remnawave_node_compose_src }}"
   delegate_to: localhost
   become: false
-  register: worker_compose_src_stat
+  register: remnawave_node_compose_src_stat
 
-- name: Validate worker compose file exists on control-node
+- name: Validate remnawave node compose file exists on control-node
   ansible.builtin.assert:
     that:
-      - worker_compose_src_stat.stat.exists
-      - worker_compose_src_stat.stat.isreg
-    fail_msg: "Worker compose file not found: {{ worker_compose_src }}"
+      - remnawave_node_compose_src_stat.stat.exists
+      - remnawave_node_compose_src_stat.stat.isreg
+    fail_msg: "Remnawave node compose file not found: {{ remnawave_node_compose_src }}"
 
-- name: Ensure worker env file exists on control-node
+- name: Ensure remnawave node env file exists on control-node
   ansible.builtin.stat:
-    path: "{{ worker_env_src }}"
+    path: "{{ remnawave_node_env_src }}"
   delegate_to: localhost
   become: false
-  register: worker_env_src_stat
+  register: remnawave_node_env_src_stat
 
-- name: Validate worker env file exists on control-node
+- name: Validate remnawave node env file exists on control-node
   ansible.builtin.assert:
     that:
-      - worker_env_src_stat.stat.exists
-      - worker_env_src_stat.stat.isreg
-    fail_msg: "Worker env file not found: {{ worker_env_src }}"
+      - remnawave_node_env_src_stat.stat.exists
+      - remnawave_node_env_src_stat.stat.isreg
+    fail_msg: "Remnawave node env file not found: {{ remnawave_node_env_src }}"
 
-- name: Read worker env file on control-node
+- name: Read remnawave node env file on control-node
   ansible.builtin.slurp:
-    src: "{{ worker_env_src }}"
+    src: "{{ remnawave_node_env_src }}"
   delegate_to: localhost
   become: false
-  register: worker_env_src_content
+  register: remnawave_node_env_src_content
 
 - name: Resolve remnawave node listen port from env
   ansible.builtin.set_fact:
     remnawave_node_listen_port: >-
       {{
         (
-          (worker_env_src_content.content | b64decode)
+          (remnawave_node_env_src_content.content | b64decode)
           | regex_findall('(?m)^(?:NODE_PORT|APP_PORT)=([0-9]+)$')
           | first
         ) | default(node_firewall_port | default('2222'), true)
@@ -98,12 +98,12 @@
     proto: tcp
   when: remnawave_node_open_firewall | default(true) | bool
 
-- name: Deploy worker compose stack
+- name: Deploy remnawave node compose stack
   ansible.builtin.import_role:
     name: docker_compose
   vars:
-    compose_src: "{{ worker_compose_src }}"
-    compose_dest_dir: "{{ worker_compose_dest_dir }}"
-    compose_dest_file: "{{ worker_compose_dest_file }}"
-    env_src: "{{ worker_env_src }}"
-    env_dest: "{{ worker_env_dest }}"
+    compose_src: "{{ remnawave_node_compose_src }}"
+    compose_dest_dir: "{{ remnawave_node_compose_dest_dir }}"
+    compose_dest_file: "{{ remnawave_node_compose_dest_file }}"
+    env_src: "{{ remnawave_node_env_src }}"
+    env_dest: "{{ remnawave_node_env_dest }}"

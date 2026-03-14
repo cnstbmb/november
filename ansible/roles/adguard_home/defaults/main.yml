@@ -5,6 +5,7 @@ adguard_dir: "/opt/adguardhome"
 adguard_conf_dir: "/opt/adguardhome/conf"
 adguard_work_dir: "/opt/adguardhome/work"
 adguard_web_port: 3000
+adguard_internal_web_port: 3000
 adguard_dns_port: 53
 adguard_timezone: "UTC"
 adguard_manage_systemd_resolved: true

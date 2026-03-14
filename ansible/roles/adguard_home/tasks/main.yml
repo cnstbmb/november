@@ -20,6 +20,26 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Check existing AdGuard Home config
+  ansible.builtin.stat:
+    path: "{{ adguard_conf_dir }}/AdGuardHome.yaml"
+  register: adguard_home_config_stat
+  when:
+    - enable_adguard | bool
+    - not ansible_check_mode
+
+- name: Force AdGuard Home internal web port to configured value
+  ansible.builtin.lineinfile:
+    path: "{{ adguard_conf_dir }}/AdGuardHome.yaml"
+    regexp: '^  address: .*$'
+    line: "  address: 0.0.0.0:{{ adguard_internal_web_port }}"
+    backrefs: false
+  register: adguard_home_http_address
+  when:
+    - enable_adguard | bool
+    - adguard_home_config_stat.stat.exists
+    - not ansible_check_mode
+
 - name: Allow AdGuard Home DNS (TCP)
   ansible.builtin.ufw:
     rule: allow
@@ -117,4 +137,12 @@
     chdir: "{{ adguard_dir }}"
   when:
     - enable_adguard | bool
+    - not ansible_check_mode
+
+- name: Restart AdGuard Home container when web port config changed
+  ansible.builtin.command: docker restart {{ adguard_container_name }}
+  when:
+    - enable_adguard | bool
+    - adguard_home_http_address is defined
+    - adguard_home_http_address is changed
     - not ansible_check_mode

@@ -51,6 +51,11 @@
     --project-name {{ compose_project_name }}
     {% endif %}
     up -d
+    {% if docker_compose_pull_policy is defined and docker_compose_pull_policy | length > 0 %}
+    --pull {{ docker_compose_pull_policy }}
+    {% elif docker_compose_pull | default(true) | bool %}
+    --pull always
+    {% endif %}
   args:
     chdir: "{{ compose_dest_dir }}"
   when: not ansible_check_mode

@@ -85,6 +85,9 @@
   ansible.builtin.command: >
     certbot certonly --dns-cloudflare
     --dns-cloudflare-credentials {{ certbot_credentials_path }}
+    --dns-cloudflare-propagation-seconds {{ certbot_dns_propagation_seconds | default(60) }}
+    --cert-name {{ certbot_domains_effective | first }}
+    --expand
     --non-interactive --agree-tos --keep-until-expiring
     -m {{ letsencrypt_email }}
     {% for domain in certbot_domains_effective %}

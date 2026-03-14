@@ -38,6 +38,7 @@ By default it:
 
 - installs `certbot` and `python3-certbot-dns-cloudflare`
 - issues/renews certs via DNS-01 when `enable_certbot: true`
+- waits `certbot_dns_propagation_seconds` seconds before DNS-01 validation
 - enables `certbot.timer` for automatic renewal
 - installs deploy hook that reloads nginx containers after renewal
 

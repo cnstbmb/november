@@ -78,6 +78,13 @@
     remnawave_master_database_json_mode_effective: "{{ remnawave_master_database_json_mode | default('0644') }}"
   when: remnawave_master_copy_database_json | default(true) | bool
 
+- name: Resolve remnawave backend config directory paths
+  ansible.builtin.set_fact:
+    remnawave_master_configs_src_dir_effective: "{{ remnawave_master_database_json_src_effective | dirname }}"
+    remnawave_master_configs_dest_dir_effective: "{{ remnawave_master_database_json_dest_effective | dirname }}"
+    remnawave_master_bcrypt_config_src_effective: "{{ (remnawave_master_database_json_src_effective | dirname) ~ '/bcrypt.config.json' }}"
+  when: remnawave_master_copy_database_json | default(true) | bool
+
 - name: Ensure remnawave database config source is configured
   ansible.builtin.assert:
     that:
@@ -105,18 +112,37 @@
       {{ remnawave_master_database_json_src_effective }}
   when: remnawave_master_copy_database_json | default(true) | bool
 
+- name: Ensure remnawave bcrypt config exists on control node
+  ansible.builtin.stat:
+    path: "{{ remnawave_master_bcrypt_config_src_effective }}"
+  register: remnawave_master_bcrypt_config_src_stat
+  delegate_to: localhost
+  become: false
+  when: remnawave_master_copy_database_json | default(true) | bool
+
+- name: Validate remnawave bcrypt config source file
+  ansible.builtin.assert:
+    that:
+      - remnawave_master_bcrypt_config_src_stat.stat.exists
+      - remnawave_master_bcrypt_config_src_stat.stat.isreg
+    fail_msg: >-
+      bcrypt.config.json source file not found on control node:
+      {{ remnawave_master_bcrypt_config_src_effective }}
+  when: remnawave_master_copy_database_json | default(true) | bool
+
 - name: Ensure destination directory for remnawave database config exists
   ansible.builtin.file:
-    path: "{{ remnawave_master_database_json_dest_effective | dirname }}"
+    path: "{{ remnawave_master_configs_dest_dir_effective }}"
     state: directory
     mode: "0755"
   when: remnawave_master_copy_database_json | default(true) | bool
 
-- name: Copy remnawave database config to master
+- name: Copy remnawave backend configs to master
   ansible.builtin.copy:
-    src: "{{ remnawave_master_database_json_src_effective }}"
-    dest: "{{ remnawave_master_database_json_dest_effective }}"
+    src: "{{ remnawave_master_configs_src_dir_effective }}/"
+    dest: "{{ remnawave_master_configs_dest_dir_effective }}/"
     mode: "{{ remnawave_master_database_json_mode_effective }}"
+    directory_mode: "0755"
   when: remnawave_master_copy_database_json | default(true) | bool
 
 - name: Ensure nginx config directory exists in compose path

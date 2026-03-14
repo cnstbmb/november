@@ -3,6 +3,8 @@
   become: true
   roles:
     - certbot
+    - role: remnawave_panel
+      when: enable_remnawave_panel | default(false) | bool
     - remnawave_master
     - role: remnashop
       when: enable_remnashop | bool

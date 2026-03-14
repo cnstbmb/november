@@ -9,6 +9,7 @@ done
 
 >&2 echo "Postgres is up - starting nodejs server"
 
-node $SCRIPTPATH/node_modules/db-migrate/bin/db-migrate --verbose --config $SCRIPTPATH/configs/database.json up
+DB_MIGRATE_ENV="${NODE_ENV:-prod}"
+node $SCRIPTPATH/node_modules/db-migrate/bin/db-migrate --verbose --config $SCRIPTPATH/configs/database.json -e "$DB_MIGRATE_ENV" up
 
 node $SCRIPTPATH/index.js | $SCRIPTPATH/node_modules/pino-pretty/bin.js --colorize --translateTime

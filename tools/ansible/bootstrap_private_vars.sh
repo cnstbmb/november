@@ -127,6 +127,23 @@ PY
   echo "change_me"
 }
 
+generate_secret_64() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+    return
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+    return
+  fi
+
+  printf '%064s\n' "change_me" | tr ' ' '0'
+}
+
 parse_host_entry() {
   local raw="$1"
   local trimmed name target
@@ -392,6 +409,26 @@ if [ ! -f "${resolved_database_json_src}" ]; then
   echo "database.json file not found: ${remnawave_master_database_json_src}"
   exit 1
 fi
+resolved_backend_configs_dir="$(dirname "${resolved_database_json_src}")"
+required_backend_config_files=(
+  "database.json"
+  "bcrypt.config.json"
+  "crypto-pass.pem"
+  "crypto-pass-public.pem"
+  "auth.pem"
+  "auth-public.pem"
+)
+missing_backend_config_files=()
+for required_file in "${required_backend_config_files[@]}"; do
+  if [ ! -f "${resolved_backend_configs_dir}/${required_file}" ]; then
+    missing_backend_config_files+=("${required_file}")
+  fi
+done
+if [ "${#missing_backend_config_files[@]}" -gt 0 ]; then
+  echo "Required backend config files are missing in: ${resolved_backend_configs_dir}"
+  printf '  - %s\n' "${missing_backend_config_files[@]}"
+  exit 1
+fi
 
 prompt docker_users_csv "Пользователи для docker group (через запятую)" "${ansible_user}"
 
@@ -458,12 +495,42 @@ cloudflare_api_token=""
 cloudflare_manage_dns="false"
 master_certbot_domain="$(default_certbot_domain_for_host "${master_host_name}")"
 declare -a worker_certbot_domains=()
+prompt_bool enable_remnawave_panel "Установить Remnawave panel на master?" "true"
+remnawave_panel_domain=""
+remnawave_panel_dir="/opt/remnawave-panel"
+remnawave_panel_project_name="remnawave-panel"
+remnawave_panel_postgres_user="remnawave"
+remnawave_panel_postgres_db="remnawave"
+remnawave_panel_postgres_password=""
+remnawave_panel_jwt_auth_secret=""
+remnawave_panel_jwt_api_tokens_secret=""
+remnawave_panel_metrics_user="admin"
+remnawave_panel_metrics_pass=""
+remnawave_panel_webhook_secret=""
 
 for i in "${!worker_hosts[@]}"; do
   worker_name="${worker_hosts[$i]}"
   worker_certbot_domain="$(default_certbot_domain_for_host "${worker_name}")"
   worker_certbot_domains+=("${worker_certbot_domain}")
 done
+
+if [ "${enable_remnawave_panel}" = "true" ]; then
+  prompt remnawave_panel_domain "Публичный домен Remnawave panel на master" "panel.${master_host_name}"
+  if [ -z "${remnawave_panel_domain}" ]; then
+    echo "Remnawave panel domain is required when panel is enabled."
+    exit 1
+  fi
+  remnawave_panel_postgres_password="$(generate_secret)"
+  remnawave_panel_jwt_auth_secret="$(generate_secret)"
+  remnawave_panel_jwt_api_tokens_secret="$(generate_secret)"
+  remnawave_panel_metrics_pass="$(generate_secret)"
+  remnawave_panel_webhook_secret="$(generate_secret_64)"
+fi
+
+if [ "${enable_remnawave_panel}" = "true" ] && [ "${enable_certbot}" != "true" ]; then
+  echo "Remnawave panel on master requires certbot to be enabled."
+  exit 1
+fi
 
 if [ "${enable_certbot}" = "true" ]; then
   if [ -z "${master_certbot_domain}" ]; then
@@ -499,6 +566,9 @@ if [ "${enable_certbot}" = "true" ]; then
       exit 1
     fi
     dns_pairs=("${master_certbot_domain}" "${master_host_target}")
+    if [ "${enable_remnawave_panel}" = "true" ]; then
+      dns_pairs+=("${remnawave_panel_domain}" "${master_host_target}")
+    fi
     if [ "${worker_count}" -gt 0 ]; then
       for i in "${!worker_hosts[@]}"; do
         dns_pairs+=("${worker_certbot_domains[$i]}" "${worker_targets[$i]}")
@@ -757,6 +827,7 @@ panel_domain: "${master_certbot_domain}"
 remnawave_upstream_port: 8080
 cloudflare_api_token: "${cloudflare_api_token}"
 certbot_credentials_path: "${certbot_credentials_path}"
+certbot_dns_propagation_seconds: 60
 
 enable_monitoring: false
 enable_backups: false
@@ -788,14 +859,13 @@ allow_http_https: true
 firewall_master_tcp_ports:
   - 80
   - 443
-  - 9443
-  - 10443
 enable_nginx: false
 enable_certbot: ${enable_certbot}
 enable_monitoring: ${enable_monitoring}
 enable_backups: ${enable_backups}
 enable_adguard: ${enable_adguard}
 enable_remnashop: ${enable_remnashop}
+enable_remnawave_panel: ${enable_remnawave_panel}
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal"
 remnashop_env_src: "${remnashop_env_src}"
@@ -805,6 +875,22 @@ remnawave_master_copy_database_json: true
 remnawave_master_database_json_src: "${remnawave_master_database_json_src}"
 remnawave_master_database_json_dest: "/srv/configs/database.json"
 EOF
+
+if [ "${enable_remnawave_panel}" = "true" ]; then
+  cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
+remnawave_panel_domain: "${remnawave_panel_domain}"
+remnawave_panel_dir: "${remnawave_panel_dir}"
+remnawave_panel_project_name: "${remnawave_panel_project_name}"
+remnawave_panel_postgres_user: "${remnawave_panel_postgres_user}"
+remnawave_panel_postgres_password: "${remnawave_panel_postgres_password}"
+remnawave_panel_postgres_db: "${remnawave_panel_postgres_db}"
+remnawave_panel_jwt_auth_secret: "${remnawave_panel_jwt_auth_secret}"
+remnawave_panel_jwt_api_tokens_secret: "${remnawave_panel_jwt_api_tokens_secret}"
+remnawave_panel_metrics_user: "${remnawave_panel_metrics_user}"
+remnawave_panel_metrics_pass: "${remnawave_panel_metrics_pass}"
+remnawave_panel_webhook_secret: "${remnawave_panel_webhook_secret}"
+EOF
+fi
 
 if [ "${enable_adguard}" = "true" ]; then
   cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
@@ -911,6 +997,11 @@ if [ "${enable_certbot}" = "true" ]; then
 certbot_domains:
   - "${master_certbot_domain}"
 EOF
+  if [ "${enable_remnawave_panel}" = "true" ]; then
+    cat >> "${PRIVATE_DIR}/host_vars/${master_host_name}/certbot.yml" <<EOF
+  - "${remnawave_panel_domain}"
+EOF
+  fi
 
   if [ "${worker_count}" -gt 0 ]; then
     for i in "${!worker_hosts[@]}"; do

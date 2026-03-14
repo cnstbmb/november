@@ -45,6 +45,7 @@ Bootstrap также обязательно спросит путь к `database
 Домены для certbot берутся автоматически из host names, которые вы вводите в первом шаге
 (`domain=ip`), и сохраняются в:
 `.private/ansible/prod/host_vars/<host>/certbot.yml`.
+В `group_vars/all.yml` bootstrap также пишет `certbot_dns_propagation_seconds: 60`.
 Опционально bootstrap может сразу создать/обновить A/AAAA записи в Cloudflare по этим
 парам `domain=ip`.
 После деплоя Ansible включает `certbot.timer`, а renew hook автоматически делает reload

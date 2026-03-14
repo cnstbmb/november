@@ -2,13 +2,12 @@ allow_http_https: true
 firewall_master_tcp_ports:
   - 80
   - 443
-  - 9443
-  - 10443
 enable_nginx: false # set true only if nginx runs on host, not in compose
 enable_certbot: true # enable cert issuance on master via certbot role
 enable_monitoring: true
 enable_backups: true
 enable_adguard: true # deploy AdGuard Home on master
+enable_remnawave_panel: false # deploy Remnawave panel on master via docker compose
 enable_remnashop: false # deploy remnashop bot/shop on master (disabled by default)
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
@@ -33,3 +32,23 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # Required for nodejs-server startup (mounted to /srv/configs/database.json):
 # remnawave_master_database_json_src: "########" # local private path on controller
 # remnawave_master_database_json_dest: "/srv/configs/database.json"
+
+# Optional Remnawave panel on separate domain (for example panel.example.com).
+# remnawave_panel_domain: "panel.example.com"
+# remnawave_panel_dir: "/opt/remnawave-panel"
+# remnawave_panel_project_name: "remnawave-panel"
+# remnawave_panel_postgres_user: "remnawave"
+# remnawave_panel_postgres_password: "########"
+# remnawave_panel_postgres_db: "remnawave"
+# remnawave_panel_jwt_auth_secret: "########"
+# remnawave_panel_jwt_api_tokens_secret: "########"
+# remnawave_panel_metrics_user: "admin"
+# remnawave_panel_metrics_pass: "########"
+# remnawave_panel_webhook_secret: "64-char-secret"
+
+# Optional legacy Remnawave reverse proxy on 9443/10443.
+# Leave disabled unless an actual upstream service exists in your master stack.
+# remnawave_master_enable_proxy: false
+# remnawave_master_proxy_host: "remnawave"
+# remnawave_master_proxy_port: 3000
+# remnawave_master_proxy_secondary_port: 3001

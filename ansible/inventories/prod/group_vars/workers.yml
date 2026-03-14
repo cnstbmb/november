@@ -2,6 +2,13 @@ allow_http_https: false
 firewall_master_tcp_ports:
   - 2222
 
+# Stubby defaults to AdGuard DNS-over-TLS on the first inventory host in group `master`.
+# It uses master's ansible_host and first certbot domain unless overridden below.
+# stubby_manage_config: true
+# stubby_upstream_address: "########" # optional manual override, e.g. 5.42.111.142
+# stubby_tls_auth_name: "########" # optional manual override, e.g. moscow.example.com
+# stubby_tls_port: 953
+
 enable_remnawave_node: false
 
 # Worker-specific compose file for remnawave node agent

@@ -122,7 +122,21 @@ Recommended flow:
 On deploy, Ansible opens node TCP port automatically from `NODE_PORT`/`APP_PORT`
 in host `.env` (fallback: `node_firewall_port`, default `2222`).
 
-## 6) Monitoring (optional)
+## 6) Stubby On Workers
+
+Workers install `stubby` by default. The role can also manage `/etc/stubby/stubby.yml`
+and point workers to the first host in inventory group `master` via DNS-over-TLS.
+
+Defaults:
+
+- upstream address: `master` host `ansible_host`
+- TLS auth name: first value from `host_vars/<master>/certbot.yml` -> `certbot_domains`
+- TLS port: `953`
+
+If you want this to work end-to-end, master must expose a working DoT listener on the
+same TLS name and port.
+
+## 7) Monitoring (optional)
 
 If `enable_monitoring: true`, a small monitoring stack is deployed in the `monitoring_dir` path:
 
@@ -132,7 +146,7 @@ If `enable_monitoring: true`, a small monitoring stack is deployed in the `monit
 
 By default, UFW does not open these ports. Access via SSH tunnel or update firewall rules.
 
-## 7) Backups (optional)
+## 8) Backups (optional)
 
 If `enable_backups: true`, the `backups` role installs `restic`, writes a backup script,
 and schedules a cron job. Make sure:
@@ -140,7 +154,7 @@ and schedules a cron job. Make sure:
 - `backup_target` is reachable from the master node
 - `backup_paths` includes your data directories (e.g. `/srv/pg-data`, `/srv/logs`, `/etc`)
 
-## 8) Common failure points
+## 9) Common failure points
 
 - Wrong SSH port or user in inventory
 - Missing SSH public key file on the control machine
@@ -148,10 +162,11 @@ and schedules a cron job. Make sure:
 - Certbot enabled, but missing `letsencrypt_email` / `cloudflare_api_token`
 - Certbot enabled, but invalid or missing per-host domain in `host_vars/<host>/certbot.yml`
 - Certbot enabled, but inventory host is an IP instead of domain (use `domain=ip`)
+- Stubby is configured to use master DoT, but master does not expose a valid DoT listener on `953`
 - `backup_target` requires network access not permitted on the server
 - `remnashop` enabled, but `.env` still has `change_me` placeholders
 
-## 9) AdGuard Home (optional)
+## 10) AdGuard Home (optional)
 
 If you want AdGuard Home on the master node, set in:
 

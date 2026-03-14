@@ -464,6 +464,11 @@ if [ "${enable_remnawave_panel}" = "true" ] && [ "${enable_certbot}" != "true" ]
   exit 1
 fi
 
+if [ "${enable_adguard}" = "true" ] && [ "${worker_count}" -gt 0 ] && [ "${enable_certbot}" != "true" ]; then
+  echo "Workers use stubby -> master over DNS-over-TLS, so certbot must be enabled on master."
+  exit 1
+fi
+
 if [ "${enable_certbot}" = "true" ]; then
   if [ -z "${master_certbot_domain}" ]; then
     echo "Master host name '${master_host_name}' is not a domain."
@@ -792,6 +797,17 @@ if [ "${enable_adguard}" = "true" ]; then
   cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
 adguard_web_port: ${adguard_web_port}
 EOF
+
+  if [ "${worker_count}" -gt 0 ]; then
+    cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
+adguard_manage_config: true
+adguard_tls_enabled: true
+adguard_tls_server_name: "${master_certbot_domain}"
+adguard_tls_port_dns_over_tls: 953
+adguard_tls_certificate_path: "/etc/letsencrypt/live/${master_certbot_domain}/fullchain.pem"
+adguard_tls_private_key_path: "/etc/letsencrypt/live/${master_certbot_domain}/privkey.pem"
+EOF
+  fi
 fi
 
 if [ "${enable_monitoring}" = "true" ]; then
@@ -867,6 +883,8 @@ cat > "${GROUP_VARS_DIR}/workers.yml" <<EOF
 allow_http_https: ${workers_allow_http_https}
 firewall_master_tcp_ports:
   - 2222
+stubby_manage_config: true
+stubby_tls_port: 953
 enable_remnawave_node: ${enable_remnawave_node_workers}
 EOF
 

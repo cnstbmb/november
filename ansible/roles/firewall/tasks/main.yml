@@ -38,3 +38,13 @@
   when:
     - firewall_extra_tcp_ports is defined
     - firewall_extra_tcp_ports | length > 0
+
+- name: Allow extra ingress UDP ports
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  loop: "{{ firewall_extra_udp_ports | default([]) }}"
+  when:
+    - firewall_extra_udp_ports is defined
+    - firewall_extra_udp_ports | length > 0

@@ -22,6 +22,7 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # adguard_dir: "/opt/adguardhome"
 # adguard_web_port: 3000
 # adguard_dns_port: 53
+# adguard_dns_publish_host: "127.0.0.1" # bind host-side plain DNS only locally
 # adguard_timezone: "UTC"
 # adguard_manage_config: true
 # adguard_users: # keep in .private, not in git
@@ -45,6 +46,14 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # remnawave_panel_metrics_user: "admin"
 # remnawave_panel_metrics_pass: "########"
 # remnawave_panel_webhook_secret: "64-char-secret"
+# remnawave_panel_frontend_domain: "panel.example.com" # optional override; bare domain only
+# remnawave_panel_sub_public_domain: "panel.example.com/api/sub" # optional override; bare domain/path only
+# enable_remnawave_subscription_page: false
+# remnawave_subscription_page_domain: "sub.panel.example.com"
+# remnawave_subscription_page_app_port: 3010
+# remnawave_subscription_page_api_token: "########"
+# remnawave_subscription_page_panel_url: "http://remnawave:3000" # optional override for bundled mode
+# remnawave_subscription_page_custom_sub_prefix: "" # optional, when you need custom sub prefix
 
 # Optional remnawave-node on master (for example if master should also be a transit/egress node).
 # Host-specific secrets are best stored in .private/ansible/prod/host_vars/<master>/remnawave_node.yml.
@@ -61,3 +70,5 @@ backup_target: "/mnt/backup/november" # mount external disk or use remote target
 # .private/ansible/prod/host_vars/<host>/remnawave_topology.yml
 # firewall_extra_tcp_ports:
 #   - 9443
+# firewall_extra_udp_ports:
+#   - 51820

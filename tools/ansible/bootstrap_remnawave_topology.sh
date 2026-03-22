@@ -12,6 +12,25 @@ TOPOLOGY_SPEC_FILE="${TOPOLOGY_DIR}/topology-spec.json"
 TOPOLOGY_VARS_FILE="${TOPOLOGY_DIR}/topology.yml"
 SUMMARY_FILE="${TOPOLOGY_DIR}/README.generated.md"
 
+# Opinionated hard defaults for the current XHTTP topology.
+DEFAULT_EDGE_CLIENT_PORT="443"
+DEFAULT_EDGE_REALITY_TARGET="sun6-22.userapi.com:443"
+DEFAULT_EDGE_REALITY_SERVER_NAME="sun6-22.userapi.com"
+DEFAULT_EDGE_XHTTP_HOST="sun6-22.userapi.com"
+DEFAULT_EDGE_XHTTP_PATH="/s/v1/ig2/asset.jpg"
+DEFAULT_TRANSIT_INBOUND_PORT="9443"
+DEFAULT_TRANSIT_XHTTP_PATH="/assets/runtime-8f3c21.js"
+DEFAULT_TRANSIT_DIRECT_GEOIP="ru"
+DEFAULT_TRANSIT_DIRECT_GEOSITE="category-ru"
+DEFAULT_EXIT_BASE_INBOUND_PORT="8442"
+DEFAULT_EXIT_XHTTP_PATH="/assets/runtime-3o3u46.js"
+DEFAULT_EXIT_DIRECT_ENABLED="true"
+DEFAULT_EXIT_DIRECT_PORT="443"
+DEFAULT_EXIT_DIRECT_TARGET="www.microsoft.com:443"
+DEFAULT_EXIT_DIRECT_SERVER_NAME="www.microsoft.com"
+DEFAULT_EXIT_DIRECT_XHTTP_HOST="www.microsoft.com"
+DEFAULT_EXIT_DIRECT_XHTTP_PATH="/static/chunks/main-91ac4d.js"
+
 usage() {
   cat <<USAGE
 Usage:
@@ -78,6 +97,203 @@ prompt_int() {
   done
 }
 
+normalize_existing_topology_spec() {
+  local spec_path="$1"
+  local normalized_file
+
+  [ -f "${spec_path}" ] || return 1
+  normalized_file="$(mktemp "${TMPDIR:-/tmp}/topology-spec-normalized.XXXXXX")"
+
+  if python3 - "${spec_path}" "${normalized_file}" <<'__PY_SPEC__'
+import json
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1])
+dest = Path(sys.argv[2])
+text = source.read_text(encoding="utf-8")
+candidates = [text]
+if "\\n" in text:
+    candidates.append(text.replace("\\n", "\n"))
+
+for candidate in candidates:
+    try:
+        data = json.loads(candidate)
+    except Exception:
+        continue
+    dest.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    raise SystemExit(0)
+
+raise SystemExit(1)
+__PY_SPEC__
+  then
+    printf '%s' "${normalized_file}"
+    return 0
+  fi
+
+  rm -f "${normalized_file}"
+  return 1
+}
+
+spec_query() {
+  local expr="$1"
+  [ -n "${EXISTING_TOPOLOGY_SPEC_PATH:-}" ] || return 0
+
+  python3 - "${EXISTING_TOPOLOGY_SPEC_PATH}" "${expr}" <<'__PY_QUERY__'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+expr = sys.argv[2]
+value = data
+
+for part in expr.split("."):
+    if value is None:
+        break
+    while "[" in part:
+        prefix, rest = part.split("[", 1)
+        if prefix:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(prefix)
+        if value is None:
+            break
+        idx_str, remainder = rest.split("]", 1)
+        if not isinstance(value, list):
+            value = None
+            break
+        idx = int(idx_str)
+        if idx < 0 or idx >= len(value):
+            value = None
+            break
+        value = value[idx]
+        part = remainder.lstrip(".")
+        if not part:
+            break
+    else:
+        if part:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(part)
+
+if value is None:
+    raise SystemExit(0)
+
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (int, float)):
+    print(value)
+elif isinstance(value, list):
+    print(",".join(str(item) for item in value))
+elif isinstance(value, dict):
+    print(json.dumps(value, ensure_ascii=False))
+else:
+    print(value)
+__PY_QUERY__
+}
+
+spec_query_len() {
+  local expr="$1"
+  [ -n "${EXISTING_TOPOLOGY_SPEC_PATH:-}" ] || return 0
+
+  python3 - "${EXISTING_TOPOLOGY_SPEC_PATH}" "${expr}" <<'__PY_QUERY_LEN__'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+expr = sys.argv[2]
+value = data
+
+for part in expr.split("."):
+    if value is None:
+        break
+    while "[" in part:
+        prefix, rest = part.split("[", 1)
+        if prefix:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(prefix)
+        if value is None:
+            break
+        idx_str, remainder = rest.split("]", 1)
+        if not isinstance(value, list):
+            value = None
+            break
+        idx = int(idx_str)
+        if idx < 0 or idx >= len(value):
+            value = None
+            break
+        value = value[idx]
+        part = remainder.lstrip(".")
+        if not part:
+            break
+    else:
+        if part:
+            if not isinstance(value, dict):
+                value = None
+                break
+            value = value.get(part)
+
+if isinstance(value, list):
+    print(len(value))
+__PY_QUERY_LEN__
+}
+
+spec_exit_query() {
+  local host_name="$1"
+  local field_expr="$2"
+  [ -n "${EXISTING_TOPOLOGY_SPEC_PATH:-}" ] || return 0
+
+  python3 - "${EXISTING_TOPOLOGY_SPEC_PATH}" "${host_name}" "${field_expr}" <<'__PY_EXIT_QUERY__'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+host_name = sys.argv[2]
+field_expr = sys.argv[3]
+
+entry = None
+for item in data.get("exits", []):
+    if item.get("host") == host_name:
+        entry = item
+        break
+
+if entry is None:
+    raise SystemExit(0)
+
+value = entry
+for part in field_expr.split("."):
+    if value is None:
+        break
+    if not part:
+        continue
+    if not isinstance(value, dict):
+        value = None
+        break
+    value = value.get(part)
+
+if value is None:
+    raise SystemExit(0)
+
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (int, float)):
+    print(value)
+elif isinstance(value, list):
+    print(",".join(str(item) for item in value))
+elif isinstance(value, dict):
+    print(json.dumps(value, ensure_ascii=False))
+else:
+    print(value)
+__PY_EXIT_QUERY__
+}
+
 trim_whitespace() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -90,7 +306,12 @@ normalize_csv_list() {
   local out=""
   local item
   local IFS=','
-  read -r -a parts <<< "${raw}"
+  local -a parts=()
+  read -r -a parts <<< "${raw}" || true
+  if [ "${#parts[@]}" -eq 0 ]; then
+    printf '%s' ""
+    return 0
+  fi
   for item in "${parts[@]}"; do
     item="$(trim_whitespace "${item}")"
     [ -z "${item}" ] && continue
@@ -116,7 +337,12 @@ csv_to_json_array() {
   [ -z "${normalized}" ] && return 0
 
   local IFS=','
-  read -r -a parts <<< "${normalized}"
+  local -a parts=()
+  read -r -a parts <<< "${normalized}" || true
+  if [ "${#parts[@]}" -eq 0 ]; then
+    printf '%s' ""
+    return 0
+  fi
   for item in "${parts[@]}"; do
     [ -z "${item}" ] && continue
     if [ -n "${out}" ]; then
@@ -180,6 +406,55 @@ nth_host() {
   printf '%s\n' "${hosts_list}" | awk -v idx="${target_index}" 'NF { count += 1; if (count == idx) { print; exit } }'
 }
 
+host_index() {
+  local hosts_list="$1"
+  local target_host="$2"
+  printf '%s\n' "${hosts_list}" | awk -v host="${target_host}" 'NF { count += 1; if ($0 == host) { print count; exit } }'
+}
+
+print_host_choices() {
+  local hosts_list="$1"
+  printf '%s\n' "${hosts_list}" | awk 'NF { count += 1; printf("  %d) %s\n", count, $0) }'
+}
+
+resolve_host_choice() {
+  local raw_choice="$1"
+  local hosts_list="$2"
+  local resolved_host=""
+
+  if [[ "${raw_choice}" =~ ^[0-9]+$ ]]; then
+    resolved_host="$(nth_host "${hosts_list}" "${raw_choice}")"
+  elif contains_host "${raw_choice}" "${hosts_list}"; then
+    resolved_host="${raw_choice}"
+  fi
+
+  printf '%s' "${resolved_host}"
+}
+
+prompt_host_choice() {
+  local var_name="$1"
+  local message="$2"
+  local hosts_list="$3"
+  local default_host="$4"
+  local default_index raw_choice resolved_host
+
+  default_index="$(host_index "${hosts_list}" "${default_host}")"
+  [ -z "${default_index}" ] && default_index="1"
+
+  while true; do
+    echo "${message}:"
+    print_host_choices "${hosts_list}"
+    read -r -p "Выбери номер или hostname [${default_index}]: " raw_choice < /dev/tty
+    raw_choice="${raw_choice:-${default_index}}"
+    resolved_host="$(resolve_host_choice "${raw_choice}" "${hosts_list}")"
+    if [ -n "${resolved_host}" ]; then
+      printf -v "${var_name}" "%s" "${resolved_host}"
+      return
+    fi
+    echo "Некорректный выбор: ${raw_choice}"
+  done
+}
+
 default_certbot_domain_for_host() {
   local host_name="$1"
   if [[ "${host_name}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || [[ "${host_name}" == *:* ]]; then
@@ -237,8 +512,8 @@ generate_reality_keypair() {
   fi
 
   output="$(xray x25519 2>/dev/null || true)"
-  private_key="$(printf '%s\n' "${output}" | awk -F': ' '/Private key:/ { print $2; exit }')"
-  public_key="$(printf '%s\n' "${output}" | awk -F': ' '/Public key:/ { print $2; exit }')"
+  private_key="$(printf '%s\n' "${output}" | awk -F': ' '/Private key:|PrivateKey:/ { print $2; exit }')"
+  public_key="$(printf '%s\n' "${output}" | awk -F': ' '/Public key:|PublicKey:|Password:/ { print $2; exit }')"
 
   if [ -z "${private_key}" ] || [ -z "${public_key}" ]; then
     return 1
@@ -262,6 +537,8 @@ if [ ! -f "${INVENTORY_PATH}" ]; then
   echo "Run tools/ansible/bootstrap_private_vars.sh first."
   exit 1
 fi
+
+EXISTING_TOPOLOGY_SPEC_PATH=""
 
 mkdir -p "${ROOT_DIR}/.tmp/ansible-local" "${TOPOLOGY_DIR}" "${PROFILES_DIR}"
 
@@ -289,21 +566,8 @@ echo "  transit -> exits: XHTTP over TLS"
 echo "  optional direct client ingress on selected exit workers"
 echo
 
-while true; do
-  prompt transit_host "Transit host (master)" "${default_transit_host}"
-  if contains_host "${transit_host}" "${master_hosts}"; then
-    break
-  fi
-  echo "Host '${transit_host}' is not in inventory group 'master'."
-done
-
-while true; do
-  prompt edge_host "Edge host (worker)" "${default_edge_host}"
-  if contains_host "${edge_host}" "${worker_hosts}"; then
-    break
-  fi
-  echo "Host '${edge_host}' is not in inventory group 'workers'."
-done
+prompt_host_choice transit_host "Transit host (master)" "${master_hosts}" "${default_transit_host}"
+prompt_host_choice edge_host "Edge host (worker)" "${worker_hosts}" "${default_edge_host}"
 
 remaining_exit_hosts="$(printf '%s\n' "${worker_hosts}" | awk -v edge="${edge_host}" 'NF && $0 != edge')"
 remaining_exit_count="$(count_hosts "${remaining_exit_hosts}")"
@@ -313,7 +577,11 @@ if [ "${remaining_exit_count}" -lt 1 ]; then
 fi
 
 while true; do
-  prompt_int exit_count "How many exit hosts to configure" "${remaining_exit_count}" 1 "${remaining_exit_count}"
+  exit_count_default="1"
+  if [ "${remaining_exit_count}" -lt 1 ]; then
+    exit_count_default="${remaining_exit_count}"
+  fi
+  prompt_int exit_count "How many exit hosts to configure" "${exit_count_default}" 1 "${remaining_exit_count}"
   if [ "${exit_count}" -ge 1 ] && [ "${exit_count}" -le "${remaining_exit_count}" ]; then
     break
   fi
@@ -326,32 +594,47 @@ if [ -z "${transit_cert_domain}" ]; then
   exit 1
 fi
 
-prompt_int edge_client_port "Client-facing port on ${edge_host}" "443"
-prompt edge_reality_target "Reality target for ${edge_host} (example: sun6-22.userapi.com:443)" "sun6-22.userapi.com:443"
-prompt edge_reality_server_name "Reality SNI/serverName for ${edge_host}" "sun6-22.userapi.com"
-prompt edge_cover_host "XHTTP host for client-facing inbound on ${edge_host}" "sun6-22.userapi.com"
-prompt edge_cover_path "XHTTP path for client-facing inbound on ${edge_host}" "/s/v1/ig2/asset.jpg"
+edge_client_port_default="${DEFAULT_EDGE_CLIENT_PORT}"
+edge_reality_target_default="${DEFAULT_EDGE_REALITY_TARGET}"
+edge_reality_server_name_default="${DEFAULT_EDGE_REALITY_SERVER_NAME}"
+edge_cover_host_default="${DEFAULT_EDGE_XHTTP_HOST}"
+edge_cover_path_default="${DEFAULT_EDGE_XHTTP_PATH}"
+prompt_int edge_client_port "Client-facing port on ${edge_host}" "${edge_client_port_default}"
+prompt edge_reality_target "Reality target for ${edge_host} (example: sun6-22.userapi.com:443)" "${edge_reality_target_default}"
+prompt edge_reality_server_name "Reality SNI/serverName for ${edge_host}" "${edge_reality_server_name_default}"
+prompt edge_cover_host "XHTTP host for client-facing inbound on ${edge_host}" "${edge_cover_host_default}"
+prompt edge_cover_path "XHTTP path for client-facing inbound on ${edge_host}" "${edge_cover_path_default}"
 
 generated_edge_private="REPLACE_REALITY_PRIVATE_KEY"
 generated_edge_public="REPLACE_REALITY_PUBLIC_KEY"
+edge_reality_short_id_default="$(generate_short_id)"
 if generated_edge_output="$(generate_reality_keypair)"; then
   generated_edge_private="$(printf '%s\n' "${generated_edge_output}" | sed -n '1p')"
   generated_edge_public="$(printf '%s\n' "${generated_edge_output}" | sed -n '2p')"
 fi
 prompt edge_reality_private_key "Reality private key for ${edge_host}" "${generated_edge_private}"
-prompt edge_reality_public_key "Reality public key for ${edge_host} (for clients/reference)" "${generated_edge_public}"
-prompt edge_reality_short_id "Reality shortId for ${edge_host}" "$(generate_short_id)"
+prompt edge_reality_public_key "Reality public key / Password for ${edge_host} (for clients/reference)" "${generated_edge_public}"
+prompt edge_reality_short_id "Reality shortId for ${edge_host}" "${edge_reality_short_id_default}"
 
-prompt_int transit_inbound_port "Transit inbound port on ${transit_host}" "9443"
-prompt transit_dial_address "Dial address for ${edge_host} -> ${transit_host}" "${transit_cert_domain}"
-prompt transit_server_name "TLS serverName for ${edge_host} -> ${transit_host}" "${transit_cert_domain}"
-prompt transit_xhttp_host "XHTTP host for ${edge_host} -> ${transit_host}" "${transit_cert_domain}"
-prompt transit_xhttp_path "XHTTP path for ${edge_host} -> ${transit_host}" "/xhttp-transit"
-prompt edge_to_transit_uuid "Service-user UUID for ${edge_host} -> ${transit_host} (placeholder allowed)" "REPLACE_$(placeholder_slug "${edge_host}_TO_${transit_host}")_SERVICE_UUID"
+transit_inbound_port_default="${DEFAULT_TRANSIT_INBOUND_PORT}"
+transit_dial_address_default="${transit_cert_domain}"
+transit_server_name_default="${transit_cert_domain}"
+transit_xhttp_host_default="${transit_cert_domain}"
+transit_xhttp_path_default="${DEFAULT_TRANSIT_XHTTP_PATH}"
+edge_to_transit_uuid_default="REPLACE_$(placeholder_slug "${edge_host}_TO_${transit_host}")_SERVICE_UUID"
+prompt_int transit_inbound_port "Transit inbound port on ${transit_host}" "${transit_inbound_port_default}"
+prompt transit_dial_address "Dial address for ${edge_host} -> ${transit_host}" "${transit_dial_address_default}"
+prompt transit_server_name "TLS serverName for ${edge_host} -> ${transit_host}" "${transit_server_name_default}"
+prompt transit_xhttp_host "XHTTP host for ${edge_host} -> ${transit_host}" "${transit_xhttp_host_default}"
+prompt transit_xhttp_path "XHTTP path for ${edge_host} -> ${transit_host}" "${transit_xhttp_path_default}"
+prompt edge_to_transit_uuid "Service-user UUID for ${edge_host} -> ${transit_host} (placeholder allowed)" "${edge_to_transit_uuid_default}"
 
-prompt transit_direct_geoip_codes "GeoIP country codes for direct egress on ${transit_host} (comma-separated, without geoip:)" "ru"
-prompt transit_direct_ip_cidrs "Additional IP/CIDR rules for direct egress on ${transit_host} (comma-separated, optional)" ""
-prompt transit_direct_geosite "Geosite selectors for direct egress on ${transit_host} (comma-separated, without geosite:)" "category-ru"
+transit_direct_geoip_default="${DEFAULT_TRANSIT_DIRECT_GEOIP}"
+transit_direct_ip_cidrs_default=""
+transit_direct_geosite_default="${DEFAULT_TRANSIT_DIRECT_GEOSITE}"
+prompt transit_direct_geoip_codes "GeoIP country codes for direct egress on ${transit_host} (comma-separated, without geoip:)" "${transit_direct_geoip_default}"
+prompt transit_direct_ip_cidrs "Additional IP/CIDR rules for direct egress on ${transit_host} (comma-separated, optional)" "${transit_direct_ip_cidrs_default}"
+prompt transit_direct_geosite "Geosite selectors for direct egress on ${transit_host} (comma-separated, without geosite:)" "${transit_direct_geosite_default}"
 
 selected_exit_hosts=""
 exit_entries=""
@@ -361,11 +644,7 @@ while [ "${index}" -le "${exit_count}" ]; do
   [ -z "${default_exit_candidate}" ] && default_exit_candidate="$(first_host "${remaining_exit_hosts}")"
 
   while true; do
-    prompt exit_host "Exit host #${index} (worker)" "${default_exit_candidate}"
-    if ! contains_host "${exit_host}" "${remaining_exit_hosts}"; then
-      echo "Host '${exit_host}' is not available among worker exits."
-      continue
-    fi
+    prompt_host_choice exit_host "Exit host #${index} (worker)" "${remaining_exit_hosts}" "${default_exit_candidate}"
     if contains_host "${exit_host}" "${selected_exit_hosts}"; then
       echo "Host '${exit_host}' is already selected as an exit."
       continue
@@ -381,19 +660,34 @@ while [ "${index}" -le "${exit_count}" ]; do
 
   exit_slug="$(sanitize_slug "${exit_host}")"
   exit_placeholder="$(placeholder_slug "${exit_host}")"
+  exit_inbound_port_default="$((DEFAULT_EXIT_BASE_INBOUND_PORT + index))"
+  exit_dial_address_default="${exit_cert_domain}"
+  exit_server_name_default="${exit_cert_domain}"
+  exit_xhttp_host_default="${exit_cert_domain}"
+  exit_xhttp_path_default="${DEFAULT_EXIT_XHTTP_PATH}"
+  transit_to_exit_uuid_default="REPLACE_${exit_placeholder}_SERVICE_UUID"
+  exit_route_geoip_codes_default=""
+  exit_route_ip_cidrs_default=""
+  exit_route_geosite_default=""
+  exit_enable_direct_default="${DEFAULT_EXIT_DIRECT_ENABLED}"
+  exit_direct_port_default="${DEFAULT_EXIT_DIRECT_PORT}"
+  exit_direct_target_default="${DEFAULT_EXIT_DIRECT_TARGET}"
+  exit_direct_server_name_default="${DEFAULT_EXIT_DIRECT_SERVER_NAME}"
+  exit_direct_cover_host_default="${DEFAULT_EXIT_DIRECT_XHTTP_HOST}"
+  exit_direct_cover_path_default="${DEFAULT_EXIT_DIRECT_XHTTP_PATH}"
 
-  prompt_int exit_inbound_port "Transit inbound port on ${exit_host}" "$((8442 + index))"
-  prompt exit_dial_address "Dial address for ${transit_host} -> ${exit_host}" "${exit_cert_domain}"
-  prompt exit_server_name "TLS serverName for ${transit_host} -> ${exit_host}" "${exit_cert_domain}"
-  prompt exit_xhttp_host "XHTTP host for ${transit_host} -> ${exit_host}" "${exit_cert_domain}"
-  prompt exit_xhttp_path "XHTTP path for ${transit_host} -> ${exit_host}" "/xhttp-${exit_slug}"
-  prompt transit_to_exit_uuid "Service-user UUID for ${transit_host} -> ${exit_host} (placeholder allowed)" "REPLACE_${exit_placeholder}_SERVICE_UUID"
+  prompt_int exit_inbound_port "Transit inbound port on ${exit_host}" "${exit_inbound_port_default}"
+  prompt exit_dial_address "Dial address for ${transit_host} -> ${exit_host}" "${exit_dial_address_default}"
+  prompt exit_server_name "TLS serverName for ${transit_host} -> ${exit_host}" "${exit_server_name_default}"
+  prompt exit_xhttp_host "XHTTP host for ${transit_host} -> ${exit_host}" "${exit_xhttp_host_default}"
+  prompt exit_xhttp_path "XHTTP path for ${transit_host} -> ${exit_host}" "${exit_xhttp_path_default}"
+  prompt transit_to_exit_uuid "Service-user UUID for ${transit_host} -> ${exit_host} (placeholder allowed)" "${transit_to_exit_uuid_default}"
 
-  prompt exit_route_geoip_codes "GeoIP country codes for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" ""
-  prompt exit_route_ip_cidrs "Additional IP/CIDR rules for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" ""
-  prompt exit_route_geosite "Geosite selectors for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" ""
+  prompt exit_route_geoip_codes "GeoIP country codes for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" "${exit_route_geoip_codes_default}"
+  prompt exit_route_ip_cidrs "Additional IP/CIDR rules for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" "${exit_route_ip_cidrs_default}"
+  prompt exit_route_geosite "Geosite selectors for routing from ${transit_host} to ${exit_host} (comma-separated, optional)" "${exit_route_geosite_default}"
 
-  prompt_bool exit_enable_direct "Enable direct client ingress on ${exit_host}?" "false"
+  prompt_bool exit_enable_direct "Enable direct client ingress on ${exit_host}?" "${exit_enable_direct_default}"
   exit_direct_port=0
   exit_direct_target=""
   exit_direct_server_name=""
@@ -404,7 +698,7 @@ while [ "${index}" -le "${exit_count}" ]; do
   exit_direct_short_id=""
 
   if [ "${exit_enable_direct}" = "true" ]; then
-    prompt_int exit_direct_port "Direct client port on ${exit_host}" "443"
+    prompt_int exit_direct_port "Direct client port on ${exit_host}" "${exit_direct_port_default}"
     if [ "${exit_direct_port}" = "${exit_inbound_port}" ]; then
       echo "Direct client port and transit inbound port on ${exit_host} must be different."
       exit 1
@@ -412,18 +706,19 @@ while [ "${index}" -le "${exit_count}" ]; do
 
     generated_direct_private="REPLACE_REALITY_PRIVATE_KEY"
     generated_direct_public="REPLACE_REALITY_PUBLIC_KEY"
+    exit_direct_short_id_default="$(generate_short_id)"
     if generated_direct_output="$(generate_reality_keypair)"; then
       generated_direct_private="$(printf '%s\n' "${generated_direct_output}" | sed -n '1p')"
       generated_direct_public="$(printf '%s\n' "${generated_direct_output}" | sed -n '2p')"
     fi
 
-    prompt exit_direct_target "Reality target for direct clients on ${exit_host}" "www.cloudflare.com:443"
-    prompt exit_direct_server_name "Reality SNI/serverName for direct clients on ${exit_host}" "www.cloudflare.com"
-    prompt exit_direct_cover_host "XHTTP host for direct clients on ${exit_host}" "www.cloudflare.com"
-    prompt exit_direct_cover_path "XHTTP path for direct clients on ${exit_host}" "/s/${exit_slug}/asset.jpg"
+    prompt exit_direct_target "Reality target for direct clients on ${exit_host}" "${exit_direct_target_default}"
+    prompt exit_direct_server_name "Reality SNI/serverName for direct clients on ${exit_host}" "${exit_direct_server_name_default}"
+    prompt exit_direct_cover_host "XHTTP host for direct clients on ${exit_host}" "${exit_direct_cover_host_default}"
+    prompt exit_direct_cover_path "XHTTP path for direct clients on ${exit_host}" "${exit_direct_cover_path_default}"
     prompt exit_direct_private_key "Reality private key for direct clients on ${exit_host}" "${generated_direct_private}"
-    prompt exit_direct_public_key "Reality public key for direct clients on ${exit_host}" "${generated_direct_public}"
-    prompt exit_direct_short_id "Reality shortId for direct clients on ${exit_host}" "$(generate_short_id)"
+    prompt exit_direct_public_key "Reality public key / Password for direct clients on ${exit_host}" "${generated_direct_public}"
+    prompt exit_direct_short_id "Reality shortId for direct clients on ${exit_host}" "${exit_direct_short_id_default}"
   fi
 
   if [ -n "${selected_exit_hosts}" ]; then
@@ -431,47 +726,45 @@ while [ "${index}" -le "${exit_count}" ]; do
   fi
   selected_exit_hosts+="${exit_host}"
 
+  exit_entry="$(cat <<EOF
+    {
+      "index": ${index},
+      "host": "$(json_escape "${exit_host}")",
+      "slug": "$(json_escape "${exit_slug}")",
+      "cert_domain": "$(json_escape "${exit_cert_domain}")",
+      "inbound_port": ${exit_inbound_port},
+      "dial_address": "$(json_escape "${exit_dial_address}")",
+      "server_name": "$(json_escape "${exit_server_name}")",
+      "xhttp_host": "$(json_escape "${exit_xhttp_host}")",
+      "xhttp_path": "$(json_escape "${exit_xhttp_path}")",
+      "service_uuid": "$(json_escape "${transit_to_exit_uuid}")",
+      "route_geoip_codes": [$(csv_to_json_array "${exit_route_geoip_codes}")],
+      "route_ip_cidrs": [$(csv_to_json_array "${exit_route_ip_cidrs}")],
+      "route_geosite": [$(csv_to_json_array "${exit_route_geosite}")],
+      "direct": {
+        "enabled": ${exit_enable_direct},
+        "client_port": ${exit_direct_port},
+        "reality_target": "$(json_escape "${exit_direct_target}")",
+        "reality_server_name": "$(json_escape "${exit_direct_server_name}")",
+        "cover_host": "$(json_escape "${exit_direct_cover_host}")",
+        "cover_path": "$(json_escape "${exit_direct_cover_path}")",
+        "reality_private_key": "$(json_escape "${exit_direct_private_key}")",
+        "reality_public_key": "$(json_escape "${exit_direct_public_key}")",
+        "reality_short_id": "$(json_escape "${exit_direct_short_id}")"
+      }
+    }
+EOF
+)"
   if [ -n "${exit_entries}" ]; then
-    exit_entries+=","$'\n'
+    exit_entries+=$',\n'
   fi
-  exit_entries+="    {\n"
-  exit_entries+="      \"index\": ${index},\n"
-  exit_entries+="      \"host\": \"$(json_escape "${exit_host}")\",\n"
-  exit_entries+="      \"slug\": \"$(json_escape "${exit_slug}")\",\n"
-  exit_entries+="      \"cert_domain\": \"$(json_escape "${exit_cert_domain}")\",\n"
-  exit_entries+="      \"inbound_port\": ${exit_inbound_port},\n"
-  exit_entries+="      \"dial_address\": \"$(json_escape "${exit_dial_address}")\",\n"
-  exit_entries+="      \"server_name\": \"$(json_escape "${exit_server_name}")\",\n"
-  exit_entries+="      \"xhttp_host\": \"$(json_escape "${exit_xhttp_host}")\",\n"
-  exit_entries+="      \"xhttp_path\": \"$(json_escape "${exit_xhttp_path}")\",\n"
-  exit_entries+="      \"service_uuid\": \"$(json_escape "${transit_to_exit_uuid}")\",\n"
-  exit_entries+="      \"route_geoip_codes\": [$(csv_to_json_array "${exit_route_geoip_codes}")],\n"
-  exit_entries+="      \"route_ip_cidrs\": [$(csv_to_json_array "${exit_route_ip_cidrs}")],\n"
-  exit_entries+="      \"route_geosite\": [$(csv_to_json_array "${exit_route_geosite}")],\n"
-  exit_entries+="      \"direct\": {\n"
-  exit_entries+="        \"enabled\": ${exit_enable_direct},\n"
-  exit_entries+="        \"client_port\": ${exit_direct_port},\n"
-  exit_entries+="        \"reality_target\": \"$(json_escape "${exit_direct_target}")\",\n"
-  exit_entries+="        \"reality_server_name\": \"$(json_escape "${exit_direct_server_name}")\",\n"
-  exit_entries+="        \"cover_host\": \"$(json_escape "${exit_direct_cover_host}")\",\n"
-  exit_entries+="        \"cover_path\": \"$(json_escape "${exit_direct_cover_path}")\",\n"
-  exit_entries+="        \"reality_private_key\": \"$(json_escape "${exit_direct_private_key}")\",\n"
-  exit_entries+="        \"reality_public_key\": \"$(json_escape "${exit_direct_public_key}")\",\n"
-  exit_entries+="        \"reality_short_id\": \"$(json_escape "${exit_direct_short_id}")\"\n"
-  exit_entries+="      }\n"
-  exit_entries+="    }"
+  exit_entries+="${exit_entry}"
 
   index=$((index + 1))
 done
 
 default_exit_host="$(first_host "${selected_exit_hosts}")"
-while true; do
-  prompt default_exit_host "Default non-RU exit host" "${default_exit_host}"
-  if contains_host "${default_exit_host}" "${selected_exit_hosts}"; then
-    break
-  fi
-  echo "Host '${default_exit_host}' is not among selected exits."
-done
+prompt_host_choice default_exit_host "Default non-RU exit host" "${selected_exit_hosts}" "${default_exit_host}"
 
 cat > "${TOPOLOGY_SPEC_FILE}" <<__SPEC__
 {
@@ -558,20 +851,40 @@ def xhttp_reality_inbound(tag, port, target, server_name, private_key, short_id,
     }
 
 
-def xhttp_tls_inbound(tag, port, client_uuid, cert_domain, host, path, email):
+def xhttp_reality_inbound_minimal(tag, port, target, server_name, private_key, short_id, path):
+    return {
+        "tag": tag,
+        "listen": "0.0.0.0",
+        "port": int(port),
+        "protocol": "vless",
+        "settings": {"clients": [], "decryption": "none"},
+        "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"]},
+        "streamSettings": {
+            "network": "xhttp",
+            "security": "reality",
+            "xhttpSettings": {
+                "path": path,
+            },
+            "realitySettings": {
+                "show": False,
+                "target": target,
+                "xver": 0,
+                "serverNames": [server_name],
+                "privateKey": private_key,
+                "shortIds": [short_id],
+            },
+        },
+    }
+
+
+def xhttp_tls_inbound(tag, port, cert_domain, host, path):
     return {
         "tag": tag,
         "listen": "0.0.0.0",
         "port": int(port),
         "protocol": "vless",
         "settings": {
-            "clients": [
-                {
-                    "id": client_uuid,
-                    "flow": "",
-                    "email": email,
-                }
-            ],
+            "clients": [],
             "decryption": "none",
         },
         "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic", "fakedns"]},
@@ -622,6 +935,26 @@ def xhttp_tls_outbound(tag, address, port, client_uuid, server_name, host, path)
 
 def base_dns_rule():
     return {"type": "field", "port": "53", "network": "TCP,UDP", "outboundTag": "LOCAL_DNS"}
+
+
+def local_dns_config():
+    return {
+        "servers": [
+            {
+                "address": "127.0.0.1",
+                "port": 53,
+                "domains": [],
+                "expectIPs": [],
+                "unexpectedIPs": [],
+                "queryStrategy": "UseIPv4",
+                "skipFallback": True,
+                "disableCache": False,
+                "finalQuery": False,
+            }
+        ],
+        "queryStrategy": "UseIP",
+        "tag": "dns_inbound",
+    }
 
 
 def private_block_rule():
@@ -720,6 +1053,7 @@ for host, meta in host_ports.items():
 
 edge_profile = {
     "log": {"loglevel": "warning"},
+    "dns": local_dns_config(),
     "inbounds": [
         xhttp_reality_inbound(
             tag="EDGE_CLIENT_IN",
@@ -801,15 +1135,14 @@ for entry in exits:
 transit_rules.append(network_rule(exit_by_host[default_exit_host]["outbound_tag"]))
 transit_profile = {
     "log": {"loglevel": "warning"},
+    "dns": local_dns_config(),
     "inbounds": [
         xhttp_tls_inbound(
             tag="FROM_EDGE",
             port=transit["inbound_port"],
-            client_uuid=edge["to_transit_uuid"],
             cert_domain=transit["cert_domain"],
             host=transit["xhttp_host"],
             path=transit["xhttp_path"],
-            email=f"{edge['host']}-to-{transit['host']}",
         )
     ],
     "outbounds": transit_outbounds,
@@ -831,30 +1164,28 @@ for idx, entry in enumerate(exits, start=1):
             xhttp_tls_inbound(
                 tag="FROM_TRANSIT",
                 port=entry["inbound_port"],
-                client_uuid=entry["service_uuid"],
                 cert_domain=entry["cert_domain"],
                 host=entry["xhttp_host"],
                 path=entry["xhttp_path"],
-                email=f"{transit['host']}-to-{entry['host']}",
             )
         )
     direct = entry["direct"]
     if direct.get("enabled"):
         inbounds.append(
-            xhttp_reality_inbound(
+            xhttp_reality_inbound_minimal(
                 tag="DIRECT_CLIENT_IN",
                 port=direct["client_port"],
                 target=direct["reality_target"],
                 server_name=direct["reality_server_name"],
                 private_key=direct["reality_private_key"],
                 short_id=direct["reality_short_id"],
-                host=direct["cover_host"],
                 path=direct["cover_path"],
             )
         )
 
     exit_profile = {
         "log": {"loglevel": "warning"},
+        "dns": local_dns_config(),
         "inbounds": inbounds,
         "outbounds": [
             {"tag": "EGRESS", "protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}},

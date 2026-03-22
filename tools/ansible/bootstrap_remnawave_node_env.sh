@@ -59,6 +59,42 @@ prompt_bool() {
   done
 }
 
+trim_trailing_newlines() {
+  local value="$1"
+  value="${value%$'\n'}"
+  value="${value%$'\r'}"
+  printf '%s' "${value}"
+}
+
+resolve_secret_input() {
+  local raw_value="$1"
+  local resolved=""
+
+  if [ "${raw_value}" = ":clipboard" ]; then
+    if command -v pbpaste >/dev/null 2>&1; then
+      resolved="$(pbpaste)"
+    else
+      echo "Clipboard mode requires pbpaste on this machine." >&2
+      return 1
+    fi
+  elif [[ "${raw_value}" == @* ]]; then
+    local secret_path="${raw_value#@}"
+    if [[ "${secret_path}" != /* ]]; then
+      secret_path="${ROOT_DIR}/${secret_path}"
+    fi
+    if [ ! -f "${secret_path}" ]; then
+      echo "Secret file not found: ${secret_path}" >&2
+      return 1
+    fi
+    resolved="$(cat "${secret_path}")"
+  else
+    resolved="${raw_value}"
+  fi
+
+  resolved="$(trim_trailing_newlines "${resolved}")"
+  printf '%s' "${resolved}"
+}
+
 extract_group_hosts() {
   local group_name="$1"
   local inventory_json_file
@@ -191,6 +227,7 @@ workers_enabled_default="$(current_group_enabled "${WORKERS_VARS_PATH}")"
 echo "=== Remnawave Node env bootstrap ==="
 echo "For each selected host paste value from panel Nodes -> Management."
 echo "Both legacy and current formats are written (.env will contain APP_PORT/NODE_PORT and SSL_CERT/SECRET_KEY)."
+echo "Tip: for long secrets use ':clipboard' or '@/absolute/or/relative/path/to/secret.txt'."
 
 selected_hosts=""
 if [ -n "${master_hosts}" ]; then
@@ -234,15 +271,24 @@ while IFS= read -r host_name; do
 
   node_port_default="${existing_port:-2222}"
   node_secret_default="${existing_secret:-}"
+  node_secret_prompt_default=""
+  if [ -n "${node_secret_default}" ]; then
+    node_secret_prompt_default="<keep-existing>"
+  fi
 
   prompt node_port "Node port for ${host_name}" "${node_port_default}"
-  prompt node_secret_input "SECRET_KEY/SSL_CERT for ${host_name}" "${node_secret_default}"
+  prompt node_secret_input "SECRET_KEY/SSL_CERT for ${host_name}" "${node_secret_prompt_default}"
+  if [ "${node_secret_input}" = "<keep-existing>" ]; then
+    node_secret_input="${node_secret_default}"
+  fi
   if [ -z "${node_secret_input}" ]; then
     echo "Secret for ${host_name} is required."
     exit 1
   fi
 
-  node_secret="${node_secret_input}"
+  if ! node_secret="$(resolve_secret_input "${node_secret_input}")"; then
+    exit 1
+  fi
   node_secret="${node_secret#SECRET_KEY=}"
   node_secret="${node_secret#SSL_CERT=}"
 

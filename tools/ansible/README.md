@@ -18,6 +18,119 @@ tools/ansible/bootstrap_private_vars.sh
 tools/ansible/run_prod_private.sh
 ```
 
+## С нуля на чистых VPS
+
+Рекомендуемый порядок для новой сети:
+
+1. Создать inventory и private vars:
+
+```bash
+npm run ansible:bootstrap
+```
+
+Что делает шаг:
+- создаёт `.private/ansible/prod/hosts.yml`
+- создаёт `.private/ansible/prod/group_vars/all.yml`
+- создаёт `.private/ansible/prod/group_vars/master.yml`
+- создаёт `.private/ansible/prod/group_vars/workers.yml`
+- создаёт `host_vars/<host>/certbot.yml` для certbot доменов
+
+2. Поднять базовую инфраструктуру и master control-plane:
+
+```bash
+npm run ansible:base
+npm run ansible:master
+```
+
+Что делает шаг:
+- `base` ставит Docker/UFW/fail2ban и открывает базовые firewall rules
+- `master` поднимает certbot, Remnawave panel, AdGuard, monitoring, backups
+
+3. Зайти в Remnawave panel и создать ноды, чтобы получить management secret для каждой ноды
+(`Nodes -> Management`).
+
+Важно:
+- ноды в panel можно создать до `Config Profile`
+- `node-env` использует именно management secret ноды
+- `topology` генерирует профили и не требуется для самого шага создания нод
+
+4. Сгенерировать private `.env` для remnawave-node на тех хостах, где нода должна быть установлена:
+
+```bash
+npm run ansible:node-env
+```
+
+Что делает шаг:
+- спрашивает, включать ли `remnawave_node` на `master`
+- спрашивает, включать ли `remnawave_node` на `workers`
+- пишет `.private/ansible/prod/remnawave-node/<host>.env`
+- пишет `.private/ansible/prod/host_vars/<host>/remnawave_node.yml`
+
+5. Сгенерировать topology и `Config Profile` JSON для Remnawave:
+
+```bash
+npm run ansible:topology
+```
+
+Что делает шаг:
+- готовит схему `edge -> transit -> multiple exits` на `XHTTP`
+- поддерживает optional direct client ingress на selected exit hosts
+- позволяет выбирать inventory hosts по номеру или по hostname
+- использует жёсткие opinionated defaults для camouflage-полей:
+  - `ya -> client`: `sun6-22.userapi.com`
+  - `ya -> moscow`: `/assets/runtime-8f3c21.js`
+  - `transit -> exit`: `/assets/runtime-3o3u46.js`
+  - `direct exit`: `www.microsoft.com` + `/static/chunks/main-91ac4d.js`
+- пишет JSON профили в `.private/ansible/prod/remnawave-topology/profiles`
+- пишет `firewall_extra_tcp_ports` в `.private/ansible/prod/host_vars/<host>/remnawave_topology.yml`
+
+Если service-user UUID ещё не готовы, helper допускает placeholder `REPLACE_*`.
+Это не мешает сначала сделать `node-env`, а потом вернуться к профилям.
+
+Опционально, если нужна отдельная Subscription Page для Remnawave вместо raw
+`/api/sub` endpoint, после panel bootstrap можно подготовить её private vars и DNS:
+
+```bash
+npm run ansible:subscription-page
+```
+
+Что делает шаг:
+- читает `master` из `.private/ansible/prod/hosts.yml`
+- пишет bundled Subscription Page vars в `.private/ansible/prod/group_vars/master.yml`
+- добавляет subdomain в `.private/ansible/prod/host_vars/<master>/certbot.yml`
+- может сразу создать/обновить `A/AAAA` запись в Cloudflare
+- после этого достаточно выполнить `npm run ansible:master`
+
+6. Импортировать generated JSON профили в Remnawave panel и привязать их к нодам.
+
+7. Проверить generated private config и при необходимости подправить:
+
+- `.private/ansible/prod/group_vars/master.yml`
+- `.private/ansible/prod/group_vars/workers.yml`
+- `.private/ansible/prod/host_vars/*`
+
+8. Прогнать dry-run:
+
+```bash
+npm run ansible:run:check
+```
+
+9. Применить на серверах:
+
+```bash
+npm run ansible:run
+```
+
+Если ОС только что переустановлены и нужен поэтапный старт:
+
+```bash
+npm run ansible:base
+npm run ansible:master
+npm run ansible:workers
+```
+
+`site` эквивалентен последовательности `base -> master -> workers`.
+
 Подготовка боевых `.env` для remnawave-node на выбранных hosts (`master` и/или `workers`) (интерактивно):
 
 ```bash
@@ -30,6 +143,13 @@ tools/ansible/bootstrap_remnawave_node_env.sh
 
 ```bash
 tools/ansible/bootstrap_remnawave_topology.sh
+```
+
+Подготовка private vars для bundled Remnawave Subscription Page
+(`sub.domain` + `REMNAWAVE_API_TOKEN` + certbot SAN + optional Cloudflare DNS):
+
+```bash
+tools/ansible/bootstrap_remnawave_subscription_page.sh
 ```
 
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы

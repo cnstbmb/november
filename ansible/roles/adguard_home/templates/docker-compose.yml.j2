@@ -6,8 +6,8 @@ services:
     restart: unless-stopped
     ports:
       - "{{ adguard_web_port }}:{{ adguard_internal_web_port }}/tcp"
-      - "{{ adguard_dns_port }}:53/tcp"
-      - "{{ adguard_dns_port }}:53/udp"
+      - "{{ adguard_dns_publish_host }}:{{ adguard_dns_port }}:53/tcp"
+      - "{{ adguard_dns_publish_host }}:{{ adguard_dns_port }}:53/udp"
 {% if adguard_tls_enabled | bool and (adguard_tls_port_https | int) > 0 %}
       - "{{ adguard_tls_port_https }}:{{ adguard_tls_port_https }}/tcp"
 {% endif %}

@@ -27,9 +27,9 @@
     mode: "0600"
   when: not ansible_check_mode
 
-- name: Check restic repository
-  ansible.builtin.command: restic snapshots
-  register: restic_snapshots
+- name: Check restic repository config
+  ansible.builtin.command: restic cat config
+  register: restic_repo_config
   changed_when: false
   failed_when: false
   environment: >-
@@ -41,11 +41,40 @@
     }}
   when: not ansible_check_mode
 
+- name: Determine whether restic repository needs initialization
+  ansible.builtin.set_fact:
+    restic_repository_missing: >-
+      {{
+        (restic_repo_config.rc | int != 0) and
+        (
+          (restic_repo_config.stderr | default('') | lower) is search('is there a repository') or
+          (restic_repo_config.stderr | default('') | lower) is search('unable to open config file') or
+          (restic_repo_config.stderr | default('') | lower) is search('config file does not exist') or
+          (restic_repo_config.stderr | default('') | lower) is search('specified key does not exist')
+        )
+      }}
+  when: not ansible_check_mode
+
+- name: Fail when restic repository check returned unexpected error
+  ansible.builtin.assert:
+    that:
+      - restic_repo_config.rc | int == 0 or restic_repository_missing | bool
+    fail_msg: >-
+      Restic repository check failed with an unexpected error.
+      stdout={{ restic_repo_config.stdout | default('') }}
+      stderr={{ restic_repo_config.stderr | default('') }}
+  when: not ansible_check_mode
+
 - name: Initialize restic repository
   ansible.builtin.command: restic init
+  register: restic_init
   when:
     - not ansible_check_mode
-    - restic_snapshots.rc != 0
+    - restic_repository_missing | bool
+  changed_when: restic_init.rc == 0
+  failed_when: >-
+    restic_init.rc != 0 and
+    ('already initialized' not in (restic_init.stderr | default('') | lower))
   environment: >-
     {{
       {

@@ -9,6 +9,7 @@ adguard_manage_config: false
 adguard_web_port: 3000
 adguard_internal_web_port: 3000
 adguard_dns_port: 53
+adguard_dns_publish_host: "0.0.0.0"
 adguard_timezone: "UTC"
 adguard_manage_systemd_resolved: true
 

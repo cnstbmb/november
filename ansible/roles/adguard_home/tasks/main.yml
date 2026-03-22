@@ -60,6 +60,7 @@
     proto: tcp
   when:
     - enable_adguard | bool
+    - adguard_dns_publish_host not in ['127.0.0.1', '::1', 'localhost']
     - not ansible_check_mode
 
 - name: Allow AdGuard Home DNS (UDP)
@@ -69,6 +70,29 @@
     proto: udp
   when:
     - enable_adguard | bool
+    - adguard_dns_publish_host not in ['127.0.0.1', '::1', 'localhost']
+    - not ansible_check_mode
+
+- name: Remove AdGuard Home DNS (TCP) from UFW when plain DNS is local-only
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: tcp
+    delete: true
+  when:
+    - enable_adguard | bool
+    - adguard_dns_publish_host in ['127.0.0.1', '::1', 'localhost']
+    - not ansible_check_mode
+
+- name: Remove AdGuard Home DNS (UDP) from UFW when plain DNS is local-only
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ adguard_dns_port }}"
+    proto: udp
+    delete: true
+  when:
+    - enable_adguard | bool
+    - adguard_dns_publish_host in ['127.0.0.1', '::1', 'localhost']
     - not ansible_check_mode
 
 - name: Allow AdGuard Home DNS-over-TLS
@@ -155,7 +179,7 @@
     - enable_adguard | bool
     - adguard_manage_systemd_resolved | bool
     - adguard_dns_port | int == 53
-    - "'systemd-resolved.service' in ansible_facts.services"
+    - "'systemd-resolved.service' in (ansible_facts.services | default({}))"
     - not ansible_check_mode
 
 - name: Restart systemd-resolved when DNS stub listener config changed
@@ -166,7 +190,7 @@
     - enable_adguard | bool
     - adguard_manage_systemd_resolved | bool
     - adguard_dns_port | int == 53
-    - "'systemd-resolved.service' in ansible_facts.services"
+    - "'systemd-resolved.service' in (ansible_facts.services | default({}))"
     - adguard_resolved_stub is changed
     - not ansible_check_mode
 
@@ -180,7 +204,7 @@
     - enable_adguard | bool
     - adguard_manage_systemd_resolved | bool
     - adguard_dns_port | int == 53
-    - "'systemd-resolved.service' in ansible_facts.services"
+    - "'systemd-resolved.service' in (ansible_facts.services | default({}))"
     - not ansible_check_mode
 
 - name: Run AdGuard Home via docker compose

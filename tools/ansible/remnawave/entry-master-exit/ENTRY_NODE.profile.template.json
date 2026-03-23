@@ -1,0 +1,165 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "dns": {
+    "servers": [
+      {
+        "port": 53,
+        "address": "127.0.0.1",
+        "skipFallback": true,
+        "queryStrategy": "UseIPv4"
+      }
+    ],
+    "queryStrategy": "UseIP"
+  },
+  "inbounds": [
+    {
+      "tag": "VLESS_TCP_REALITY",
+      "port": 443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic",
+          "fakedns"
+        ],
+        "metadataOnly": false
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "sockopt": {
+          "tcpMaxSeg": 512,
+          "tcpcongestion": "bbr",
+          "domainStrategy": "UseIP",
+          "tcpUserTimeout": 10000,
+          "tcpWindowClamp": 600,
+          "tcpKeepAliveIdle": 300,
+          "tcpKeepAliveInterval": 10
+        },
+        "security": "reality",
+        "tcpSettings": {
+          "header": {
+            "type": "none"
+          },
+          "acceptProxyProtocol": false
+        },
+        "realitySettings": {
+          "show": false,
+          "xver": 0,
+          "target": "sun6-22.userapi.com:443",
+          "shortIds": [
+            "REPLACE_ENTRY_REALITY_SHORT_ID"
+          ],
+          "privateKey": "REPLACE_ENTRY_REALITY_PRIVATE_KEY",
+          "serverNames": [
+            "sun6-22.userapi.com"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "BLOCK",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "XHTTP_TO_MASTER",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "port": 5335,
+            "users": [
+              {
+                "id": "REPLACE_ENTRY_TO_MASTER_SERVICE_UUID",
+                "encryption": "none"
+              }
+            ],
+            "address": "moscow.himenkov.ru"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "alpn": [
+            "h2",
+            "http/1.1"
+          ],
+          "serverName": "moscow.himenkov.ru",
+          "fingerprint": "chrome",
+          "allowInsecure": false
+        },
+        "xhttpSettings": {
+          "host": "moscow.himenkov.ru",
+          "mode": "stream-one",
+          "path": "/fluegergeheimer",
+          "xmux": {
+            "cMaxReuseTimes": 0,
+            "maxConcurrency": "16-32",
+            "maxConnections": 0,
+            "hKeepAlivePeriod": 0,
+            "hMaxRequestTimes": "600-900",
+            "hMaxReusableSecs": "1800-3000"
+          },
+          "noGRPCHeader": false,
+          "scMinPostsIntervalMs": "30"
+        }
+      }
+    },
+    {
+      "tag": "DNS_OUT",
+      "protocol": "freedom",
+      "settings": {
+        "redirect": "127.0.0.1:53"
+      }
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "port": "53",
+        "type": "field",
+        "network": "TCP,UDP",
+        "outboundTag": "DNS_OUT"
+      },
+      {
+        "ip": [
+          "geoip:private"
+        ],
+        "type": "field",
+        "outboundTag": "BLOCK"
+      },
+      {
+        "type": "field",
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "VLESS_TCP_REALITY"
+        ],
+        "outboundTag": "XHTTP_TO_MASTER"
+      }
+    ],
+    "domainStrategy": "AsIs"
+  }
+}

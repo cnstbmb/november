@@ -12,7 +12,10 @@ TOPOLOGY_SPEC_FILE="${TOPOLOGY_DIR}/topology-spec.json"
 TOPOLOGY_VARS_FILE="${TOPOLOGY_DIR}/topology.yml"
 SUMMARY_FILE="${TOPOLOGY_DIR}/README.generated.md"
 
-# Opinionated hard defaults for the current XHTTP topology.
+# Opinionated hard defaults for supported topology modes.
+DEFAULT_GENERATION_MODE="xhttp_multi_exit"
+
+# Legacy/current XHTTP multi-exit mode.
 DEFAULT_EDGE_CLIENT_PORT="443"
 DEFAULT_EDGE_REALITY_TARGET="sun6-22.userapi.com:443"
 DEFAULT_EDGE_REALITY_SERVER_NAME="sun6-22.userapi.com"
@@ -31,6 +34,22 @@ DEFAULT_EXIT_DIRECT_SERVER_NAME="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_HOST="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_PATH="/static/chunks/main-91ac4d.js"
 
+# Entry -> master -> exit mode with mandatory WireGuard on master.
+DEFAULT_ENTRY_PUBLIC_PORT="443"
+DEFAULT_ENTRY_REALITY_TARGET="sun6-22.userapi.com:443"
+DEFAULT_ENTRY_REALITY_SERVER_NAME="sun6-22.userapi.com"
+DEFAULT_ENTRY_TO_MASTER_PORT="5335"
+DEFAULT_ENTRY_TO_MASTER_PATH="/fluegergeheimer"
+DEFAULT_MASTER_WG_PORT="51820"
+DEFAULT_MASTER_PUBLIC_PORT="10443"
+DEFAULT_MASTER_REALITY_TARGET="borsaistanbul.com:10443"
+DEFAULT_MASTER_REALITY_SERVER_NAMES="borsaistanbul.com,www.borsaistanbul.com"
+DEFAULT_MASTER_TO_EXIT_PORT="8443"
+DEFAULT_EXIT_PUBLIC_DIRECT_PORT="443"
+DEFAULT_EXIT_REALITY_TARGET="apple.com:443"
+DEFAULT_EXIT_REALITY_SERVER_NAMES="apple.com,www.apple.com"
+DEFAULT_WG_ALLOWED_IP_BASE="10.8.0"
+
 usage() {
   cat <<USAGE
 Usage:
@@ -38,10 +57,12 @@ Usage:
 
 Interactive helper:
   - reads master/workers from ${INVENTORY_PATH}
-  - prepares XHTTP topology: edge -> transit -> multiple exits
-  - supports optional direct client ingress on selected worker exits
+  - supports two generation modes:
+    1) edge -> transit -> multiple exits on XHTTP
+    2) entry -> master -> exit with mandatory WireGuard on master
   - writes profile JSON files to ${PROFILES_DIR}
-  - writes firewall_extra_tcp_ports to host_vars/<host>/remnawave_topology.yml
+  - writes firewall_extra_tcp_ports and firewall_extra_udp_ports to
+    host_vars/<host>/remnawave_topology.yml
 USAGE
 }
 
@@ -488,6 +509,75 @@ certbot_domain_for_host() {
   else
     default_certbot_domain_for_host "${host_name}"
   fi
+}
+
+inventory_host_var() {
+  local host_name="$1"
+  local var_name="$2"
+  local host_json_file
+
+  host_json_file="$(mktemp "${TMPDIR:-/tmp}/ansible-host.XXXXXX")"
+  ANSIBLE_LOCAL_TEMP="${ROOT_DIR}/.tmp/ansible-local" \
+    ansible-inventory -i "${INVENTORY_PATH}" --host "${host_name}" > "${host_json_file}"
+  python3 - "${host_json_file}" "${var_name}" <<'__PY_HOST_VAR__'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+value = data.get(sys.argv[2])
+if value is None:
+    raise SystemExit(0)
+if isinstance(value, (dict, list)):
+    raise SystemExit(0)
+print(value)
+__PY_HOST_VAR__
+  rm -f "${host_json_file}"
+}
+
+inventory_public_address_for_host() {
+  local host_name="$1"
+  local public_address=""
+
+  public_address="$(inventory_host_var "${host_name}" "ansible_host" || true)"
+  if [ -n "${public_address}" ]; then
+    printf '%s\n' "${public_address}"
+  else
+    printf '%s\n' "${host_name}"
+  fi
+}
+
+prompt_generation_mode() {
+  local var_name="$1"
+  local default_mode="${2:-${DEFAULT_GENERATION_MODE}}"
+  local default_choice="1"
+  local choice=""
+
+  if [ "${default_mode}" = "entry_master_exit" ]; then
+    default_choice="2"
+  fi
+
+  while true; do
+    echo "Generation mode:"
+    echo "  1) edge -> transit -> multiple exits (XHTTP)"
+    echo "  2) entry -> master -> exit + WireGuard"
+    read -r -p "Выбери режим [${default_choice}]: " choice < /dev/tty
+    choice="${choice:-${default_choice}}"
+    case "${choice}" in
+      1|xhttp|xhttp_multi_exit)
+        printf -v "${var_name}" "xhttp_multi_exit"
+        return
+        ;;
+      2|entry|entry_master_exit|master)
+        printf -v "${var_name}" "entry_master_exit"
+        return
+        ;;
+      *)
+        echo "Некорректный выбор: ${choice}"
+        ;;
+    esac
+  done
 }
 
 generate_short_id() {

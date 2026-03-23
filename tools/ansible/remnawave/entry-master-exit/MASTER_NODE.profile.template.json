@@ -1,0 +1,291 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "dns": {
+    "servers": [
+      {
+        "port": 53,
+        "address": "127.0.0.1",
+        "skipFallback": true,
+        "queryStrategy": "UseIPv4"
+      }
+    ],
+    "queryStrategy": "UseIP"
+  },
+  "inbounds": [
+    {
+      "tag": "BRIDGE_MASTER_IN",
+      "port": 5335,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic",
+          "fakedns"
+        ],
+        "metadataOnly": false
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "alpn": [
+            "h2",
+            "http/1.1"
+          ],
+          "maxVersion": "1.3",
+          "minVersion": "1.2",
+          "certificates": [
+            {
+              "usage": "encipherment",
+              "keyFile": "/etc/letsencrypt/live/moscow.himenkov.ru/privkey.pem",
+              "certificateFile": "/etc/letsencrypt/live/moscow.himenkov.ru/fullchain.pem"
+            }
+          ]
+        },
+        "xhttpSettings": {
+          "host": "moscow.himenkov.ru",
+          "mode": "stream-one",
+          "path": "/fluegergeheimer",
+          "scMaxBufferedPosts": 30,
+          "scMaxEachPostBytes": "1000000",
+          "scStreamUpServerSecs": "20-80"
+        }
+      }
+    },
+    {
+      "tag": "WG_KEENETIC_IN",
+      "port": 51820,
+      "listen": "0.0.0.0",
+      "protocol": "wireguard",
+      "settings": {
+        "peers": [
+          {
+            "publicKey": "REPLACE_WG_PEER_PUBLIC_KEY",
+            "allowedIPs": [
+              "10.8.0.2/32"
+            ]
+          }
+        ],
+        "secretKey": "REPLACE_WG_SECRET_KEY",
+        "kernelMode": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ],
+        "metadataOnly": false
+      }
+    },
+    {
+      "tag": "VLESS_REALITY_MOSCOW",
+      "port": 10443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ],
+        "metadataOnly": false
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "xver": 0,
+          "target": "borsaistanbul.com:10443",
+          "shortIds": [
+            "REPLACE_MASTER_REALITY_SHORT_ID",
+            ""
+          ],
+          "privateKey": "REPLACE_MASTER_REALITY_PRIVATE_KEY",
+          "serverNames": [
+            "borsaistanbul.com",
+            "www.borsaistanbul.com"
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom",
+      "settings": {
+        "noises": [
+          {
+            "type": "rand",
+            "delay": "10-16",
+            "packet": "10-20",
+            "applyTo": "ip"
+          }
+        ],
+        "domainStrategy": "AsIs"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpMptcp": true,
+          "penetrate": true,
+          "tcpFastOpen": true
+        }
+      }
+    },
+    {
+      "tag": "BLOCK",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "IPv4",
+      "protocol": "freedom",
+      "settings": {
+        "noises": [
+          {
+            "type": "rand",
+            "delay": "10-16",
+            "packet": "10-20",
+            "applyTo": "ip"
+          }
+        ],
+        "domainStrategy": "UseIPv4"
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tcpMptcp": true,
+          "penetrate": true,
+          "tcpFastOpen": true
+        }
+      }
+    },
+    {
+      "tag": "GRPC_TO_EXIT",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "port": 8443,
+            "users": [
+              {
+                "id": "REPLACE_MASTER_TO_EXIT_SERVICE_UUID",
+                "encryption": "none"
+              }
+            ],
+            "address": "149.33.31.13"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "security": "tls",
+        "tlsSettings": {
+          "alpn": [
+            "h2",
+            "http/1.1"
+          ],
+          "serverName": "serb.himenkov.ru",
+          "fingerprint": "chrome",
+          "allowInsecure": false
+        },
+        "grpcSettings": {
+          "multiMode": false,
+          "serviceName": ""
+        }
+      }
+    },
+    {
+      "tag": "DNS_OUT",
+      "protocol": "freedom",
+      "settings": {
+        "redirect": "127.0.0.1:53"
+      }
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "port": "53",
+        "type": "field",
+        "network": "TCP,UDP",
+        "outboundTag": "DNS_OUT"
+      },
+      {
+        "type": "field",
+        "protocol": [
+          "bittorrent"
+        ],
+        "outboundTag": "BLOCK"
+      },
+      {
+        "ip": [
+          "geoip:private"
+        ],
+        "type": "field",
+        "outboundTag": "BLOCK"
+      },
+      {
+        "ip": [
+          "geoip:ru"
+        ],
+        "type": "field",
+        "outboundTag": "IPv4"
+      },
+      {
+        "type": "field",
+        "domain": [
+          "geosite:category-ru"
+        ],
+        "outboundTag": "IPv4"
+      },
+      {
+        "ip": [
+          "geoip:cn"
+        ],
+        "type": "field",
+        "outboundTag": "IPv4"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "BRIDGE_MASTER_IN"
+        ],
+        "outboundTag": "GRPC_TO_EXIT"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "WG_KEENETIC_IN"
+        ],
+        "outboundTag": "GRPC_TO_EXIT"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "VLESS_REALITY_MOSCOW"
+        ],
+        "outboundTag": "GRPC_TO_EXIT"
+      }
+    ],
+    "domainStrategy": "AsIs"
+  }
+}

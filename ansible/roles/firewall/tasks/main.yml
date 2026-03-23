@@ -26,7 +26,21 @@
     rule: allow
     port: "{{ item }}"
     proto: tcp
-  loop: "{{ firewall_master_tcp_ports | default([80, 443, 9443, 10443]) }}"
+  loop: >-
+    {{
+      (
+        firewall_master_tcp_ports | default([80, 443, 9443, 10443])
+      )
+      +
+      (
+        [monitoring_grafana_port]
+        if (enable_monitoring | default(false) | bool)
+        else []
+      )
+      | map('int')
+      | unique
+      | list
+    }}
   when: allow_http_https | bool
 
 - name: Allow extra ingress TCP ports

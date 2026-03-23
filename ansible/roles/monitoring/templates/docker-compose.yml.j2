@@ -18,13 +18,26 @@ services:
     image: grafana/grafana-oss:latest
     container_name: monitoring-grafana
     restart: unless-stopped
+{% if monitoring_grafana_tls_enabled | default(false) | bool %}
+    user: "0:0"
+{% endif %}
     ports:
       - "{{ monitoring_grafana_port }}:3000"
     environment:
       - GF_SECURITY_ADMIN_USER={{ monitoring_grafana_admin_user }}
       - GF_SECURITY_ADMIN_PASSWORD={{ monitoring_grafana_admin_password }}
+{% if monitoring_grafana_tls_enabled | default(false) | bool %}
+      - GF_SERVER_PROTOCOL=https
+      - GF_SERVER_DOMAIN={{ monitoring_grafana_tls_domain }}
+      - GF_SERVER_ROOT_URL=https://{{ monitoring_grafana_tls_domain }}:{{ monitoring_grafana_port }}
+      - GF_SERVER_CERT_FILE=/etc/letsencrypt/live/{{ monitoring_grafana_tls_cert_domain | default(monitoring_grafana_tls_domain, true) }}/fullchain.pem
+      - GF_SERVER_CERT_KEY=/etc/letsencrypt/live/{{ monitoring_grafana_tls_cert_domain | default(monitoring_grafana_tls_domain, true) }}/privkey.pem
+{% endif %}
     volumes:
       - grafana-data:/var/lib/grafana
+{% if monitoring_grafana_tls_enabled | default(false) | bool %}
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+{% endif %}
 
   loki:
     image: {{ monitoring_loki_image }}

@@ -2,6 +2,7 @@ allow_http_https: true
 firewall_master_tcp_ports:
   - 80
   - 443
+  - 10443
 enable_nginx: false # set true only if nginx runs on host, not in compose
 enable_certbot: true # enable cert issuance on master via certbot role
 enable_monitoring: true

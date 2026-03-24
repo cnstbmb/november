@@ -1,0 +1,14 @@
+monitoring_prometheus_retention: "7d"
+monitoring_loki_retention: "168h"
+monitoring_loki_image: "grafana/loki:2.9.10"
+monitoring_grafana_tls_enabled: false
+monitoring_grafana_tls_domain: ""
+monitoring_grafana_tls_cert_domain: ""
+monitoring_prometheus_scrape_interval: "15s"
+monitoring_prometheus_evaluation_interval: "15s"
+monitoring_auto_discover_node_targets: true
+monitoring_node_exporter_port: 9100
+monitoring_prometheus_scrape_remnawave_panel_metrics: true
+monitoring_remnawave_panel_metrics_path: "/metrics"
+monitoring_grafana_prometheus_uid: "prometheus"
+monitoring_grafana_loki_uid: "loki"

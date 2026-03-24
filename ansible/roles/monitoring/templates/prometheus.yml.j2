@@ -1,14 +1,45 @@
 global:
-  scrape_interval: 15s
+  scrape_interval: {{ monitoring_prometheus_scrape_interval }}
+  evaluation_interval: {{ monitoring_prometheus_evaluation_interval }}
+
+{% set master_hosts = groups['master'] | default([]) %}
+{% set worker_hosts = groups['workers'] | default([]) %}
+{% set monitored_hosts = (master_hosts + worker_hosts) | unique %}
 
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+        labels:
+          host: "{{ (groups['master'] | default([]) | first) | default(inventory_hostname) }}"
 
   - job_name: nodes
     static_configs:
+{% if monitoring_auto_discover_node_targets | default(true) | bool %}
+{% for host in monitored_hosts %}
       - targets:
-{% for target in monitoring_node_targets %}
+          - "{% if host == inventory_hostname %}host.docker.internal{% else %}{{ hostvars[host].ansible_host | default(host) }}{% endif %}:{{ monitoring_node_exporter_port | default(9100) }}"
+        labels:
+          host: "{{ host }}"
+          role: "{{ 'master' if host in (groups['master'] | default([])) else 'worker' }}"
+{% endfor %}
+{% else %}
+      - targets:
+{% for target in monitoring_node_targets | default([]) %}
           - "{{ target }}"
 {% endfor %}
+{% endif %}
+
+{% if enable_remnawave_panel | default(false) | bool and monitoring_prometheus_scrape_remnawave_panel_metrics | default(true) | bool and remnawave_panel_metrics_user | default('') | length > 0 and remnawave_panel_metrics_pass | default('') | length > 0 %}
+  - job_name: remnawave_panel
+    metrics_path: {{ monitoring_remnawave_panel_metrics_path | default('/metrics') }}
+    basic_auth:
+      username: "{{ remnawave_panel_metrics_user }}"
+      password: "{{ remnawave_panel_metrics_pass }}"
+    static_configs:
+      - targets:
+          - "remnawave:{{ remnawave_panel_metrics_port | default(3001) }}"
+        labels:
+          host: "{{ (groups['master'] | default([]) | first) | default(inventory_hostname) }}"
+          role: "master"
+{% endif %}

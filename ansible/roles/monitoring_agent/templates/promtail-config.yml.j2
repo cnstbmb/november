@@ -1,0 +1,48 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /positions/positions.yaml
+
+clients:
+  - url: >-
+      {{
+        'http://host.docker.internal:' ~ monitoring_loki_port ~ '/loki/api/v1/push'
+        if inventory_hostname == ((groups['master'] | default([]) | first) | default(''))
+        else
+        'http://' ~ (hostvars[(groups['master'] | default([]) | first)].ansible_host | default((groups['master'] | default([]) | first))) ~ ':' ~ monitoring_loki_port ~ '/loki/api/v1/push'
+      }}
+
+scrape_configs:
+  - job_name: varlogs
+    static_configs:
+      - targets: ["localhost"]
+        labels:
+          job: varlogs
+          host: "{{ inventory_hostname }}"
+          role: "{{ 'master' if inventory_hostname in (groups['master'] | default([])) else 'worker' }}"
+          __path__: /var/log/*.log
+
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    pipeline_stages:
+      - docker: {}
+    relabel_configs:
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: container
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: compose_service
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
+        target_label: compose_project
+      - source_labels: ["__meta_docker_container_log_stream"]
+        target_label: stream
+      - target_label: job
+        replacement: docker
+      - target_label: host
+        replacement: "{{ inventory_hostname }}"
+      - target_label: role
+        replacement: "{{ 'master' if inventory_hostname in (groups['master'] | default([])) else 'worker' }}"

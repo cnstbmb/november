@@ -1,9 +1,10 @@
-version: "3.8"
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: monitoring-prometheus
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -13,6 +14,11 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+{% if enable_remnawave_panel | default(false) | bool %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
 
   grafana:
     image: grafana/grafana-oss:latest
@@ -33,8 +39,13 @@ services:
       - GF_SERVER_CERT_FILE=/etc/letsencrypt/live/{{ monitoring_grafana_tls_cert_domain | default(monitoring_grafana_tls_domain, true) }}/fullchain.pem
       - GF_SERVER_CERT_KEY=/etc/letsencrypt/live/{{ monitoring_grafana_tls_cert_domain | default(monitoring_grafana_tls_domain, true) }}/privkey.pem
 {% endif %}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 {% if monitoring_grafana_tls_enabled | default(false) | bool %}
       - /etc/letsencrypt:/etc/letsencrypt:ro
 {% endif %}
@@ -48,29 +59,16 @@ services:
     command: -config.file=/etc/loki/config.yml
     volumes:
       - ./loki-config.yml:/etc/loki/config.yml:ro
-
-  promtail:
-    image: {{ monitoring_promtail_image }}
-    container_name: monitoring-promtail
-    restart: unless-stopped
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /etc/hostname:/etc/hostname:ro
-      - ./promtail-config.yml:/etc/promtail/config.yml:ro
-
-  node_exporter:
-    image: prom/node-exporter:latest
-    container_name: monitoring-node-exporter
-    restart: unless-stopped
-    network_mode: host
-    pid: host
-    command:
-      - "--path.rootfs=/host"
-    volumes:
-      - /:/host:ro,rslave
+      - loki-data:/loki
 
 volumes:
   prometheus-data:
   grafana-data:
+  loki-data:
+
+{% if enable_remnawave_panel | default(false) | bool %}
+networks:
+  remnawave-network:
+    name: "{{ remnawave_network_name | default('remnawave-network') }}"
+    external: true
+{% endif %}

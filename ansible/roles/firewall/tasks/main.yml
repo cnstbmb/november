@@ -62,3 +62,25 @@
   when:
     - firewall_extra_udp_ports is defined
     - firewall_extra_udp_ports | length > 0
+
+- name: Allow Prometheus scrapes from master to worker node exporters
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ monitoring_node_exporter_port | default(9100) | string }}"
+    proto: tcp
+    from_ip: "{{ hostvars[item].ansible_host | default(item) }}"
+  loop: "{{ groups['master'] | default([]) }}"
+  when:
+    - enable_monitoring | default(false) | bool
+    - inventory_hostname not in (groups['master'] | default([]))
+
+- name: Allow Promtail on workers to push logs into master Loki
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ monitoring_loki_port | default(3100) | string }}"
+    proto: tcp
+    from_ip: "{{ hostvars[item].ansible_host | default(item) }}"
+  loop: "{{ groups['workers'] | default([]) }}"
+  when:
+    - enable_monitoring | default(false) | bool
+    - inventory_hostname in (groups['master'] | default([]))

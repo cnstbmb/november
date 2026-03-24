@@ -1,6 +1,9 @@
 allow_http_https: false
 firewall_master_tcp_ports:
   - 2222
+#
+# Enable lightweight monitoring agents (node_exporter + promtail) on workers.
+# enable_monitoring: true
 
 # Stubby defaults to AdGuard DNS-over-TLS on the first inventory host in group `master`.
 # It uses master's ansible_host and first certbot domain unless overridden below.

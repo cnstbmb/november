@@ -1,0 +1,114 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (host, job) (count_over_time({job=~\"docker|varlogs\", host=~\"$host\"}[$__interval]))", "queryType": "range", "refId": "A"}],
+      "title": "Log Volume",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (host, container) (count_over_time({job=\"docker\", host=~\"$host\", container=~\"$container\"} |~ \"(?i)error|warn|fatal\" [$__interval]))", "queryType": "range", "refId": "A"}],
+      "title": "Docker Error/Warn Matches",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "sortOrder": "Descending"},
+      "targets": [{"editorMode": "code", "expr": "{job=\"docker\", host=~\"$host\", container=~\"$container\"}", "queryType": "range", "refId": "A"}],
+      "title": "Docker Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "gridPos": {"h": 12, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "sortOrder": "Descending"},
+      "targets": [{"editorMode": "code", "expr": "{job=\"varlogs\", host=~\"$host\"}", "queryType": "range", "refId": "A"}],
+      "title": "System Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["november", "logs"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+        "definition": "label_values({job=~\"docker|varlogs\"}, host)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Host",
+        "multi": true,
+        "name": "host",
+        "options": [],
+        "query": "label_values({job=~\"docker|varlogs\"}, host)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {"selected": true, "text": "All", "value": "$__all"},
+        "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+        "definition": "label_values({job=\"docker\", host=~\"$host\"}, container)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Container",
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": "label_values({job=\"docker\", host=~\"$host\"}, container)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "",
+  "title": "Logs Overview",
+  "uid": "november-logs",
+  "version": 1,
+  "weekStart": ""
+}

@@ -1,0 +1,3 @@
+monitoring_agent_dir: "/opt/monitoring-agent"
+monitoring_node_exporter_image: "quay.io/prometheus/node-exporter:v1.9.1"
+monitoring_promtail_image: "grafana/promtail:2.9.10"

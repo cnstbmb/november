@@ -1,0 +1,34 @@
+- name: Ensure monitoring agent directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_agent_dir }}"
+    state: directory
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Remove legacy fixed-name monitoring containers
+  ansible.builtin.command: docker rm -f {{ item }}
+  loop:
+    - monitoring-node-exporter
+    - monitoring-promtail
+  register: monitoring_agent_legacy_cleanup
+  failed_when: false
+  changed_when: monitoring_agent_legacy_cleanup.rc == 0
+  when: not ansible_check_mode
+
+- name: Render monitoring agent configs
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - src: docker-compose.yml.j2
+      dest: "{{ monitoring_agent_dir }}/docker-compose.yml"
+    - src: promtail-config.yml.j2
+      dest: "{{ monitoring_agent_dir }}/promtail-config.yml"
+  when: not ansible_check_mode
+
+- name: Start monitoring agent stack
+  ansible.builtin.command: docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ monitoring_agent_dir }}"
+  when: not ansible_check_mode

@@ -109,7 +109,13 @@ dist
 .idea/
 
 configs
-/ansible/
+/ansible/*
+!/ansible/roles/
+/ansible/roles/*
+!/ansible/roles/monitoring/
+!/ansible/roles/monitoring/**
+!/ansible/roles/monitoring_agent/
+!/ansible/roles/monitoring_agent/**
 .private/
 
 .vscode

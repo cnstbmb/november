@@ -8,3 +8,5 @@
     - firewall
     - fail2ban
     - docker
+    - role: monitoring_agent
+      when: enable_monitoring | default(false) | bool

@@ -6,3 +6,5 @@
     - certbot
     - role: remnawave_node
       when: enable_remnawave_node | default(true) | bool
+    - role: backups
+      when: enable_backups | bool

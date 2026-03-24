@@ -201,9 +201,20 @@ nginx-контейнеров (`remnawave-panel-proxy` на master, если pane
 Если `enable_backups=true`, bootstrap отдельно спросит, нужны ли S3-ключи.
 При выборе S3 он запросит `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
 (и опционально `AWS_DEFAULT_REGION`) и запишет их в `backup_env` в
-`.private/ansible/prod/group_vars/master.yml`.
+`.private/ansible/prod/group_vars/all.yml`.
 Если target введён как `https://...`, скрипт автоматически преобразует его в
 формат restic `s3:https://...`.
+Для Remnawave на master разумный набор путей такой:
+- `/opt/remnawave-panel`
+- `/opt/remnawave-node`
+- `/opt/adguardhome`
+- `/var/backups/remnawave`
+- `/etc/letsencrypt`
+
+Для workers:
+- `/opt/remnawave-node`
+- `/etc/letsencrypt`
+- `/etc/stubby`
 
 Прогрев SSH-сессий по всем хостам (по очереди, `ssh ... exit`):
 

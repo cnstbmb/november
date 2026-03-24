@@ -90,6 +90,22 @@
     mode: "0750"
   when: not ansible_check_mode
 
+- name: Ensure backup prepare directory exists
+  ansible.builtin.file:
+    path: "{{ backup_prepare_dir }}"
+    state: directory
+    mode: "0700"
+  when:
+    - not ansible_check_mode
+    - backup_remnawave_pg_dump_enabled | bool
+
+- name: Install backup prepare script
+  ansible.builtin.template:
+    src: restic-backup-prepare.sh.j2
+    dest: /usr/local/bin/restic-backup-prepare.sh
+    mode: "0750"
+  when: not ansible_check_mode
+
 - name: Schedule backup cron
   ansible.builtin.cron:
     name: "restic-backup"

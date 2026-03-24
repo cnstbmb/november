@@ -98,6 +98,21 @@
     proto: tcp
   when: remnawave_node_open_firewall | default(true) | bool
 
+- name: Find legacy remnawave node containers
+  ansible.builtin.shell: >
+    docker ps -a --format '{% raw %}{{.ID}} {{.Names}} {{.Image}}{% endraw %}'
+    | awk '$3 ~ /^remnawave\/node/ && $2 != "remnawave-node" { print $1 }'
+  register: remnawave_node_legacy_containers
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Remove legacy remnawave node containers
+  ansible.builtin.command: "docker rm -f {{ item }}"
+  loop: "{{ remnawave_node_legacy_containers.stdout_lines }}"
+  when:
+    - not ansible_check_mode
+    - remnawave_node_legacy_containers.stdout_lines | length > 0
+
 - name: Deploy remnawave node compose stack
   ansible.builtin.import_role:
     name: docker_compose

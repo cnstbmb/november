@@ -1,0 +1,6 @@
+backup_retry_lock: "30m"
+backup_prepare_dir: "/var/backups/remnawave"
+backup_external_target_regex: "^(s3:|/mnt/|/media/|/run/media/|/Volumes/)"
+backup_remnawave_pg_dump_enabled: "{{ enable_remnawave_panel | default(false) | bool }}"
+backup_remnawave_pg_dump_container_name: "remnawave-db"
+backup_remnawave_pg_dump_filename: "remnawave-postgres.sql.gz"

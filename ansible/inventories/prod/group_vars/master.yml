@@ -17,7 +17,15 @@ remnashop_validate_env: true # fail if .env contains placeholders like change_me
 # remnashop_env_dest: "/opt/remnashop/.env"
 monitoring_prometheus_retention: "7d"
 monitoring_loki_retention: "168h"
-backup_target: "/mnt/backup/november" # mount external disk or use remote target like s3://bucket/path
+backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:https://endpoint/bucket
+
+# Recommended Remnawave backup set on master:
+# backup_paths:
+#   - "/opt/remnawave-panel"   # panel compose/.env/nginx/subscription env
+#   - "/opt/remnawave-node"    # master node compose/.env
+#   - "/opt/adguardhome"       # DNS config used by worker stubby chain
+#   - "/var/backups/remnawave" # staged PostgreSQL dumps
+#   - "/etc/letsencrypt"       # TLS certificates for panel/adguard/node/grafana
 
 # Optional AdGuard overrides:
 # adguard_dir: "/opt/adguardhome"

@@ -9,9 +9,19 @@ export {{ env_name }}={{ env_value | quote }}
 
 backup_paths="{{ backup_paths | join(' ') }}"
 
-restic backup ${backup_paths} {% for ex in backup_exclude | default([]) %}--exclude {{ ex }} {% endfor %}
+if [ -x /usr/local/bin/restic-backup-prepare.sh ]; then
+  /usr/local/bin/restic-backup-prepare.sh
+fi
+
+restic backup \
+  --host {{ inventory_hostname | quote }} \
+  --retry-lock {{ backup_retry_lock | quote }} \
+  ${backup_paths} \
+  {% for ex in backup_exclude | default([]) %}--exclude {{ ex }} {% endfor %}
 
 restic forget --prune \
+  --host {{ inventory_hostname | quote }} \
+  --retry-lock {{ backup_retry_lock | quote }} \
   --keep-daily {{ backup_keep_daily }} \
   --keep-weekly {{ backup_keep_weekly }} \
   --keep-monthly {{ backup_keep_monthly }}

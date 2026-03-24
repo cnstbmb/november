@@ -5,6 +5,15 @@ firewall_master_tcp_ports:
 # Enable lightweight monitoring agents (node_exporter + promtail) on workers.
 # enable_monitoring: true
 
+# Optional worker backups if you want fast Remnawave recovery for edge/exit nodes.
+# enable_backups: true
+# backup_paths:
+#   - "/opt/remnawave-node"
+#   - "/etc/letsencrypt"
+#   - "/etc/stubby"
+# backup_cron_hour: "2"
+# backup_cron_minute: "15"
+
 # Stubby defaults to AdGuard DNS-over-TLS on the first inventory host in group `master`.
 # It uses master's ansible_host and first certbot domain unless overridden below.
 # stubby_manage_config: true

@@ -151,8 +151,88 @@ By default, UFW does not open these ports. Access via SSH tunnel or update firew
 If `enable_backups: true`, the `backups` role installs `restic`, writes a backup script,
 and schedules a cron job. Make sure:
 
-- `backup_target` is reachable from the master node
-- `backup_paths` includes your data directories (e.g. `/srv/pg-data`, `/srv/logs`, `/etc`)
+- `backup_target` is reachable from every host that should write snapshots
+- `backup_paths` points to real service data, not placeholder paths
+
+For a Remnawave deployment, the useful backup set is:
+
+- master:
+  - `/opt/remnawave-panel`
+  - `/opt/remnawave-node`
+  - `/opt/adguardhome`
+  - `/var/backups/remnawave`
+  - `/etc/letsencrypt`
+- workers:
+  - `/opt/remnawave-node`
+  - `/etc/letsencrypt`
+  - `/etc/stubby`
+
+The `backups` role also stages a PostgreSQL logical dump for the Remnawave panel on master:
+
+- `/var/backups/remnawave/remnawave-postgres.sql.gz`
+
+This is generated before each `restic backup`, so panel state is restorable even though
+PostgreSQL itself lives in a Docker volume.
+
+### Remnawave Restore
+
+1. Recreate the host with the same inventory hostname.
+2. Run `npm run ansible:base`, then the relevant playbook:
+   - `npm run ansible:master` for master
+   - `ansible-playbook -i .private/ansible/prod/hosts.yml ansible/playbooks/workers.yml` for workers
+3. Install `restic` credentials on the host by re-running Ansible or copying `/etc/restic/credentials`.
+4. Inspect snapshots:
+
+```bash
+restic snapshots --host moscow.himenkov.ru
+restic snapshots --host ya.himenkov.ru
+restic snapshots --host serb.himenkov.ru
+```
+
+5. Restore the host snapshot into a staging directory:
+
+```bash
+restic restore latest --host moscow.himenkov.ru --target /root/restore/master
+```
+
+6. Copy back the required paths from the staging directory:
+   - master:
+     - `/root/restore/master/opt/remnawave-panel -> /opt/remnawave-panel`
+     - `/root/restore/master/opt/remnawave-node -> /opt/remnawave-node`
+     - `/root/restore/master/opt/adguardhome -> /opt/adguardhome`
+     - `/root/restore/master/etc/letsencrypt -> /etc/letsencrypt`
+     - `/root/restore/master/var/backups/remnawave -> /var/backups/remnawave`
+   - workers:
+     - `/root/restore/<host>/opt/remnawave-node -> /opt/remnawave-node`
+     - `/root/restore/<host>/etc/letsencrypt -> /etc/letsencrypt`
+     - `/root/restore/<host>/etc/stubby -> /etc/stubby`
+
+7. On master, re-create an empty panel DB volume if needed, then import the dump:
+
+```bash
+cd /opt/remnawave-panel
+docker compose down
+docker volume rm remnawave-panel-db-data || true
+docker compose up -d remnawave-db
+gunzip -c /var/backups/remnawave/remnawave-postgres.sql.gz | docker exec -i remnawave-db psql -U remnawave postgres
+docker compose up -d
+```
+
+If you changed `remnawave_panel_project_name`, replace `remnawave-panel-db-data`
+with your actual Docker volume name.
+
+8. On workers, start the node stack after restoring files:
+
+```bash
+cd /opt/remnawave-node
+docker compose up -d
+```
+
+9. Verify:
+   - `docker ps`
+   - panel opens
+   - nodes reconnect in Remnawave
+   - cert-backed inbounds answer on expected ports
 
 ## 9) Common failure points
 
@@ -164,6 +244,7 @@ and schedules a cron job. Make sure:
 - Certbot enabled, but inventory host is an IP instead of domain (use `domain=ip`)
 - Stubby is configured to use master DoT, but master does not expose a valid DoT listener on `953`
 - `backup_target` requires network access not permitted on the server
+- `backup_paths` points to non-existent directories, so snapshots contain only `/etc`
 - `remnashop` enabled, but `.env` still has `change_me` placeholders
 
 ## 10) AdGuard Home (optional)

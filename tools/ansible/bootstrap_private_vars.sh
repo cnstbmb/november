@@ -609,9 +609,13 @@ if [ "${enable_monitoring}" = "true" ]; then
 fi
 
 if [ "${enable_backups}" = "true" ]; then
+  backup_paths_default="/etc"
+  if [ "${enable_remnawave_panel}" = "true" ] || [ "${enable_remnawave_node_master}" = "true" ] || [ "${enable_adguard}" = "true" ]; then
+    backup_paths_default="/opt/remnawave-panel,/opt/remnawave-node,/opt/adguardhome,/var/backups/remnawave,/etc/letsencrypt"
+  fi
   prompt backup_target "Backup target (например s3:https://endpoint/bucket или /mnt/backup/november)" "/mnt/backup/november"
   prompt_secret backup_password "Backup password (restic)"
-  prompt backup_paths_csv "Backup paths (через запятую)" "/srv/pg-data,/srv/logs,/etc"
+  prompt backup_paths_csv "Backup paths (через запятую)" "${backup_paths_default}"
   prompt backup_exclude_csv "Backup exclude (через запятую, можно пусто)" ""
   prompt backup_keep_daily "Keep daily" "7"
   prompt backup_keep_weekly "Keep weekly" "4"
@@ -694,6 +698,13 @@ if [ -z "${docker_users_yaml}" ]; then
   docker_users_yaml=$'\n  - "'"${ansible_user}"'"'
 fi
 
+backup_target_all="/mnt/backup/november"
+backup_password_all=""
+if [ "${enable_backups}" = "true" ]; then
+  backup_target_all="${backup_target}"
+  backup_password_all="${backup_password}"
+fi
+
 cat > "${GROUP_VARS_DIR}/all.yml" <<EOF
 ansible_user: "${ansible_user}"
 ansible_port: ${ansible_port}
@@ -732,8 +743,8 @@ monitoring_grafana_admin_user: "admin"
 monitoring_grafana_admin_password: ""
 monitoring_node_targets:${monitoring_targets_yaml}
 
-backup_target: "/mnt/backup/november"
-backup_password: ""
+backup_target: "${backup_target_all}"
+backup_password: "${backup_password_all}"
 backup_paths: []
 backup_exclude: []
 backup_keep_daily: 7
@@ -746,6 +757,19 @@ backup_cron_month: "*"
 backup_cron_weekday: "*"
 backup_require_external_target: true
 EOF
+
+if [ "${enable_backups}" = "true" ] && [ "${backup_use_s3}" = "true" ]; then
+  cat >> "${GROUP_VARS_DIR}/all.yml" <<EOF
+backup_env:
+  AWS_ACCESS_KEY_ID: "${backup_s3_access_key_id}"
+  AWS_SECRET_ACCESS_KEY: "${backup_s3_secret_access_key}"
+EOF
+  if [ -n "${backup_s3_region}" ]; then
+    cat >> "${GROUP_VARS_DIR}/all.yml" <<EOF
+  AWS_DEFAULT_REGION: "${backup_s3_region}"
+EOF
+  fi
+fi
 
 cat > "${GROUP_VARS_DIR}/master.yml" <<EOF
 allow_http_https: true
@@ -852,8 +876,6 @@ if [ "${enable_backups}" = "true" ]; then
   fi
 
   cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
-backup_target: "${backup_target}"
-backup_password: "${backup_password}"
 backup_paths:${backup_paths_yaml}
 backup_exclude:${backup_exclude_yaml}
 backup_keep_daily: ${backup_keep_daily}
@@ -865,19 +887,6 @@ backup_cron_day: "*"
 backup_cron_month: "*"
 backup_cron_weekday: "*"
 EOF
-
-  if [ "${backup_use_s3}" = "true" ]; then
-    cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
-backup_env:
-  AWS_ACCESS_KEY_ID: "${backup_s3_access_key_id}"
-  AWS_SECRET_ACCESS_KEY: "${backup_s3_secret_access_key}"
-EOF
-    if [ -n "${backup_s3_region}" ]; then
-      cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
-  AWS_DEFAULT_REGION: "${backup_s3_region}"
-EOF
-    fi
-  fi
 fi
 
 cat > "${GROUP_VARS_DIR}/workers.yml" <<EOF

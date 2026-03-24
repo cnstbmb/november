@@ -116,6 +116,8 @@ configs
 !/ansible/roles/monitoring/**
 !/ansible/roles/monitoring_agent/
 !/ansible/roles/monitoring_agent/**
+!/ansible/roles/backups/
+!/ansible/roles/backups/**
 .private/
 
 .vscode

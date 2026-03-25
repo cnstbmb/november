@@ -247,6 +247,9 @@ tools/ansible/warmup_prod_private.sh
 `deployments/prod/remnawave-node/docker-compose.yml` также монтирует
 `/etc/letsencrypt` в контейнер, чтобы XHTTP/TLS inbounds в custom profiles могли
 читать certbot-сертификаты с host.
+Каноническое имя контейнера в этом шаблоне — `remnanode`; перед деплоем роль
+автоматически удаляет другие legacy-контейнеры на образе `remnawave/node`,
+чтобы не возникал конфликт по `2222`.
 Для дополнительных портов topology-helper пишет `firewall_extra_tcp_ports` в
 `.private/ansible/prod/host_vars/<host>/remnawave_topology.yml`; роль `firewall`
 открывает их при следующем прогоне `base`/`site`.

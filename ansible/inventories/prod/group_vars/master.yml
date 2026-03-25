@@ -47,6 +47,7 @@ backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:h
 # remnawave_panel_domain: "panel.example.com"
 # remnawave_panel_dir: "/opt/remnawave-panel"
 # remnawave_panel_project_name: "remnawave-panel"
+# remnawave_panel_pull_policy: "missing" # compose pull policy: missing, never, always
 # remnawave_panel_postgres_user: "remnawave"
 # remnawave_panel_postgres_password: "########"
 # remnawave_panel_postgres_db: "remnawave"

@@ -118,6 +118,8 @@ Recommended flow:
 - use `tools/ansible/bootstrap_remnawave_node_env.sh` to generate per-host private `.env`
 - keep secrets in `.private/ansible/prod/remnawave-node/<host>.env`
 - store host override in `.private/ansible/prod/host_vars/<host>/remnawave_node.yml`
+- the canonical container name is `remnanode`; deploy removes older `remnawave/node`
+  containers with any other name before `docker compose up`
 
 On deploy, Ansible opens node TCP port automatically from `NODE_PORT`/`APP_PORT`
 in host `.env` (fallback: `node_firewall_port`, default `2222`).

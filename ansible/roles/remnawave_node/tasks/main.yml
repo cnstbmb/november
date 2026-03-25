@@ -101,7 +101,7 @@
 - name: Find legacy remnawave node containers
   ansible.builtin.shell: >
     docker ps -a --format '{% raw %}{{.ID}} {{.Names}} {{.Image}}{% endraw %}'
-    | awk '$3 ~ /^remnawave\/node/ && $2 != "remnawave-node" { print $1 }'
+    | awk '$3 ~ /^remnawave\/node/ && $2 != "remnanode" { print $1 }'
   register: remnawave_node_legacy_containers
   changed_when: false
   when: not ansible_check_mode

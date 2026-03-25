@@ -777,6 +777,7 @@ firewall_master_tcp_ports:
   - 80
   - 443
   - 10443
+  - 20443
 enable_nginx: false
 enable_certbot: ${enable_certbot}
 enable_monitoring: ${enable_monitoring}

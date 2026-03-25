@@ -1,4 +1,4 @@
-# Remnawave Cascade Profile (Entry -> Exit)
+# Remnawave Profile Templates
 
 Файлы:
 
@@ -6,20 +6,23 @@
 вход клиентов на RU entry (`inbounds`), локальный выход для RU (`outbound: DIRECT`), выход через DE node для всего остального (`outbound: DE_EXIT`).
 - `worker-node.docker-compose.example.yml`: пример compose для worker-ноды (`remnawave/node`).
 - `../bootstrap_remnawave_topology.sh`: интерактивный helper, который подготавливает
-  private JSON-профили для схемы `edge -> transit -> multiple exits` на `XHTTP`,
-  умеет включать optional direct client ingress на worker-нодах и пишет
-  `firewall_extra_tcp_ports` в host vars.
+  private JSON-профили для двух схем:
+  - `edge -> transit -> multiple exits` на `XHTTP`
+  - `entry -> master -> exit + WireGuard`
+- `entry-master-exit/`: канонические templates и renderer для схемы
+  `ENTRY_NODE -> MASTER_NODE -> EXIT_NODE`, включая `10443`, `20443` и
+  обязательный `WireGuard` inbound на master.
 
 ## Как применить
 
-1. Скопировать файл и заменить все `REPLACE_*` значения.
-2. В панели Remnawave создать/обновить `Config Profile` этим JSON.
-3. Привязать профиль к entry-ноде (RU).
-4. На DE-ноде поднять соответствующий inbound (совпадает с `DE_EXIT` параметрами).
-5. Проверить, что worker-ноды задеплоены через Ansible (playbook `workers.yml`).
+1. Запустить `tools/ansible/bootstrap_remnawave_topology.sh`.
+2. Выбрать нужный generation mode.
+3. Проверить сгенерированные JSON в `.private/ansible/prod/remnawave-topology/profiles/`.
+4. Импортировать `Config Profiles` в Remnawave и привязать их к нужным нодам.
+5. Применить firewall/node изменения через Ansible.
 
 ## Важно
 
 - Это шаблон, не готовый прод-конфиг.
-- Перед продом проверь совместимость метода/шифра и порта с твоей DE-нодой.
-- Для multi-geo добавляй outbounds (`NL_EXIT`, `TR_EXIT`) и правила в `routing.rules`.
+- Для `entry-master-exit` используй [README.md](/Users/konstantin/november/tools/ansible/remnawave/entry-master-exit/README.md) в подпапке как source of truth.
+- Перед продом проверь сертификаты, service-user UUID и `SECRET_KEY` нод.

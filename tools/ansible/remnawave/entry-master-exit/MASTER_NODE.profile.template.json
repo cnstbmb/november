@@ -127,6 +127,44 @@
           ]
         }
       }
+    },
+    {
+      "tag": "VLESS_REALITY_DIRECT_MSK",
+      "port": 20443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "sniffing": {
+        "enabled": true,
+        "routeOnly": false,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ],
+        "metadataOnly": false
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "xver": 0,
+          "target": "borsaistanbul.com:443",
+          "shortIds": [
+            "REPLACE_MASTER_DIRECT_MSK_REALITY_SHORT_ID",
+            ""
+          ],
+          "privateKey": "REPLACE_MASTER_DIRECT_MSK_REALITY_PRIVATE_KEY",
+          "serverNames": [
+            "borsaistanbul.com",
+            "www.borsaistanbul.com"
+          ]
+        }
+      }
     }
   ],
   "outbounds": [
@@ -258,6 +296,13 @@
         "outboundTag": "IPv4"
       },
       {
+        "type": "field",
+        "domain": [
+          "geosite:youtube"
+        ],
+        "outboundTag": "IPv4"
+      },
+      {
         "ip": [
           "geoip:cn"
         ],
@@ -284,6 +329,13 @@
           "VLESS_REALITY_MOSCOW"
         ],
         "outboundTag": "GRPC_TO_EXIT"
+      },
+      {
+        "type": "field",
+        "inboundTag": [
+          "VLESS_REALITY_DIRECT_MSK"
+        ],
+        "outboundTag": "IPv4"
       }
     ],
     "domainStrategy": "AsIs"

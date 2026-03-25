@@ -14,7 +14,8 @@
 - `MASTER_NODE`
   - bridge inbound: `BRIDGE_MASTER_IN` on `5335`
   - public direct: `VLESS_REALITY_MOSCOW` on `10443`
-  - optional wireguard: `WG_KEENETIC_IN` on `51820`
+  - public direct: `VLESS_REALITY_DIRECT_MSK` on `20443`
+  - mandatory wireguard: `WG_KEENETIC_IN` on `51820`
   - bridge outbound: `GRPC_TO_EXIT` -> `serb:8443`
 - `EXIT_NODE`
   - public direct: `VLESS_REALITY_DIRECT` on `443`
@@ -42,6 +43,8 @@ Placeholders to replace:
 - `REPLACE_ENTRY_TO_MASTER_SERVICE_UUID`
 - `REPLACE_MASTER_REALITY_PRIVATE_KEY`
 - `REPLACE_MASTER_REALITY_SHORT_ID`
+- `REPLACE_MASTER_DIRECT_MSK_REALITY_PRIVATE_KEY`
+- `REPLACE_MASTER_DIRECT_MSK_REALITY_SHORT_ID`
 - `REPLACE_MASTER_TO_EXIT_SERVICE_UUID`
 - `REPLACE_WG_SECRET_KEY`
 - `REPLACE_WG_PEER_PUBLIC_KEY`
@@ -76,6 +79,12 @@ Advanced host overrides: empty/default.
   - address: `5.42.111.142`
   - port: `10443`
   - node: `moscow.himenkov.ru`
+- `DIRECT MOSCOW`
+  - profile: `MASTER_NODE`
+  - inbound: `VLESS_REALITY_DIRECT_MSK`
+  - address: `5.42.111.142`
+  - port: `20443`
+  - node: `moscow.himenkov.ru`
 - `SERBIA`
   - profile: `EXIT_NODE`
   - inbound: `VLESS_REALITY_DIRECT`
@@ -89,6 +98,7 @@ Advanced host overrides: empty/default.
   - `VLESS_TCP_REALITY`
   - `VLESS_REALITY_MOSCOW`
 - `Direct Exit Squad`
+  - `VLESS_REALITY_DIRECT_MSK`
   - `VLESS_REALITY_DIRECT`
 - `Bridge Master Squad`
   - `BRIDGE_MASTER_IN`
@@ -112,6 +122,7 @@ Regular users:
   - `WHITE LIST`
   - `MOSCOW`
 - assign `Direct Exit Squad` for:
+  - `DIRECT MOSCOW`
   - `SERBIA`
 
 Current public pattern:
@@ -128,14 +139,11 @@ Current public pattern:
 4. Create/update `Internal Squads`.
 5. Create/update the two system users.
 6. Bind ordinary users to `Public Squad` and optionally `Direct Exit Squad`.
-7. Create/update hosts `WHITE LIST`, `MOSCOW`, `SERBIA`.
+7. Create/update hosts `WHITE LIST`, `MOSCOW`, `DIRECT MOSCOW`, `SERBIA`.
 
 ## WireGuard
 
-`WG_KEENETIC_IN` should be treated as optional.
+`WG_KEENETIC_IN` should be treated as mandatory.
 
-Reason:
-
-- peers are unique per deployment
-- `secretKey` is deployment-specific
-- not every rollout needs WireGuard enabled on `MASTER_NODE`
+Peers and `secretKey` remain deployment-specific, but сам inbound считается
+частью канонического `MASTER_NODE` профиля и должен генерироваться всегда.

@@ -18,6 +18,18 @@
     - "{{ monitoring_dir }}/grafana/dashboards"
   when: not ansible_check_mode
 
+- name: Allow master-local Prometheus scrapes to node exporter via docker bridge
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ monitoring_node_exporter_port | default(9100) | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ monitoring_master_local_scrape_cidrs | default(['172.17.0.0/16']) }}"
+  when:
+    - enable_monitoring | default(false) | bool
+    - inventory_hostname in (groups['master'] | default([]))
+    - not ansible_check_mode
+
 - name: Render monitoring configs
   ansible.builtin.template:
     src: "{{ item }}"

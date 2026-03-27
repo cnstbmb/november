@@ -1,8 +1,19 @@
 services:
   node_exporter:
     image: {{ monitoring_node_exporter_image }}
+    container_name: {{ monitoring_node_exporter_container_name }}
     restart: unless-stopped
+{% if monitoring_node_exporter_use_host_network | default(true) | bool %}
     network_mode: host
+{% else %}
+    expose:
+      - "{{ monitoring_node_exporter_port | default(9100) }}"
+    networks:
+      - default
+{% if monitoring_agent_attach_remnawave_network | default(false) | bool %}
+      - remnawave-network
+{% endif %}
+{% endif %}
     command:
       - "--path.procfs=/host/proc"
       - "--path.rootfs=/rootfs"
@@ -15,6 +26,7 @@ services:
 
   promtail:
     image: {{ monitoring_promtail_image }}
+    container_name: monitoring-promtail
     restart: unless-stopped
     command:
       - "-config.file=/etc/promtail/config.yml"
@@ -29,3 +41,10 @@ services:
 
 volumes:
   promtail-positions:
+
+{% if monitoring_agent_attach_remnawave_network | default(false) | bool and not (monitoring_node_exporter_use_host_network | default(true) | bool) %}
+networks:
+  remnawave-network:
+    name: "{{ monitoring_agent_network_name }}"
+    external: true
+{% endif %}

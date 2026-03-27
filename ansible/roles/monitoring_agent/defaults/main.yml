@@ -1,3 +1,7 @@
 monitoring_agent_dir: "/opt/monitoring-agent"
 monitoring_node_exporter_image: "quay.io/prometheus/node-exporter:v1.9.1"
 monitoring_promtail_image: "grafana/promtail:2.9.10"
+monitoring_node_exporter_use_host_network: true
+monitoring_node_exporter_container_name: "monitoring-node-exporter"
+monitoring_agent_attach_remnawave_network: false
+monitoring_agent_network_name: "{{ remnawave_network_name | default('remnawave-network') }}"

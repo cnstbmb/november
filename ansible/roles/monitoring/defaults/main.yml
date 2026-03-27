@@ -11,6 +11,8 @@ monitoring_prometheus_scrape_interval: "15s"
 monitoring_prometheus_evaluation_interval: "15s"
 monitoring_auto_discover_node_targets: true
 monitoring_node_exporter_port: 9100
+monitoring_master_local_scrape_cidrs:
+  - "172.17.0.0/16"
 monitoring_prometheus_scrape_remnawave_panel_metrics: true
 monitoring_prometheus_scrape_remnashop_probes: true
 monitoring_remnawave_panel_metrics_path: "/metrics"

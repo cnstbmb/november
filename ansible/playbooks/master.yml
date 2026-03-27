@@ -9,6 +9,8 @@
       when: enable_remnawave_panel | default(false) | bool
     - role: remnawave_node
       when: enable_remnawave_node | default(false) | bool
+    - role: monitoring_agent
+      when: enable_monitoring | bool
     - adguard_home
     - role: nginx
       when: enable_nginx | bool

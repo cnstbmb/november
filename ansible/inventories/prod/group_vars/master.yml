@@ -7,6 +7,9 @@ firewall_master_tcp_ports:
 enable_nginx: false # set true only if nginx runs on host, not in compose
 enable_certbot: true # enable cert issuance on master via certbot role
 enable_monitoring: true
+# monitoring_node_exporter_use_host_network: false # on master you can switch exporter to bridge network
+# monitoring_agent_attach_remnawave_network: true # lets Prometheus scrape master exporter by container name
+# monitoring_master_node_exporter_target: "monitoring-node-exporter:9100" # override default host.docker.internal target
 enable_backups: true
 enable_adguard: true # deploy AdGuard Home on master
 enable_remnawave_panel: false # deploy Remnawave panel on master via docker compose

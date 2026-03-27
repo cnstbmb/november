@@ -595,6 +595,116 @@ def build_exit_profile(exit_node):
     }
 
 
+def build_direct_exit_profile(direct_exit):
+    return {
+        "log": base_log(),
+        "dns": dns_config(),
+        "inbounds": [
+            {
+                "tag": "VLESS_REALITY_DIRECT_EXIT",
+                "port": int(direct_exit["public_port"]),
+                "listen": "0.0.0.0",
+                "protocol": "vless",
+                "settings": {
+                    "clients": [],
+                    "decryption": "none",
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls", "quic", "fakedns"],
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "tcpSettings": {
+                        "header": {"type": "none"},
+                        "acceptProxyProtocol": False,
+                    },
+                    "realitySettings": {
+                        "show": False,
+                        "xver": 0,
+                        "target": direct_exit["reality_target"],
+                        "shortIds": [direct_exit["reality_short_id"]],
+                        "privateKey": direct_exit["reality_private_key"],
+                        "serverNames": direct_exit["reality_server_names"],
+                    },
+                },
+            }
+        ],
+        "outbounds": [
+            {
+                "tag": "DIRECT",
+                "protocol": "freedom",
+                "settings": {
+                    "noises": [
+                        {
+                            "type": "rand",
+                            "delay": "10-16",
+                            "packet": "10-20",
+                            "applyTo": "ip",
+                        }
+                    ],
+                    "domainStrategy": "AsIs",
+                },
+                "streamSettings": {
+                    "sockopt": {
+                        "tcpMptcp": True,
+                        "penetrate": True,
+                        "tcpFastOpen": True,
+                    }
+                },
+            },
+            {"tag": "BLOCK", "protocol": "blackhole"},
+            {
+                "tag": "IPv4",
+                "protocol": "freedom",
+                "settings": {
+                    "noises": [
+                        {
+                            "type": "rand",
+                            "delay": "10-16",
+                            "packet": "10-20",
+                            "applyTo": "ip",
+                        }
+                    ],
+                    "domainStrategy": "UseIPv4",
+                },
+                "streamSettings": {
+                    "sockopt": {
+                        "tcpMptcp": True,
+                        "penetrate": True,
+                        "tcpFastOpen": True,
+                    }
+                },
+            },
+            {
+                "tag": "DNS_OUT",
+                "protocol": "freedom",
+                "settings": {"redirect": "127.0.0.1:53"},
+            },
+        ],
+        "routing": {
+            "rules": [
+                dns_rule(),
+                block_rule_bittorrent(),
+                block_rule_private(),
+                {
+                    "type": "field",
+                    "network": "TCP,UDP",
+                    "protocol": ["http", "tls", "quic"],
+                    "outboundTag": "IPv4",
+                },
+                {
+                    "type": "field",
+                    "network": "TCP,UDP",
+                    "outboundTag": "DIRECT",
+                },
+            ],
+            "domainStrategy": "AsIs",
+        },
+    }
+
+
 def main():
     spec_path = Path(sys.argv[1])
     profiles_dir = Path(sys.argv[2])
@@ -606,6 +716,11 @@ def main():
     entry = spec["entry"]
     master = spec["master"]
     exit_node = spec["exit"]
+    direct_exit = spec.get("direct_exit")
+    exit_host_remark = exit_node.get("host_remark") or ("AMSTERDAM" if direct_exit else "SERBIA")
+    direct_exit_host_remark = (
+        (direct_exit.get("host_remark") or "SERBIA") if direct_exit else None
+    )
 
     profiles_dir.mkdir(parents=True, exist_ok=True)
     host_vars_dir.mkdir(parents=True, exist_ok=True)
@@ -631,6 +746,12 @@ def main():
             "udp_ports": [],
         },
     }
+    if direct_exit:
+        host_ports[direct_exit["host"]] = {
+            "roles": ["direct"],
+            "tcp_ports": [int(direct_exit["public_port"])],
+            "udp_ports": [],
+        }
 
     for host, meta in host_ports.items():
         tcp_ports = meta["tcp_ports"]
@@ -643,10 +764,15 @@ def main():
     entry_profile_file = profiles_dir / f"01-entry-{entry['host']}.profile.json"
     master_profile_file = profiles_dir / f"02-master-{master['host']}.profile.json"
     exit_profile_file = profiles_dir / f"03-exit-{exit_node['host']}.profile.json"
+    direct_exit_profile_file = (
+        profiles_dir / f"04-direct-exit-{direct_exit['host']}.profile.json" if direct_exit else None
+    )
 
     write_json(entry_profile_file, build_entry_profile(entry, master))
     write_json(master_profile_file, build_master_profile(master, exit_node))
     write_json(exit_profile_file, build_exit_profile(exit_node))
+    if direct_exit and direct_exit_profile_file:
+        write_json(direct_exit_profile_file, build_direct_exit_profile(direct_exit))
 
     for host, meta in host_ports.items():
         host_dir = host_vars_dir / host
@@ -708,7 +834,7 @@ def main():
                 "node": master["host"],
             },
             {
-                "remark": "SERBIA",
+                "remark": exit_host_remark,
                 "profile": "EXIT_NODE",
                 "inbound": "VLESS_REALITY_DIRECT",
                 "address": exit_node["public_address"],
@@ -720,7 +846,10 @@ def main():
             {"name": "Public Squad", "inbounds": ["VLESS_TCP_REALITY", "VLESS_REALITY_MOSCOW"]},
             {
                 "name": "Direct Exit Squad",
-                "inbounds": ["VLESS_REALITY_DIRECT_MSK", "VLESS_REALITY_DIRECT"],
+                "inbounds": clean_list(
+                    ["VLESS_REALITY_DIRECT_MSK", "VLESS_REALITY_DIRECT"]
+                    + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else [])
+                ),
             },
             {"name": "Bridge Master Squad", "inbounds": ["BRIDGE_MASTER_IN"]},
             {"name": "Bridge Exit Squad", "inbounds": ["BRIDGE_EXIT_IN"]},
@@ -766,7 +895,7 @@ def main():
                 "path": "",
             },
             {
-                "host": "SERBIA",
+                "host": exit_host_remark,
                 "public_key": exit_node["reality_public_key"],
                 "short_id": exit_node["reality_short_id"],
                 "server_names": exit_node["reality_server_names"],
@@ -774,7 +903,75 @@ def main():
             },
         ],
     }
+    if direct_exit:
+        topology_data["nodes"].append(
+            {
+                "host": direct_exit["host"],
+                "profile": "DIRECT_EXIT",
+                "public_address": direct_exit["public_address"],
+                "node_port": 2222,
+            }
+        )
+        topology_data["hosts"].append(
+            {
+                "remark": direct_exit_host_remark,
+                "profile": "DIRECT_EXIT",
+                "inbound": "VLESS_REALITY_DIRECT_EXIT",
+                "address": direct_exit["public_address"],
+                "port": int(direct_exit["public_port"]),
+                "node": direct_exit["host"],
+            }
+        )
+        topology_data["client_values"].append(
+            {
+                "host": direct_exit_host_remark,
+                "public_key": direct_exit["reality_public_key"],
+                "short_id": direct_exit["reality_short_id"],
+                "server_names": direct_exit["reality_server_names"],
+                "path": "",
+            }
+        )
     topology_vars_file.write_text(emit_yaml(topology_data) + "\n", encoding="utf-8")
+
+    summary_node_lines = [
+        f"- ENTRY_NODE -> {entry['host']} ({entry['public_address']}:2222)",
+        f"- MASTER_NODE -> {master['host']} ({master['public_address']}:2222)",
+        f"- EXIT_NODE -> {exit_node['host']} ({exit_node['public_address']}:2222)",
+    ]
+    if direct_exit:
+        summary_node_lines.append(
+            f"- DIRECT_EXIT -> {direct_exit['host']} ({direct_exit['public_address']}:2222)"
+        )
+
+    summary_host_lines = [
+        f"- WHITE LIST -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
+        f"- MOSCOW -> {master['public_address']}:{master['reality_moscow']['port']} ({master['host']})",
+        f"- DIRECT MOSCOW -> {master['public_address']}:{master['reality_direct_msk']['port']} ({master['host']})",
+        f"- {exit_host_remark} -> {exit_node['public_address']}:{exit_node['public_port']} ({exit_node['host']})",
+    ]
+    if direct_exit:
+        summary_host_lines.append(
+            f"- {direct_exit_host_remark} -> {direct_exit['public_address']}:{direct_exit['public_port']} ({direct_exit['host']})"
+        )
+
+    summary_client_lines = [
+        f"- WHITE LIST: public_key={entry['reality_public_key']}, shortId={entry['reality_short_id']}",
+        f"- MOSCOW: public_key={master['reality_moscow']['public_key']}, shortId={master['reality_moscow']['short_id']}",
+        f"- DIRECT MOSCOW: public_key={master['reality_direct_msk']['public_key']}, shortId={master['reality_direct_msk']['short_id']}",
+        f"- {exit_host_remark}: public_key={exit_node['reality_public_key']}, shortId={exit_node['reality_short_id']}",
+    ]
+    if direct_exit:
+        summary_client_lines.append(
+            f"- {direct_exit_host_remark}: public_key={direct_exit['reality_public_key']}, shortId={direct_exit['reality_short_id']}"
+        )
+
+    summary_port_lines = [
+        f"- {entry['host']}: {entry['public_port']}/tcp",
+        f"- {master['host']}: {master['bridge_inbound_port']}/tcp, {master['reality_moscow']['port']}/tcp, {master['reality_direct_msk']['port']}/tcp, {master['wg_port']}/udp",
+        f"- {exit_node['host']}: {exit_node['public_port']}/tcp, {exit_node['bridge_inbound_port']}/tcp",
+    ]
+    if direct_exit:
+        summary_port_lines.append(f"- {direct_exit['host']}: {direct_exit['public_port']}/tcp")
 
     summary_lines = [
         "# Remnawave topology bootstrap",
@@ -782,45 +979,47 @@ def main():
         "## Mode",
         "",
         "- entry -> master -> exit + WireGuard",
+        "- optional direct-only exit profile",
         "",
         "## Nodes",
         "",
-        f"- ENTRY_NODE -> {entry['host']} ({entry['public_address']}:2222)",
-        f"- MASTER_NODE -> {master['host']} ({master['public_address']}:2222)",
-        f"- EXIT_NODE -> {exit_node['host']} ({exit_node['public_address']}:2222)",
+        *summary_node_lines,
         "",
         "## Hosts",
         "",
-        f"- WHITE LIST -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
-        f"- MOSCOW -> {master['public_address']}:{master['reality_moscow']['port']} ({master['host']})",
-        f"- DIRECT MOSCOW -> {master['public_address']}:{master['reality_direct_msk']['port']} ({master['host']})",
-        f"- SERBIA -> {exit_node['public_address']}:{exit_node['public_port']} ({exit_node['host']})",
+        *summary_host_lines,
         "",
         "## Squads",
         "",
         "- Public Squad -> VLESS_TCP_REALITY, VLESS_REALITY_MOSCOW",
-        "- Direct Exit Squad -> VLESS_REALITY_DIRECT_MSK, VLESS_REALITY_DIRECT",
+        "- Direct Exit Squad -> "
+        + ", ".join(clean_list(["VLESS_REALITY_DIRECT_MSK", "VLESS_REALITY_DIRECT"] + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else []))),
         "- Bridge Master Squad -> BRIDGE_MASTER_IN",
         "- Bridge Exit Squad -> BRIDGE_EXIT_IN",
         "",
         "## Client values",
         "",
-        f"- WHITE LIST: public_key={entry['reality_public_key']}, shortId={entry['reality_short_id']}",
-        f"- MOSCOW: public_key={master['reality_moscow']['public_key']}, shortId={master['reality_moscow']['short_id']}",
-        f"- DIRECT MOSCOW: public_key={master['reality_direct_msk']['public_key']}, shortId={master['reality_direct_msk']['short_id']}",
-        f"- SERBIA: public_key={exit_node['reality_public_key']}, shortId={exit_node['reality_short_id']}",
+        *summary_client_lines,
         "",
         "## Ports to open via Ansible",
         "",
-        f"- {entry['host']}: {entry['public_port']}/tcp",
-        f"- {master['host']}: {master['bridge_inbound_port']}/tcp, {master['reality_moscow']['port']}/tcp, {master['reality_direct_msk']['port']}/tcp, {master['wg_port']}/udp",
-        f"- {exit_node['host']}: {exit_node['public_port']}/tcp, {exit_node['bridge_inbound_port']}/tcp",
+        *summary_port_lines,
         "",
         "## Manual follow-up",
         "",
-        "1. Import ENTRY_NODE, MASTER_NODE, EXIT_NODE into Remnawave Config Profiles.",
-        "2. Bind profiles to nodes ya.himenkov.ru, moscow.himenkov.ru, serb.himenkov.ru.",
-        "3. Create hosts WHITE LIST, MOSCOW, DIRECT MOSCOW, SERBIA.",
+        "1. Import ENTRY_NODE, MASTER_NODE, EXIT_NODE"
+        + (", DIRECT_EXIT" if direct_exit else "")
+        + " into Remnawave Config Profiles.",
+        "2. Bind profiles to nodes "
+        + ", ".join(
+            [entry["host"], master["host"], exit_node["host"]]
+            + ([direct_exit["host"]] if direct_exit else [])
+        )
+        + ".",
+        "3. Create hosts WHITE LIST, MOSCOW, DIRECT MOSCOW, "
+        + exit_host_remark
+        + (f", {direct_exit_host_remark}" if direct_exit else "")
+        + ".",
         "4. Create/update Internal Squads: Public Squad, Direct Exit Squad, Bridge Master Squad, Bridge Exit Squad.",
         "5. Create/update service users bridge_entry_to_master and bridge_master_to_exit.",
         "6. Put regular users into Public Squad + Direct Exit Squad.",
@@ -833,6 +1032,7 @@ def main():
         f"- {entry_profile_file}",
         f"- {master_profile_file}",
         f"- {exit_profile_file}",
+        *([f"- {direct_exit_profile_file}"] if direct_exit and direct_exit_profile_file else []),
         f"- {topology_vars_file}",
     ]
     summary_file.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")

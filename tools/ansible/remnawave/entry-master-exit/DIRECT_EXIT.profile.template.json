@@ -15,7 +15,7 @@
   },
   "inbounds": [
     {
-      "tag": "VLESS_REALITY_DIRECT",
+      "tag": "VLESS_REALITY_DIRECT_EXIT",
       "port": 443,
       "listen": "0.0.0.0",
       "protocol": "vless",
@@ -46,56 +46,13 @@
           "xver": 0,
           "target": "apple.com:443",
           "shortIds": [
-            "REPLACE_EXIT_REALITY_SHORT_ID"
+            "REPLACE_DIRECT_EXIT_REALITY_SHORT_ID"
           ],
-          "privateKey": "REPLACE_EXIT_REALITY_PRIVATE_KEY",
+          "privateKey": "REPLACE_DIRECT_EXIT_REALITY_PRIVATE_KEY",
           "serverNames": [
             "apple.com",
             "www.apple.com"
           ]
-        }
-      }
-    },
-    {
-      "tag": "BRIDGE_EXIT_IN",
-      "port": 8443,
-      "listen": "0.0.0.0",
-      "protocol": "vless",
-      "settings": {
-        "clients": [],
-        "decryption": "none"
-      },
-      "sniffing": {
-        "enabled": true,
-        "destOverride": [
-          "http",
-          "tls",
-          "quic",
-          "fakedns"
-        ]
-      },
-      "streamSettings": {
-        "network": "grpc",
-        "security": "tls",
-        "tlsSettings": {
-          "alpn": [
-            "h2",
-            "http/1.1"
-          ],
-          "maxVersion": "1.3",
-          "minVersion": "1.2",
-          "serverName": "himenkov.ru",
-          "certificates": [
-            {
-              "usage": "encipherment",
-              "keyFile": "/etc/letsencrypt/live/himenkov.ru/privkey.pem",
-              "certificateFile": "/etc/letsencrypt/live/himenkov.ru/fullchain.pem"
-            }
-          ]
-        },
-        "grpcSettings": {
-          "multiMode": false,
-          "serviceName": ""
         }
       }
     }

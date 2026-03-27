@@ -229,7 +229,7 @@
                 "encryption": "none"
               }
             ],
-            "address": "149.33.31.13"
+            "address": "109.234.34.227"
           }
         ]
       },
@@ -241,7 +241,7 @@
             "h2",
             "http/1.1"
           ],
-          "serverName": "serb.himenkov.ru",
+          "serverName": "himenkov.ru",
           "fingerprint": "chrome",
           "allowInsecure": false
         },

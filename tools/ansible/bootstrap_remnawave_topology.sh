@@ -14,7 +14,8 @@ SUMMARY_FILE="${TOPOLOGY_DIR}/README.generated.md"
 ENTRY_MASTER_EXIT_RENDERER="${ROOT_DIR}/tools/ansible/remnawave/entry-master-exit/render_entry_master_exit.py"
 
 # Opinionated hard defaults for supported topology modes.
-# Current production topology is entry -> master -> exit with WireGuard.
+# Current production topology is entry -> master -> exit with WireGuard and
+# optional dedicated direct-only exit.
 DEFAULT_GENERATION_MODE="entry_master_exit"
 
 # Legacy/current XHTTP multi-exit mode.
@@ -36,7 +37,8 @@ DEFAULT_EXIT_DIRECT_SERVER_NAME="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_HOST="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_PATH="/static/chunks/main-91ac4d.js"
 
-# Entry -> master -> exit mode with mandatory WireGuard on master.
+# Entry -> master -> exit mode with mandatory WireGuard on master and
+# optional dedicated direct-only exit.
 DEFAULT_ENTRY_PUBLIC_PORT="443"
 DEFAULT_ENTRY_REALITY_TARGET="sun6-22.userapi.com:443"
 DEFAULT_ENTRY_REALITY_SERVER_NAME="sun6-22.userapi.com"
@@ -52,9 +54,14 @@ DEFAULT_MASTER_DIRECT_MSK_SERVER_NAMES="borsaistanbul.com,www.borsaistanbul.com"
 DEFAULT_MASTER_IPV4_GEOIP_CODES="ru,cn"
 DEFAULT_MASTER_IPV4_GEOSITE="category-ru,youtube"
 DEFAULT_MASTER_TO_EXIT_PORT="8443"
+DEFAULT_EXIT_HOST_REMARK="AMSTERDAM"
 DEFAULT_EXIT_PUBLIC_DIRECT_PORT="443"
 DEFAULT_EXIT_REALITY_TARGET="apple.com:443"
 DEFAULT_EXIT_REALITY_SERVER_NAMES="apple.com,www.apple.com"
+DEFAULT_DIRECT_EXIT_HOST_REMARK="SERBIA"
+DEFAULT_DIRECT_EXIT_PUBLIC_PORT="443"
+DEFAULT_DIRECT_EXIT_REALITY_TARGET="apple.com:443"
+DEFAULT_DIRECT_EXIT_REALITY_SERVER_NAMES="apple.com,www.apple.com"
 DEFAULT_WG_ALLOWED_IP_BASE="10.8.0"
 
 usage() {
@@ -67,6 +74,7 @@ Interactive helper:
   - supports two generation modes:
     1) edge -> transit -> multiple exits on XHTTP
     2) entry -> master -> exit with mandatory WireGuard on master
+       and optional dedicated direct-only exit
   - writes profile JSON files to ${PROFILES_DIR}
   - writes firewall_extra_tcp_ports and firewall_extra_udp_ports to
     host_vars/<host>/remnawave_topology.yml
@@ -568,7 +576,7 @@ prompt_generation_mode() {
   while true; do
     echo "Generation mode:"
     echo "  1) edge -> transit -> multiple exits (XHTTP)"
-    echo "  2) entry -> master -> exit + WireGuard"
+    echo "  2) entry -> master -> exit (+ direct exit) + WireGuard"
     read -r -p "Выбери режим [${default_choice}]: " choice < /dev/tty
     choice="${choice:-${default_choice}}"
     case "${choice}" in
@@ -681,6 +689,7 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
   echo "  master public direct: REALITY on 20443"
   echo "  mandatory WireGuard on master"
   echo "  master -> exit: gRPC over TLS"
+  echo "  optional dedicated direct-only exit profile"
   echo
 
   prompt_host_choice master_host "Master host" "${master_hosts}" "${default_master_host}"
@@ -695,9 +704,30 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
   default_exit_host="$(first_host "${remaining_exit_hosts}")"
   prompt_host_choice exit_host "Exit host (worker)" "${remaining_exit_hosts}" "${default_exit_host}"
 
+  remaining_direct_exit_hosts="$(printf '%s\n' "${worker_hosts}" | awk -v entry="${entry_host}" -v exit="${exit_host}" 'NF && $0 != entry && $0 != exit')"
+  enable_direct_exit="false"
+  direct_exit_host=""
+  if [ "$(count_hosts "${remaining_direct_exit_hosts}")" -ge 1 ]; then
+    existing_direct_exit_host="$(spec_query "direct_exit.host" || true)"
+    if [ -n "${existing_direct_exit_host}" ] && contains_host "${existing_direct_exit_host}" "${remaining_direct_exit_hosts}"; then
+      default_direct_exit_host="${existing_direct_exit_host}"
+      enable_direct_exit_default="true"
+    else
+      default_direct_exit_host="$(first_host "${remaining_direct_exit_hosts}")"
+      enable_direct_exit_default="true"
+    fi
+    prompt_bool enable_direct_exit "Configure dedicated direct-only exit node" "${enable_direct_exit_default}"
+    if [ "${enable_direct_exit}" = "true" ]; then
+      prompt_host_choice direct_exit_host "Direct-only exit host (worker)" "${remaining_direct_exit_hosts}" "${default_direct_exit_host}"
+    fi
+  fi
+
   entry_public_address="$(inventory_public_address_for_host "${entry_host}")"
   master_public_address="$(inventory_public_address_for_host "${master_host}")"
   exit_public_address="$(inventory_public_address_for_host "${exit_host}")"
+  if [ "${enable_direct_exit}" = "true" ]; then
+    direct_exit_public_address="$(inventory_public_address_for_host "${direct_exit_host}")"
+  fi
 
   master_cert_domain="$(certbot_domain_for_host "${master_host}")"
   exit_cert_domain="$(certbot_domain_for_host "${exit_host}")"
@@ -811,6 +841,7 @@ EOF
     "REPLACE_$(placeholder_slug "${master_host}_TO_${exit_host}")_SERVICE_UUID"
 
   prompt_int exit_public_port "Direct client port on ${exit_host}" "${DEFAULT_EXIT_PUBLIC_DIRECT_PORT}"
+  prompt exit_host_remark "Host remark for direct access on ${exit_host}" "${DEFAULT_EXIT_HOST_REMARK}"
   prompt exit_reality_target "Reality target for ${exit_host}" "${DEFAULT_EXIT_REALITY_TARGET}"
   prompt exit_reality_server_names_csv \
     "Reality serverNames for ${exit_host} (comma-separated)" \
@@ -826,6 +857,43 @@ EOF
   prompt exit_reality_private_key "Reality private key for ${exit_host}" "${generated_exit_private}"
   prompt exit_reality_public_key "Reality public key for ${exit_host}" "${generated_exit_public}"
   prompt exit_reality_short_id "Reality shortId for ${exit_host}" "${exit_reality_short_id_default}"
+
+  direct_exit_json_block=""
+  if [ "${enable_direct_exit}" = "true" ]; then
+    prompt_int direct_exit_public_port "Direct-only client port on ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_PUBLIC_PORT}"
+    prompt direct_exit_host_remark "Host remark for direct-only access on ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_HOST_REMARK}"
+    prompt direct_exit_reality_target "Reality target for ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_REALITY_TARGET}"
+    prompt direct_exit_reality_server_names_csv \
+      "Reality serverNames for ${direct_exit_host} (comma-separated)" \
+      "${DEFAULT_DIRECT_EXIT_REALITY_SERVER_NAMES}"
+    direct_exit_reality_server_names_csv="$(normalize_csv_list "${direct_exit_reality_server_names_csv}")"
+    generated_direct_exit_private="REPLACE_DIRECT_EXIT_REALITY_PRIVATE_KEY"
+    generated_direct_exit_public="REPLACE_DIRECT_EXIT_REALITY_PUBLIC_KEY"
+    direct_exit_short_id_default="$(generate_short_id)"
+    if generated_direct_exit_output="$(generate_reality_keypair)"; then
+      generated_direct_exit_private="$(printf '%s\n' "${generated_direct_exit_output}" | sed -n '1p')"
+      generated_direct_exit_public="$(printf '%s\n' "${generated_direct_exit_output}" | sed -n '2p')"
+    fi
+    prompt direct_exit_reality_private_key "Reality private key for ${direct_exit_host}" "${generated_direct_exit_private}"
+    prompt direct_exit_reality_public_key "Reality public key for ${direct_exit_host}" "${generated_direct_exit_public}"
+    prompt direct_exit_reality_short_id "Reality shortId for ${direct_exit_host}" "${direct_exit_short_id_default}"
+
+    direct_exit_json_block="$(cat <<EOF
+,
+  "direct_exit": {
+    "host": "$(json_escape "${direct_exit_host}")",
+    "public_address": "$(json_escape "${direct_exit_public_address}")",
+    "host_remark": "$(json_escape "${direct_exit_host_remark}")",
+    "public_port": ${direct_exit_public_port},
+    "reality_target": "$(json_escape "${direct_exit_reality_target}")",
+    "reality_server_names": [$(csv_to_json_array "${direct_exit_reality_server_names_csv}")],
+    "reality_private_key": "$(json_escape "${direct_exit_reality_private_key}")",
+    "reality_public_key": "$(json_escape "${direct_exit_reality_public_key}")",
+    "reality_short_id": "$(json_escape "${direct_exit_reality_short_id}")"
+  }
+EOF
+)"
+  fi
 
   cat > "${TOPOLOGY_SPEC_FILE}" <<__SPEC_ENTRY_MASTER_EXIT__
 {
@@ -884,6 +952,7 @@ ${wg_peer_entries}
   "exit": {
     "host": "$(json_escape "${exit_host}")",
     "public_address": "$(json_escape "${exit_public_address}")",
+    "host_remark": "$(json_escape "${exit_host_remark}")",
     "cert_domain": "$(json_escape "${exit_cert_domain}")",
     "public_port": ${exit_public_port},
     "bridge_inbound_port": ${exit_bridge_inbound_port},
@@ -892,7 +961,7 @@ ${wg_peer_entries}
     "reality_private_key": "$(json_escape "${exit_reality_private_key}")",
     "reality_public_key": "$(json_escape "${exit_reality_public_key}")",
     "reality_short_id": "$(json_escape "${exit_reality_short_id}")"
-  }
+  }${direct_exit_json_block}
 }
 __SPEC_ENTRY_MASTER_EXIT__
 

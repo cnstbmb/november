@@ -163,7 +163,8 @@ tools/ansible/bootstrap_remnawave_subscription_page.sh
 ```
 
 Готовые sanitized templates для схемы `ENTRY -> MASTER -> EXIT`
-с `Reality/TCP`, `XHTTP/TLS`, `gRPC/TLS` и mandatory `WireGuard`
+с `Reality/TCP`, `XHTTP/TLS`, `gRPC/TLS`, optional `DIRECT_EXIT`
+и mandatory `WireGuard`
 лежат в:
 
 ```bash
@@ -175,6 +176,7 @@ tools/ansible/remnawave/entry-master-exit/
 - `ENTRY_NODE.profile.template.json`
 - `MASTER_NODE.profile.template.json`
 - `EXIT_NODE.profile.template.json`
+- `DIRECT_EXIT.profile.template.json`
 - `README.md` с mapping по `Hosts`, `Internal Squads`, `system users`
 
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы

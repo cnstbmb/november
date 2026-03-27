@@ -14,7 +14,8 @@ SUMMARY_FILE="${TOPOLOGY_DIR}/README.generated.md"
 ENTRY_MASTER_EXIT_RENDERER="${ROOT_DIR}/tools/ansible/remnawave/entry-master-exit/render_entry_master_exit.py"
 
 # Opinionated hard defaults for supported topology modes.
-DEFAULT_GENERATION_MODE="xhttp_multi_exit"
+# Current production topology is entry -> master -> exit with WireGuard.
+DEFAULT_GENERATION_MODE="entry_master_exit"
 
 # Legacy/current XHTTP multi-exit mode.
 DEFAULT_EDGE_CLIENT_PORT="443"
@@ -43,7 +44,7 @@ DEFAULT_ENTRY_TO_MASTER_PORT="5335"
 DEFAULT_ENTRY_TO_MASTER_PATH="/fluegergeheimer"
 DEFAULT_MASTER_WG_PORT="51820"
 DEFAULT_MASTER_PUBLIC_PORT="10443"
-DEFAULT_MASTER_REALITY_TARGET="borsaistanbul.com:10443"
+DEFAULT_MASTER_REALITY_TARGET="borsaistanbul.com:443"
 DEFAULT_MASTER_REALITY_SERVER_NAMES="borsaistanbul.com,www.borsaistanbul.com"
 DEFAULT_MASTER_DIRECT_MSK_PORT="20443"
 DEFAULT_MASTER_DIRECT_MSK_TARGET="borsaistanbul.com:443"

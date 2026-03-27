@@ -115,7 +115,7 @@
         "realitySettings": {
           "show": false,
           "xver": 0,
-          "target": "borsaistanbul.com:10443",
+          "target": "borsaistanbul.com:443",
           "shortIds": [
             "REPLACE_MASTER_REALITY_SHORT_ID",
             ""

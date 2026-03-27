@@ -7,8 +7,8 @@
 - `worker-node.docker-compose.example.yml`: пример compose для worker-ноды (`remnawave/node`).
 - `../bootstrap_remnawave_topology.sh`: интерактивный helper, который подготавливает
   private JSON-профили для двух схем:
-  - `edge -> transit -> multiple exits` на `XHTTP`
-  - `entry -> master -> exit + WireGuard`
+  - `entry -> master -> exit + WireGuard` as current canonical topology
+  - `edge -> transit -> multiple exits` на `XHTTP` as legacy mode
 - `entry-master-exit/`: канонические templates и renderer для схемы
   `ENTRY_NODE -> MASTER_NODE -> EXIT_NODE`, включая `10443`, `20443` и
   обязательный `WireGuard` inbound на master.
@@ -25,4 +25,5 @@
 
 - Это шаблон, не готовый прод-конфиг.
 - Для `entry-master-exit` используй [README.md](/Users/konstantin/november/tools/ansible/remnawave/entry-master-exit/README.md) в подпапке как source of truth.
+- Для текущего `MASTER_NODE` по умолчанию используется `Reality target` `borsaistanbul.com:443`.
 - Перед продом проверь сертификаты, service-user UUID и `SECRET_KEY` нод.

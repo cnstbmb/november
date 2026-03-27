@@ -73,16 +73,19 @@ npm run ansible:topology
 ```
 
 Что делает шаг:
-- готовит схему `edge -> transit -> multiple exits` на `XHTTP`
-- поддерживает optional direct client ingress на selected exit hosts
+- по умолчанию готовит текущую каноническую схему
+  `entry -> master -> exit + WireGuard`
+- также умеет legacy-схему `edge -> transit -> multiple exits` на `XHTTP`
 - позволяет выбирать inventory hosts по номеру или по hostname
 - использует жёсткие opinionated defaults для camouflage-полей:
-  - `ya -> client`: `sun6-22.userapi.com`
-  - `ya -> moscow`: `/assets/runtime-8f3c21.js`
-  - `transit -> exit`: `/assets/runtime-3o3u46.js`
-  - `direct exit`: `www.microsoft.com` + `/static/chunks/main-91ac4d.js`
+  - `entry -> client`: `sun6-22.userapi.com`
+  - `entry -> master`: `/fluegergeheimer`
+  - `master public`: `borsaistanbul.com:443`
+  - `master direct`: `borsaistanbul.com:443`
+  - `master -> exit`: `gRPC/TLS` на `8443`
 - пишет JSON профили в `.private/ansible/prod/remnawave-topology/profiles`
-- пишет `firewall_extra_tcp_ports` в `.private/ansible/prod/host_vars/<host>/remnawave_topology.yml`
+- пишет `firewall_extra_tcp_ports` и `firewall_extra_udp_ports` в
+  `.private/ansible/prod/host_vars/<host>/remnawave_topology.yml`
 
 Если service-user UUID ещё не готовы, helper допускает placeholder `REPLACE_*`.
 Это не мешает сначала сделать `node-env`, а потом вернуться к профилям.
@@ -137,12 +140,19 @@ npm run ansible:workers
 tools/ansible/bootstrap_remnawave_node_env.sh
 ```
 
-Подготовка private topology vars и `Config Profile` JSON для расширяемой схемы
-`edge -> transit -> multiple exits` на `XHTTP`
-с optional direct client ingress на выбранных worker-нодах:
+Подготовка private topology vars и `Config Profile` JSON для двух поддерживаемых схем:
+
+- текущая каноническая: `entry -> master -> exit + WireGuard`
+- legacy: `edge -> transit -> multiple exits` на `XHTTP`
 
 ```bash
 tools/ansible/bootstrap_remnawave_topology.sh
+```
+
+Для текущего прод-конфига source of truth лежит в:
+
+```bash
+tools/ansible/remnawave/entry-master-exit/
 ```
 
 Подготовка private vars для bundled Remnawave Subscription Page
@@ -153,7 +163,7 @@ tools/ansible/bootstrap_remnawave_subscription_page.sh
 ```
 
 Готовые sanitized templates для схемы `ENTRY -> MASTER -> EXIT`
-с `Reality/TCP`, `XHTTP/TLS`, `gRPC/TLS` и optional `WireGuard`
+с `Reality/TCP`, `XHTTP/TLS`, `gRPC/TLS` и mandatory `WireGuard`
 лежат в:
 
 ```bash

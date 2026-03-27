@@ -13,6 +13,7 @@ enable_remnawave_panel: false # deploy Remnawave panel on master via docker comp
 enable_remnashop: false # deploy remnashop bot/shop on master (disabled by default)
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
+remnashop_domain: "bot.example.com" # public HTTPS domain routed by remnawave-panel proxy
 remnashop_validate_env: true # fail if .env contains placeholders like change_me
 # remnashop_env_src: "########" # local private path on controller, e.g. /Users/you/november/.private/ansible/prod/remnashop/.env
 # remnashop_env_dest: "/opt/remnashop/.env"
@@ -57,6 +58,8 @@ backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:h
 # remnawave_panel_metrics_user: "admin"
 # remnawave_panel_metrics_pass: "########"
 # remnawave_panel_webhook_secret: "64-char-secret"
+# remnawave_panel_webhook_enabled: true
+# remnawave_panel_webhook_url: "https://bot.example.com/api/v1/remnawave"
 # remnawave_panel_frontend_domain: "panel.example.com" # optional override; bare domain only
 # remnawave_panel_sub_public_domain: "panel.example.com/api/sub" # optional override; bare domain/path only
 # enable_remnawave_subscription_page: false

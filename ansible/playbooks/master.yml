@@ -3,12 +3,12 @@
   become: true
   roles:
     - certbot
+    - role: remnashop
+      when: enable_remnashop | bool
     - role: remnawave_panel
       when: enable_remnawave_panel | default(false) | bool
     - role: remnawave_node
       when: enable_remnawave_node | default(false) | bool
-    - role: remnashop
-      when: enable_remnashop | bool
     - adguard_home
     - role: nginx
       when: enable_nginx | bool

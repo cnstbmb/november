@@ -13,8 +13,13 @@ enable_remnawave_panel: false # deploy Remnawave panel on master via docker comp
 enable_remnashop: false # deploy remnashop bot/shop on master (disabled by default)
 remnashop_dir: "/opt/remnashop"
 remnashop_mode: "internal" # internal uses remnawave network, external publishes ports
+remnashop_app_port: 5000 # host-local port used for post-deploy HTTP probe
+remnashop_host_packages: ["ripgrep"] # host-side helpers for manual diagnostics on master
 remnashop_domain: "bot.example.com" # public HTTPS domain routed by remnawave-panel proxy
 remnashop_validate_env: true # fail if .env contains placeholders like change_me
+remnashop_pull_policy: "missing" # compose pull policy for app/worker/scheduler: missing, never, always
+remnashop_manage_sysctl: true # set host sysctl required by bundled Valkey/Redis
+remnashop_wait_timeout: 120 # seconds to wait for remnashop services and HTTP probe after deploy
 # remnashop_env_src: "########" # local private path on controller, e.g. /Users/you/november/.private/ansible/prod/remnashop/.env
 # remnashop_env_dest: "/opt/remnashop/.env"
 monitoring_prometheus_retention: "7d"

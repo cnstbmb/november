@@ -1,3 +1,4 @@
+{% set monitoring_attach_remnawave_network = (enable_remnawave_panel | default(false) | bool) or (enable_remnashop | default(false) | bool) %}
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -14,7 +15,21 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-{% if enable_remnawave_panel | default(false) | bool %}
+{% if monitoring_attach_remnawave_network %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
+
+  blackbox-exporter:
+    image: {{ monitoring_blackbox_image }}
+    container_name: monitoring-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/blackbox_exporter/config.yml"
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+{% if monitoring_attach_remnawave_network %}
     networks:
       - default
       - remnawave-network
@@ -66,7 +81,7 @@ volumes:
   grafana-data:
   loki-data:
 
-{% if enable_remnawave_panel | default(false) | bool %}
+{% if monitoring_attach_remnawave_network %}
 networks:
   remnawave-network:
     name: "{{ remnawave_network_name | default('remnawave-network') }}"

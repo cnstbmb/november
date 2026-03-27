@@ -1,6 +1,7 @@
 # Common settings for all hosts
 ansible_user: "########" # SSH user, e.g. ubuntu or root
 ansible_port: ######## # SSH port, e.g. 22
+ansible_python_interpreter: "/usr/bin/python3" # pin interpreter to avoid Ansible discovery warnings
 ssh_public_key_path: "########" # local path to public key, delete if unused
 
 timezone: "########" # e.g. Europe/Amsterdam

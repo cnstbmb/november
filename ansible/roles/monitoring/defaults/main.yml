@@ -1,6 +1,9 @@
 monitoring_prometheus_retention: "7d"
 monitoring_loki_retention: "168h"
 monitoring_loki_image: "grafana/loki:2.9.10"
+monitoring_blackbox_image: "prom/blackbox-exporter:v0.26.0"
+monitoring_blackbox_enabled: true
+monitoring_blackbox_port: 9115
 monitoring_grafana_tls_enabled: false
 monitoring_grafana_tls_domain: ""
 monitoring_grafana_tls_cert_domain: ""
@@ -9,6 +12,9 @@ monitoring_prometheus_evaluation_interval: "15s"
 monitoring_auto_discover_node_targets: true
 monitoring_node_exporter_port: 9100
 monitoring_prometheus_scrape_remnawave_panel_metrics: true
+monitoring_prometheus_scrape_remnashop_probes: true
 monitoring_remnawave_panel_metrics_path: "/metrics"
+monitoring_remnashop_internal_probe_url: "http://remnashop:{{ remnashop_app_port | default(5000) }}/"
+monitoring_remnashop_webhook_probe_url: "https://{{ remnashop_domain }}/api/v1/telegram"
 monitoring_grafana_prometheus_uid: "prometheus"
 monitoring_grafana_loki_uid: "loki"

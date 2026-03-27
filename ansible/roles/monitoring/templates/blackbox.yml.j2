@@ -1,0 +1,16 @@
+modules:
+  http_remnashop_internal:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      valid_status_codes: [200, 404, 405]
+
+  http_remnashop_webhook:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      valid_status_codes: [405]

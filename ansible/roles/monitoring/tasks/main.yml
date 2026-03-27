@@ -26,6 +26,8 @@
   loop:
     - prometheus.yml.j2
     - loki-config.yml.j2
+    - blackbox.yml.j2
+  register: monitoring_config_templates
   when: not ansible_check_mode
 
 - name: Render Grafana provisioning files
@@ -44,6 +46,9 @@
       dest: "{{ monitoring_dir }}/grafana/dashboards/host-detail.json"
     - src: dashboard-logs-overview.json.j2
       dest: "{{ monitoring_dir }}/grafana/dashboards/logs-overview.json"
+    - src: dashboard-service-health.json.j2
+      dest: "{{ monitoring_dir }}/grafana/dashboards/service-health.json"
+  register: monitoring_grafana_templates
   when: not ansible_check_mode
 
 - name: Render monitoring compose file
@@ -51,7 +56,21 @@
     src: docker-compose.yml.j2
     dest: "{{ monitoring_dir }}/docker-compose.yml"
     mode: "0644"
+  register: monitoring_compose_template
   when: not ansible_check_mode
+
+- name: Recreate monitoring stack when config changed
+  ansible.builtin.command: docker compose up -d --remove-orphans --force-recreate
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - not ansible_check_mode
+    - >
+      (monitoring_config_templates is defined and (monitoring_config_templates.results | selectattr('changed') | list | length > 0))
+      or
+      (monitoring_grafana_templates is defined and (monitoring_grafana_templates.results | selectattr('changed') | list | length > 0))
+      or
+      (monitoring_compose_template is defined and monitoring_compose_template.changed)
 
 - name: Start monitoring stack
   ansible.builtin.command: docker compose up -d --remove-orphans

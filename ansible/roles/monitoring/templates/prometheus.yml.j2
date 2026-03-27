@@ -5,13 +5,14 @@ global:
 {% set master_hosts = groups['master'] | default([]) %}
 {% set worker_hosts = groups['workers'] | default([]) %}
 {% set monitored_hosts = (master_hosts + worker_hosts) | unique %}
+{% set master_host = (groups['master'] | default([]) | first) | default(inventory_hostname) %}
 
 scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
         labels:
-          host: "{{ (groups['master'] | default([]) | first) | default(inventory_hostname) }}"
+          host: "{{ master_host }}"
 
   - job_name: nodes
     static_configs:
@@ -40,6 +41,48 @@ scrape_configs:
       - targets:
           - "remnawave:{{ remnawave_panel_metrics_port | default(3001) }}"
         labels:
-          host: "{{ (groups['master'] | default([]) | first) | default(inventory_hostname) }}"
+          host: "{{ master_host }}"
           role: "master"
+{% endif %}
+
+{% if enable_remnashop | default(false) | bool and monitoring_blackbox_enabled | default(true) | bool and monitoring_prometheus_scrape_remnashop_probes | default(true) | bool and remnashop_domain | default('', true) | length > 0 %}
+  - job_name: remnashop_internal_http
+    metrics_path: /probe
+    params:
+      module: [http_remnashop_internal]
+    static_configs:
+      - targets:
+          - "{{ monitoring_remnashop_internal_probe_url }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "remnashop"
+          probe: "internal"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "monitoring-blackbox-exporter:{{ monitoring_blackbox_port }}"
+
+  - job_name: remnashop_webhook
+    metrics_path: /probe
+    params:
+      module: [http_remnashop_webhook]
+    static_configs:
+      - targets:
+          - "{{ monitoring_remnashop_webhook_probe_url }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "remnashop"
+          probe: "webhook"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "monitoring-blackbox-exporter:{{ monitoring_blackbox_port }}"
 {% endif %}

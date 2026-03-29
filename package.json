@@ -36,6 +36,7 @@
     "ansible:workers:check": "tools/ansible/run_prod_private.sh --playbook workers --check",
     "ansible:site": "tools/ansible/run_prod_private.sh --playbook site",
     "ansible:site:check": "tools/ansible/run_prod_private.sh --playbook site --check",
+    "remnashop:update": "ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible -i .private/ansible/prod/hosts.yml master -b -m shell -a \"cd /opt/remnashop && docker compose pull remnashop remnashop-taskiq-worker remnashop-taskiq-scheduler && docker compose up -d\"",
     "landing:up": "docker compose -f deployments/landing-lite/docker-compose.yml up -d",
     "landing:down": "docker compose -f deployments/landing-lite/docker-compose.yml down",
     "landing:logs": "docker compose -f deployments/landing-lite/docker-compose.yml logs -f",

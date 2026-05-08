@@ -21,6 +21,8 @@ MAX_POLLS="${MAX_POLLS:-300}"
 RETRY_DELAY="${RETRY_DELAY:-3}"
 CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
 CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
+RATE_LIMIT_RETRY_DELAY="${RATE_LIMIT_RETRY_DELAY:-15}"
+MAX_RATE_LIMIT_RETRY_DELAY="${MAX_RATE_LIMIT_RETRY_DELAY:-900}"
 
 API_BODY=""
 OPERATION_JSON=""
@@ -29,9 +31,117 @@ CURRENT_ADDR_ID=""
 CURRENT_IP=""
 MATCH_FOUND=0
 PENDING_DELETE_IDS=()
+LAST_API_ERROR_KIND=""
+LAST_API_ERROR_MESSAGE=""
+LAST_API_ERROR_METRIC=""
+LAST_API_ERROR_LIMIT=""
+LAST_API_ERROR_USAGE=""
+LAST_API_ERROR_REQUIRED=""
+CURRENT_RATE_LIMIT_DELAY=0
 
 log_warn() {
   echo "  ! $*" >&2
+}
+
+reset_api_error_state() {
+  LAST_API_ERROR_KIND=""
+  LAST_API_ERROR_MESSAGE=""
+  LAST_API_ERROR_METRIC=""
+  LAST_API_ERROR_LIMIT=""
+  LAST_API_ERROR_USAGE=""
+  LAST_API_ERROR_REQUIRED=""
+}
+
+extract_api_error_details() {
+  python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read()
+decoder = json.JSONDecoder()
+idx = 0
+data = None
+
+try:
+    while idx < len(raw):
+        while idx < len(raw) and raw[idx].isspace():
+            idx += 1
+        if idx >= len(raw):
+            break
+        data, idx = decoder.raw_decode(raw, idx)
+except json.JSONDecodeError:
+    sys.exit(1)
+
+if data is None:
+    sys.exit(1)
+
+code = str(data.get("code", ""))
+message = data.get("message", "")
+metric = ""
+limit = ""
+required = ""
+usage = ""
+
+for detail in data.get("details") or []:
+    if detail.get("@type") != "type.googleapis.com/yandex.cloud.quota.QuotaFailure":
+        continue
+    for violation in detail.get("violations") or []:
+        metric_info = violation.get("metric") or {}
+        metric = metric_info.get("name", "") or metric
+        limit = metric_info.get("limit", "") or limit
+        usage = str(metric_info.get("usage", "")) or usage
+        required = violation.get("required", "") or required
+        if metric:
+            break
+    if metric:
+        break
+
+kind = ""
+if code == "8" and metric.endswith(".rate"):
+    kind = "quota_rate_limit"
+elif code == "8":
+    kind = "quota"
+
+print(kind)
+print(message)
+print(metric)
+print(limit)
+print(usage)
+print(required)
+'
+}
+
+update_api_error_state() {
+  local error_details
+
+  reset_api_error_state
+
+  if ! error_details=$(printf '%s' "$API_BODY" | extract_api_error_details); then
+    return
+  fi
+
+  LAST_API_ERROR_KIND=$(printf '%s\n' "$error_details" | sed -n '1p')
+  LAST_API_ERROR_MESSAGE=$(printf '%s\n' "$error_details" | sed -n '2p')
+  LAST_API_ERROR_METRIC=$(printf '%s\n' "$error_details" | sed -n '3p')
+  LAST_API_ERROR_LIMIT=$(printf '%s\n' "$error_details" | sed -n '4p')
+  LAST_API_ERROR_USAGE=$(printf '%s\n' "$error_details" | sed -n '5p')
+  LAST_API_ERROR_REQUIRED=$(printf '%s\n' "$error_details" | sed -n '6p')
+}
+
+next_rate_limit_delay() {
+  if (( CURRENT_RATE_LIMIT_DELAY <= 0 )); then
+    CURRENT_RATE_LIMIT_DELAY="$RATE_LIMIT_RETRY_DELAY"
+  else
+    CURRENT_RATE_LIMIT_DELAY=$(( CURRENT_RATE_LIMIT_DELAY * 2 ))
+  fi
+
+  if (( CURRENT_RATE_LIMIT_DELAY > MAX_RATE_LIMIT_RETRY_DELAY )); then
+    CURRENT_RATE_LIMIT_DELAY="$MAX_RATE_LIMIT_RETRY_DELAY"
+  fi
+}
+
+reset_rate_limit_delay() {
+  CURRENT_RATE_LIMIT_DELAY=0
 }
 
 get_iam_token() {
@@ -85,6 +195,8 @@ api_request() {
   local data="${3-}"
   local response http_code
 
+  reset_api_error_state
+
   local IAM_TOKEN
   if ! IAM_TOKEN=$(get_iam_token); then
     log_warn "не удалось получить IAM-токен"
@@ -95,8 +207,6 @@ api_request() {
     -sS
     --connect-timeout "$CURL_CONNECT_TIMEOUT"
     --max-time "$CURL_MAX_TIME"
-    --retry 3
-    --retry-delay 1
     -X "$method"
     -H "Authorization: Bearer $IAM_TOKEN"
   )
@@ -114,6 +224,7 @@ api_request() {
   API_BODY="${response%$'\n'*}"
 
   if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
+    update_api_error_state
     log_warn "API $method $url вернул HTTP $http_code"
     [[ -n "$API_BODY" ]] && log_warn "Ответ API: $API_BODY"
     return 1
@@ -366,10 +477,20 @@ while true; do
       \"zoneId\": \"$ZONE\"
     }
   }"; then
-    log_warn "не удалось создать адрес, повторяем через ${RETRY_DELAY}s"
-    sleep "$RETRY_DELAY"
+    CREATE_DELAY="$RETRY_DELAY"
+    if [[ "$LAST_API_ERROR_KIND" == "quota_rate_limit" && "$LAST_API_ERROR_METRIC" == "vpc.externalAddressesCreation.rate" ]]; then
+      next_rate_limit_delay
+      CREATE_DELAY="$CURRENT_RATE_LIMIT_DELAY"
+      log_warn "упёрлись в ${LAST_API_ERROR_METRIC}; usage=${LAST_API_ERROR_USAGE:-n/a}, limit=${LAST_API_ERROR_LIMIT}, required=${LAST_API_ERROR_REQUIRED}"
+      log_warn "ждём ${CREATE_DELAY}s перед новой попыткой создания адреса"
+    else
+      log_warn "не удалось создать адрес, повторяем через ${CREATE_DELAY}s"
+    fi
+    sleep "$CREATE_DELAY"
     continue
   fi
+
+  reset_rate_limit_delay
 
   if ! OP_ID=$(printf '%s' "$API_BODY" | extract_operation_id); then
     log_warn "не удалось извлечь id операции создания, повторяем через ${RETRY_DELAY}s"

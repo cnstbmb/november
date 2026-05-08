@@ -16,6 +16,8 @@ adguard_manage_systemd_resolved: true
 adguard_pprof_port: 6060
 adguard_pprof_enabled: false
 adguard_session_ttl: "720h"
+adguard_admin_user: ""
+adguard_admin_password: ""
 adguard_users: []
 adguard_auth_attempts: 5
 adguard_block_auth_min: 15

@@ -11,6 +11,34 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Build effective AdGuard users list
+  ansible.builtin.set_fact:
+    adguard_effective_users: >-
+      {{
+        adguard_users
+        if (adguard_users | length > 0)
+        else (
+          [
+            {
+              'name': adguard_admin_user,
+              'password': (
+                adguard_admin_password
+                if (adguard_admin_password is match('^\\$2[aby]\\$'))
+                else (
+                  adguard_admin_password
+                  | password_hash('bcrypt', ((inventory_hostname ~ ':' ~ adguard_admin_user) | hash('sha256'))[:22])
+                )
+              )
+            }
+          ]
+          if ((adguard_admin_user | default('') | length > 0) and (adguard_admin_password | default('') | length > 0))
+          else []
+        )
+      }}
+  when:
+    - enable_adguard | bool
+    - adguard_manage_config | bool
+
 - name: Write AdGuard Home compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2

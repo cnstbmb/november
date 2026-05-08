@@ -21,6 +21,9 @@ remnashop_host_packages: ["ripgrep"] # host-side helpers for manual diagnostics 
 remnashop_domain: "bot.example.com" # public HTTPS domain routed by remnawave-panel proxy
 remnashop_validate_env: true # fail if .env contains placeholders like change_me
 remnashop_pull_policy: "missing" # compose pull policy for app/worker/scheduler: missing, never, always
+remnashop_disable_ipv6: false # set true if provider IPv6 is degraded and Telegram API hangs on AAAA
+remnashop_extra_hosts: [] # emergency hostname pinning, e.g. ["api.telegram.org:149.154.166.110"]
+remnashop_env_overrides: {} # optional env overrides applied on target after .env copy, e.g. {BOT_PROXY_URL: "socks5://1.2.3.4:1080"}
 remnashop_manage_sysctl: true # set host sysctl required by bundled Valkey/Redis
 remnashop_wait_timeout: 120 # seconds to wait for remnashop services and HTTP probe after deploy
 # remnashop_env_src: "########" # local private path on controller, e.g. /Users/you/november/.private/ansible/prod/remnashop/.env
@@ -44,6 +47,8 @@ backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:h
 # adguard_dns_publish_host: "127.0.0.1" # bind host-side plain DNS only locally
 # adguard_timezone: "UTC"
 # adguard_manage_config: true
+# adguard_admin_user: "admin" # plain login; password below may be plain or bcrypt hash
+# adguard_admin_password: "########"
 # adguard_users: # keep in .private, not in git
 #   - name: "admin"
 #     password: "$2a$10$..."

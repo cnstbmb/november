@@ -6,6 +6,8 @@
     - certbot
     - role: remnawave_node
       when: enable_remnawave_node | default(true) | bool
+    - role: socks5_proxy
+      when: enable_socks5_proxy | default(false) | bool
     - role: monitoring_agent
       when: enable_monitoring | bool
     - role: backups

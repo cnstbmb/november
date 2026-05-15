@@ -37,9 +37,10 @@ DEFAULT_EXIT_DIRECT_SERVER_NAME="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_HOST="www.microsoft.com"
 DEFAULT_EXIT_DIRECT_XHTTP_PATH="/static/chunks/main-91ac4d.js"
 
-# Entry -> master -> exit mode with mandatory WireGuard on master and
-# optional dedicated direct-only exit.
+# Entry -> master -> exit mode with optional hidden home-exit, optional
+# WireGuard on master, and optional dedicated direct-only exit.
 DEFAULT_ENTRY_PUBLIC_PORT="443"
+DEFAULT_ENTRY_HOST_REMARK="WHITE LIST PRO"
 DEFAULT_ENTRY_REALITY_TARGET="sun6-22.userapi.com:443"
 DEFAULT_ENTRY_REALITY_SERVER_NAME="sun6-22.userapi.com"
 DEFAULT_ENTRY_TO_MASTER_PORT="5335"
@@ -51,13 +52,22 @@ DEFAULT_MASTER_REALITY_SERVER_NAMES="borsaistanbul.com,www.borsaistanbul.com"
 DEFAULT_MASTER_DIRECT_MSK_PORT="20443"
 DEFAULT_MASTER_DIRECT_MSK_TARGET="borsaistanbul.com:443"
 DEFAULT_MASTER_DIRECT_MSK_SERVER_NAMES="borsaistanbul.com,www.borsaistanbul.com"
-DEFAULT_MASTER_IPV4_GEOIP_CODES="ru,cn"
-DEFAULT_MASTER_IPV4_GEOSITE="category-ru,youtube"
+DEFAULT_MASTER_ROUTE_HOME_IP_CIDRS=""
+DEFAULT_MASTER_ROUTE_HOME_GEOIP_CODES="ru,cn"
+DEFAULT_MASTER_ROUTE_HOME_GEOSITE="category-ru"
+DEFAULT_MASTER_IPV4_IP_CIDRS=""
+DEFAULT_MASTER_IPV4_GEOIP_CODES=""
+DEFAULT_MASTER_IPV4_GEOSITE="youtube"
+DEFAULT_MASTER_BLOCK_DETECTOR_DOMAINS="domain:app-analytics-services.com,domain:appsflyersdk.com,domain:appsflyer.com,domain:uss.2gis.com,domain:relay.api.2gis.com,domain:relay-api.eu.2gis.com,domain:tjam.mis.2gis.ru,domain:clickstream-proxy.api.2gis.com,domain:whatismyip.com,domain:ipinfo.io,domain:ipinfo.app,domain:ifconfig.me,domain:ifconfig.co,domain:ifconfig.io,domain:icanhazip.com,domain:ipecho.net,domain:checkip.amazonaws.com,domain:myip.opendns.com,domain:api.myip.com,domain:myexternalip.com,domain:wtfismyip.com,domain:ipify.org,domain:ident.me,domain:ipapi.co,domain:ip.sb,domain:geojs.io,domain:browserleaks.com,domain:ipleak.net,domain:whoer.net,domain:2ip.ru,domain:internet.yandex.ru,domain:ip-api.com,domain:vpnapi.io,domain:apivoid.com,domain:api.incolumitas.com,domain:ipxapi.com,domain:botoi.com,domain:apify.com,domain:getipintel.net,domain:vpnblocker.net,domain:ipwarner.com,domain:iplocate.io,domain:criminalip.io,domain:focsec.com,domain:ip2proxy.com,domain:ip2location.io,domain:ipqualityscore.com,domain:iphub.info,domain:iphunter.info,domain:apifreaks.com"
+DEFAULT_MASTER_BLOCK_DETECTOR_PORTS=""
 DEFAULT_MASTER_TO_EXIT_PORT="8443"
 DEFAULT_EXIT_HOST_REMARK="AMSTERDAM"
 DEFAULT_EXIT_PUBLIC_DIRECT_PORT="443"
 DEFAULT_EXIT_REALITY_TARGET="apple.com:443"
 DEFAULT_EXIT_REALITY_SERVER_NAMES="apple.com,www.apple.com"
+DEFAULT_HOME_EXIT_PUBLIC_PORT="443"
+DEFAULT_HOME_EXIT_REALITY_TARGET="apple.com:443"
+DEFAULT_HOME_EXIT_REALITY_SERVER_NAMES="apple.com,www.apple.com"
 DEFAULT_DIRECT_EXIT_HOST_REMARK="SERBIA"
 DEFAULT_DIRECT_EXIT_PUBLIC_PORT="443"
 DEFAULT_DIRECT_EXIT_REALITY_TARGET="apple.com:443"
@@ -73,8 +83,8 @@ Interactive helper:
   - reads master/workers from ${INVENTORY_PATH}
   - supports two generation modes:
     1) edge -> transit -> multiple exits on XHTTP
-    2) entry -> master -> exit with mandatory WireGuard on master
-       and optional dedicated direct-only exit
+    2) entry -> master -> exit with optional hidden home-exit,
+       optional WireGuard on master, and optional dedicated direct-only exit
   - writes profile JSON files to ${PROFILES_DIR}
   - writes firewall_extra_tcp_ports and firewall_extra_udp_ports to
     host_vars/<host>/remnawave_topology.yml
@@ -330,6 +340,34 @@ else:
 __PY_EXIT_QUERY__
 }
 
+spec_value_or_default() {
+  local expr="$1"
+  local fallback="${2:-}"
+  local value=""
+  value="$(spec_query "${expr}" || true)"
+  if [ -n "${value}" ]; then
+    printf '%s' "${value}"
+  else
+    printf '%s' "${fallback}"
+  fi
+}
+
+spec_master_wg_peer_public_keys_csv() {
+  [ -n "${EXISTING_TOPOLOGY_SPEC_PATH:-}" ] || return 0
+
+  python3 - "${EXISTING_TOPOLOGY_SPEC_PATH}" <<'__PY_SPEC_WG__'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+items = data.get("master", {}).get("wg_peers", [])
+values = [item.get("public_key", "") for item in items if isinstance(item, dict) and item.get("public_key")]
+if values:
+    print(",".join(values))
+__PY_SPEC_WG__
+}
+
 trim_whitespace() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -576,7 +614,7 @@ prompt_generation_mode() {
   while true; do
     echo "Generation mode:"
     echo "  1) edge -> transit -> multiple exits (XHTTP)"
-    echo "  2) entry -> master -> exit (+ direct exit) + WireGuard"
+    echo "  2) entry -> master -> exit (+ optional hidden home-exit / direct exit)"
     read -r -p "Выбери режим [${default_choice}]: " choice < /dev/tty
     choice="${choice:-${default_choice}}"
     case "${choice}" in
@@ -679,16 +717,26 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
   fi
 
   default_master_host="$(first_host "${master_hosts}")"
-  default_entry_host="$(first_host "${worker_hosts}")"
+  existing_master_host="$(spec_query "master.host" || true)"
+  if [ -n "${existing_master_host}" ] && contains_host "${existing_master_host}" "${master_hosts}"; then
+    default_master_host="${existing_master_host}"
+  fi
 
-  echo "=== Remnawave topology bootstrap (entry -> master -> exit + WireGuard) ==="
+  default_entry_host="$(first_host "${worker_hosts}")"
+  existing_entry_host="$(spec_query "entry.host" || true)"
+  if [ -n "${existing_entry_host}" ] && contains_host "${existing_entry_host}" "${worker_hosts}"; then
+    default_entry_host="${existing_entry_host}"
+  fi
+
+  echo "=== Remnawave topology bootstrap (entry -> master -> exit) ==="
   echo "Profiles will be generated for:"
   echo "  entry client inbound: VLESS + TCP + REALITY"
   echo "  entry -> master: XHTTP over TLS"
   echo "  master public: REALITY on 10443"
   echo "  master public direct: REALITY on 20443"
-  echo "  mandatory WireGuard on master"
   echo "  master -> exit: gRPC over TLS"
+  echo "  optional hidden home-exit with fallback to Moscow"
+  echo "  optional WireGuard on master"
   echo "  optional dedicated direct-only exit profile"
   echo
 
@@ -702,9 +750,31 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
   fi
 
   default_exit_host="$(first_host "${remaining_exit_hosts}")"
+  existing_exit_host="$(spec_query "exit.host" || true)"
+  if [ -n "${existing_exit_host}" ] && contains_host "${existing_exit_host}" "${remaining_exit_hosts}"; then
+    default_exit_host="${existing_exit_host}"
+  fi
   prompt_host_choice exit_host "Exit host (worker)" "${remaining_exit_hosts}" "${default_exit_host}"
 
-  remaining_direct_exit_hosts="$(printf '%s\n' "${worker_hosts}" | awk -v entry="${entry_host}" -v exit="${exit_host}" 'NF && $0 != entry && $0 != exit')"
+  remaining_home_exit_hosts="$(printf '%s\n' "${worker_hosts}" | awk -v entry="${entry_host}" -v exit_host_name="${exit_host}" 'NF && $0 != entry && $0 != exit_host_name')"
+  enable_home_exit="false"
+  home_exit_host=""
+  if [ "$(count_hosts "${remaining_home_exit_hosts}")" -ge 1 ]; then
+    existing_home_exit_host="$(spec_query "home_exit.host" || true)"
+    if [ -n "${existing_home_exit_host}" ] && contains_host "${existing_home_exit_host}" "${remaining_home_exit_hosts}"; then
+      default_home_exit_host="${existing_home_exit_host}"
+      enable_home_exit_default="true"
+    else
+      default_home_exit_host="$(first_host "${remaining_home_exit_hosts}")"
+      enable_home_exit_default="false"
+    fi
+    prompt_bool enable_home_exit "Configure hidden RU home-exit node" "${enable_home_exit_default}"
+    if [ "${enable_home_exit}" = "true" ]; then
+      prompt_host_choice home_exit_host "Hidden home-exit host (worker)" "${remaining_home_exit_hosts}" "${default_home_exit_host}"
+    fi
+  fi
+
+  remaining_direct_exit_hosts="$(printf '%s\n' "${worker_hosts}" | awk -v entry="${entry_host}" -v exit_host_name="${exit_host}" -v home_host_name="${home_exit_host}" 'NF && $0 != entry && $0 != exit_host_name && $0 != home_host_name')"
   enable_direct_exit="false"
   direct_exit_host=""
   if [ "$(count_hosts "${remaining_direct_exit_hosts}")" -ge 1 ]; then
@@ -714,7 +784,7 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
       enable_direct_exit_default="true"
     else
       default_direct_exit_host="$(first_host "${remaining_direct_exit_hosts}")"
-      enable_direct_exit_default="true"
+      enable_direct_exit_default="false"
     fi
     prompt_bool enable_direct_exit "Configure dedicated direct-only exit node" "${enable_direct_exit_default}"
     if [ "${enable_direct_exit}" = "true" ]; then
@@ -725,20 +795,36 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
   entry_public_address="$(inventory_public_address_for_host "${entry_host}")"
   master_public_address="$(inventory_public_address_for_host "${master_host}")"
   exit_public_address="$(inventory_public_address_for_host "${exit_host}")"
+  if [ "${enable_home_exit}" = "true" ]; then
+    home_exit_public_address="$(inventory_public_address_for_host "${home_exit_host}")"
+  fi
   if [ "${enable_direct_exit}" = "true" ]; then
     direct_exit_public_address="$(inventory_public_address_for_host "${direct_exit_host}")"
   fi
 
   master_cert_domain="$(certbot_domain_for_host "${master_host}")"
   exit_cert_domain="$(certbot_domain_for_host "${exit_host}")"
+  if [ "${enable_home_exit}" = "true" ]; then
+    home_exit_cert_domain="$(certbot_domain_for_host "${home_exit_host}")"
+  fi
   if [ -z "${master_cert_domain}" ] || [ -z "${exit_cert_domain}" ]; then
     echo "Could not determine certbot domains for master=${master_host} or exit=${exit_host}."
     exit 1
   fi
+  if [ "${enable_home_exit}" = "true" ] && [ -z "${home_exit_cert_domain}" ]; then
+    echo "Could not determine certbot domain for hidden home-exit host ${home_exit_host}."
+    exit 1
+  fi
 
-  prompt_int entry_public_port "Client-facing port on ${entry_host}" "${DEFAULT_ENTRY_PUBLIC_PORT}"
-  prompt entry_reality_target "Reality target for ${entry_host}" "${DEFAULT_ENTRY_REALITY_TARGET}"
-  prompt entry_reality_server_name "Reality serverName for ${entry_host}" "${DEFAULT_ENTRY_REALITY_SERVER_NAME}"
+  entry_host_remark_default="$(spec_value_or_default "entry.host_remark" "${DEFAULT_ENTRY_HOST_REMARK}")"
+  entry_public_port_default="$(spec_value_or_default "entry.public_port" "${DEFAULT_ENTRY_PUBLIC_PORT}")"
+  entry_reality_target_default="$(spec_value_or_default "entry.reality_target" "${DEFAULT_ENTRY_REALITY_TARGET}")"
+  entry_reality_server_name_default="$(spec_value_or_default "entry.reality_server_name" "${DEFAULT_ENTRY_REALITY_SERVER_NAME}")"
+
+  prompt entry_host_remark "Host remark for public access on ${entry_host}" "${entry_host_remark_default}"
+  prompt_int entry_public_port "Client-facing port on ${entry_host}" "${entry_public_port_default}"
+  prompt entry_reality_target "Reality target for ${entry_host}" "${entry_reality_target_default}"
+  prompt entry_reality_server_name "Reality serverName for ${entry_host}" "${entry_reality_server_name_default}"
 
   generated_entry_private="REPLACE_ENTRY_REALITY_PRIVATE_KEY"
   generated_entry_public="REPLACE_ENTRY_REALITY_PUBLIC_KEY"
@@ -747,54 +833,75 @@ if [ "${generation_mode}" = "entry_master_exit" ]; then
     generated_entry_private="$(printf '%s\n' "${generated_entry_output}" | sed -n '1p')"
     generated_entry_public="$(printf '%s\n' "${generated_entry_output}" | sed -n '2p')"
   fi
-  prompt entry_reality_private_key "Reality private key for ${entry_host}" "${generated_entry_private}"
-  prompt entry_reality_public_key "Reality public key for ${entry_host}" "${generated_entry_public}"
-  prompt entry_reality_short_id "Reality shortId for ${entry_host}" "${entry_reality_short_id_default}"
+  prompt entry_reality_private_key "Reality private key for ${entry_host}" "$(spec_value_or_default "entry.reality_private_key" "${generated_entry_private}")"
+  prompt entry_reality_public_key "Reality public key for ${entry_host}" "$(spec_value_or_default "entry.reality_public_key" "${generated_entry_public}")"
+  prompt entry_reality_short_id "Reality shortId for ${entry_host}" "$(spec_value_or_default "entry.reality_short_id" "${entry_reality_short_id_default}")"
 
-  prompt_int bridge_master_port "Bridge inbound port on ${master_host}" "${DEFAULT_ENTRY_TO_MASTER_PORT}"
-  prompt bridge_master_host "XHTTP/TLS host for ${entry_host} -> ${master_host}" "${master_cert_domain}"
-  prompt bridge_master_path "XHTTP path for ${entry_host} -> ${master_host}" "${DEFAULT_ENTRY_TO_MASTER_PATH}"
+  prompt_int bridge_master_port "Bridge inbound port on ${master_host}" "$(spec_value_or_default "master.bridge_inbound_port" "${DEFAULT_ENTRY_TO_MASTER_PORT}")"
+  prompt entry_to_master_address "Dial address for ${entry_host} -> ${master_host}" "$(spec_value_or_default "entry.to_master_address" "${master_cert_domain}")"
+  prompt entry_to_master_server_name "TLS serverName for ${entry_host} -> ${master_host}" "$(spec_value_or_default "entry.to_master_server_name" "${master_cert_domain}")"
+  prompt bridge_master_host "XHTTP host for ${entry_host} -> ${master_host}" "$(spec_value_or_default "entry.to_master_host" "$(spec_value_or_default "master.bridge_host" "${master_cert_domain}")")"
+  prompt bridge_master_path "XHTTP path for ${entry_host} -> ${master_host}" "$(spec_value_or_default "master.bridge_path" "${DEFAULT_ENTRY_TO_MASTER_PATH}")"
   prompt entry_to_master_uuid \
     "Service-user UUID for ${entry_host} -> ${master_host}" \
-    "REPLACE_$(placeholder_slug "${entry_host}_TO_${master_host}")_SERVICE_UUID"
+    "$(spec_value_or_default "entry.bridge_uuid" "REPLACE_$(placeholder_slug "${entry_host}_TO_${master_host}")_SERVICE_UUID")"
 
-  prompt_int master_wg_port "WireGuard port on ${master_host}" "${DEFAULT_MASTER_WG_PORT}"
-  prompt wg_allowed_ip_base "WireGuard allowed IP base on ${master_host} (three octets)" "${DEFAULT_WG_ALLOWED_IP_BASE}"
-  prompt wg_secret_key "WireGuard secretKey for ${master_host}" "REPLACE_WG_SECRET_KEY"
-  prompt wg_peer_public_keys_csv \
-    "WireGuard peer public keys for ${master_host} (comma-separated)" \
-    "REPLACE_WG_PEER_PUBLIC_KEY"
-  wg_peer_public_keys_csv="$(normalize_csv_list "${wg_peer_public_keys_csv}")"
-  if [ -z "${wg_peer_public_keys_csv}" ]; then
-    echo "At least one WireGuard peer public key is required."
-    exit 1
+  enable_master_wg_default="false"
+  if [ -n "$(spec_query "master.wg_port" || true)" ]; then
+    enable_master_wg_default="true"
   fi
+  prompt_bool enable_master_wg "Enable WireGuard on ${master_host}" "${enable_master_wg_default}"
 
-  wg_peer_entries=""
-  IFS=',' read -r -a wg_peer_keys <<< "${wg_peer_public_keys_csv}" || true
-  wg_peer_index=2
-  for wg_peer_key in "${wg_peer_keys[@]}"; do
-    [ -z "${wg_peer_key}" ] && continue
-    wg_allowed_ip="${wg_allowed_ip_base}.${wg_peer_index}/32"
-    wg_peer_entry="$(cat <<EOF
+  master_wg_json_block=""
+  if [ "${enable_master_wg}" = "true" ]; then
+    prompt_int master_wg_port "WireGuard port on ${master_host}" "$(spec_value_or_default "master.wg_port" "${DEFAULT_MASTER_WG_PORT}")"
+    prompt wg_allowed_ip_base "WireGuard allowed IP base on ${master_host} (three octets)" "${DEFAULT_WG_ALLOWED_IP_BASE}"
+    prompt wg_secret_key "WireGuard secretKey for ${master_host}" "$(spec_value_or_default "master.wg_secret_key" "REPLACE_WG_SECRET_KEY")"
+    prompt wg_peer_public_keys_csv \
+      "WireGuard peer public keys for ${master_host} (comma-separated)" \
+      "$(spec_master_wg_peer_public_keys_csv || printf '%s' "REPLACE_WG_PEER_PUBLIC_KEY")"
+    wg_peer_public_keys_csv="$(normalize_csv_list "${wg_peer_public_keys_csv}")"
+    if [ -z "${wg_peer_public_keys_csv}" ]; then
+      echo "At least one WireGuard peer public key is required when WireGuard is enabled."
+      exit 1
+    fi
+
+    wg_peer_entries=""
+    IFS=',' read -r -a wg_peer_keys <<< "${wg_peer_public_keys_csv}" || true
+    wg_peer_index=2
+    for wg_peer_key in "${wg_peer_keys[@]}"; do
+      [ -z "${wg_peer_key}" ] && continue
+      wg_allowed_ip="${wg_allowed_ip_base}.${wg_peer_index}/32"
+      wg_peer_entry="$(cat <<EOF
         {
           "public_key": "$(json_escape "${wg_peer_key}")",
           "allowed_ip": "$(json_escape "${wg_allowed_ip}")"
         }
 EOF
 )"
-    if [ -n "${wg_peer_entries}" ]; then
-      wg_peer_entries+=$',\n'
-    fi
-    wg_peer_entries+="${wg_peer_entry}"
-    wg_peer_index=$((wg_peer_index + 1))
-  done
+      if [ -n "${wg_peer_entries}" ]; then
+        wg_peer_entries+=$',\n'
+      fi
+      wg_peer_entries+="${wg_peer_entry}"
+      wg_peer_index=$((wg_peer_index + 1))
+    done
 
-  prompt_int master_public_port "Public Moscow port on ${master_host}" "${DEFAULT_MASTER_PUBLIC_PORT}"
-  prompt master_reality_target "Reality target for ${master_host}:${master_public_port}" "${DEFAULT_MASTER_REALITY_TARGET}"
+    master_wg_json_block="$(cat <<EOF
+,
+    "wg_port": ${master_wg_port},
+    "wg_secret_key": "$(json_escape "${wg_secret_key}")",
+    "wg_peers": [
+${wg_peer_entries}
+    ]
+EOF
+)"
+  fi
+
+  prompt_int master_public_port "Public Moscow port on ${master_host}" "$(spec_value_or_default "master.reality_moscow.port" "${DEFAULT_MASTER_PUBLIC_PORT}")"
+  prompt master_reality_target "Reality target for ${master_host}:${master_public_port}" "$(spec_value_or_default "master.reality_moscow.target" "${DEFAULT_MASTER_REALITY_TARGET}")"
   prompt master_reality_server_names_csv \
     "Reality serverNames for ${master_host}:${master_public_port} (comma-separated)" \
-    "${DEFAULT_MASTER_REALITY_SERVER_NAMES}"
+    "$(spec_value_or_default "master.reality_moscow.server_names" "${DEFAULT_MASTER_REALITY_SERVER_NAMES}")"
   master_reality_server_names_csv="$(normalize_csv_list "${master_reality_server_names_csv}")"
   generated_master_private="REPLACE_MASTER_REALITY_PRIVATE_KEY"
   generated_master_public="REPLACE_MASTER_REALITY_PUBLIC_KEY"
@@ -803,15 +910,15 @@ EOF
     generated_master_private="$(printf '%s\n' "${generated_master_output}" | sed -n '1p')"
     generated_master_public="$(printf '%s\n' "${generated_master_output}" | sed -n '2p')"
   fi
-  prompt master_reality_private_key "Reality private key for ${master_host}:${master_public_port}" "${generated_master_private}"
-  prompt master_reality_public_key "Reality public key for ${master_host}:${master_public_port}" "${generated_master_public}"
-  prompt master_reality_short_id "Reality shortId for ${master_host}:${master_public_port}" "${master_reality_short_id_default}"
+  prompt master_reality_private_key "Reality private key for ${master_host}:${master_public_port}" "$(spec_value_or_default "master.reality_moscow.private_key" "${generated_master_private}")"
+  prompt master_reality_public_key "Reality public key for ${master_host}:${master_public_port}" "$(spec_value_or_default "master.reality_moscow.public_key" "${generated_master_public}")"
+  prompt master_reality_short_id "Reality shortId for ${master_host}:${master_public_port}" "$(spec_value_or_default "master.reality_moscow.short_id" "${master_reality_short_id_default}")"
 
-  prompt_int master_direct_msk_port "Direct Moscow port on ${master_host}" "${DEFAULT_MASTER_DIRECT_MSK_PORT}"
-  prompt master_direct_msk_target "Reality target for ${master_host}:${master_direct_msk_port}" "${DEFAULT_MASTER_DIRECT_MSK_TARGET}"
+  prompt_int master_direct_msk_port "Direct Moscow port on ${master_host}" "$(spec_value_or_default "master.reality_direct_msk.port" "${DEFAULT_MASTER_DIRECT_MSK_PORT}")"
+  prompt master_direct_msk_target "Reality target for ${master_host}:${master_direct_msk_port}" "$(spec_value_or_default "master.reality_direct_msk.target" "${DEFAULT_MASTER_DIRECT_MSK_TARGET}")"
   prompt master_direct_msk_server_names_csv \
     "Reality serverNames for ${master_host}:${master_direct_msk_port} (comma-separated)" \
-    "${DEFAULT_MASTER_DIRECT_MSK_SERVER_NAMES}"
+    "$(spec_value_or_default "master.reality_direct_msk.server_names" "${DEFAULT_MASTER_DIRECT_MSK_SERVER_NAMES}")"
   master_direct_msk_server_names_csv="$(normalize_csv_list "${master_direct_msk_server_names_csv}")"
   generated_master_direct_private="REPLACE_MASTER_DIRECT_MSK_REALITY_PRIVATE_KEY"
   generated_master_direct_public="REPLACE_MASTER_DIRECT_MSK_REALITY_PUBLIC_KEY"
@@ -820,32 +927,61 @@ EOF
     generated_master_direct_private="$(printf '%s\n' "${generated_master_direct_output}" | sed -n '1p')"
     generated_master_direct_public="$(printf '%s\n' "${generated_master_direct_output}" | sed -n '2p')"
   fi
-  prompt master_direct_msk_private_key "Reality private key for ${master_host}:${master_direct_msk_port}" "${generated_master_direct_private}"
-  prompt master_direct_msk_public_key "Reality public key for ${master_host}:${master_direct_msk_port}" "${generated_master_direct_public}"
-  prompt master_direct_msk_short_id "Reality shortId for ${master_host}:${master_direct_msk_port}" "${master_direct_msk_short_id_default}"
+  prompt master_direct_msk_private_key "Reality private key for ${master_host}:${master_direct_msk_port}" "$(spec_value_or_default "master.reality_direct_msk.private_key" "${generated_master_direct_private}")"
+  prompt master_direct_msk_public_key "Reality public key for ${master_host}:${master_direct_msk_port}" "$(spec_value_or_default "master.reality_direct_msk.public_key" "${generated_master_direct_public}")"
+  prompt master_direct_msk_short_id "Reality shortId for ${master_host}:${master_direct_msk_port}" "$(spec_value_or_default "master.reality_direct_msk.short_id" "${master_direct_msk_short_id_default}")"
 
+  master_route_home_ip_cidrs_csv=""
+  master_route_home_geoip_csv=""
+  master_route_home_geosite_csv=""
+  if [ "${enable_home_exit}" = "true" ]; then
+    prompt master_route_home_ip_cidrs_csv \
+      "Additional IP/CIDR rules that should prefer hidden home-exit on ${master_host} (comma-separated, optional)" \
+      "$(spec_value_or_default "master.route_home_ip_cidrs" "${DEFAULT_MASTER_ROUTE_HOME_IP_CIDRS}")"
+    prompt master_route_home_geoip_csv \
+      "GeoIP country codes that should prefer hidden home-exit on ${master_host} (comma-separated)" \
+      "$(spec_value_or_default "master.route_home_geoip" "${DEFAULT_MASTER_ROUTE_HOME_GEOIP_CODES}")"
+    prompt master_route_home_geosite_csv \
+      "Geosite selectors that should prefer hidden home-exit on ${master_host} (comma-separated)" \
+      "$(spec_value_or_default "master.route_home_geosite" "${DEFAULT_MASTER_ROUTE_HOME_GEOSITE}")"
+  fi
+  prompt master_route_ipv4_ip_cidrs_csv \
+    "Additional IP/CIDR rules that should use IPv4 direct egress on ${master_host} (comma-separated, optional)" \
+    "$(spec_value_or_default "master.route_ipv4_ip_cidrs" "${DEFAULT_MASTER_IPV4_IP_CIDRS}")"
   prompt master_route_ipv4_geoip_csv \
     "GeoIP country codes that should use IPv4 direct egress on ${master_host} (comma-separated)" \
-    "${DEFAULT_MASTER_IPV4_GEOIP_CODES}"
+    "$(spec_value_or_default "master.route_ipv4_geoip" "${DEFAULT_MASTER_IPV4_GEOIP_CODES}")"
   prompt master_route_ipv4_geosite_csv \
     "Geosite selectors that should use IPv4 direct egress on ${master_host} (comma-separated)" \
-    "${DEFAULT_MASTER_IPV4_GEOSITE}"
+    "$(spec_value_or_default "master.route_ipv4_geosite" "${DEFAULT_MASTER_IPV4_GEOSITE}")"
+  prompt master_block_domains_csv \
+    "Routing domain matchers to block on ${master_host} (comma-separated, e.g. domain:ipify.org)" \
+    "$(spec_value_or_default "master.block_domains" "${DEFAULT_MASTER_BLOCK_DETECTOR_DOMAINS}")"
+  prompt master_block_ports_csv \
+    "Optional TCP/UDP ports to block on ${master_host} (comma-separated)" \
+    "$(spec_value_or_default "master.block_ports" "${DEFAULT_MASTER_BLOCK_DETECTOR_PORTS}")"
+  master_route_home_ip_cidrs_csv="$(normalize_csv_list "${master_route_home_ip_cidrs_csv}")"
+  master_route_home_geoip_csv="$(normalize_csv_list "${master_route_home_geoip_csv}")"
+  master_route_home_geosite_csv="$(normalize_csv_list "${master_route_home_geosite_csv}")"
+  master_route_ipv4_ip_cidrs_csv="$(normalize_csv_list "${master_route_ipv4_ip_cidrs_csv}")"
   master_route_ipv4_geoip_csv="$(normalize_csv_list "${master_route_ipv4_geoip_csv}")"
   master_route_ipv4_geosite_csv="$(normalize_csv_list "${master_route_ipv4_geosite_csv}")"
+  master_block_domains_csv="$(normalize_csv_list "${master_block_domains_csv}")"
+  master_block_ports_csv="$(normalize_csv_list "${master_block_ports_csv}")"
 
-  prompt_int exit_bridge_inbound_port "Bridge inbound port on ${exit_host}" "${DEFAULT_MASTER_TO_EXIT_PORT}"
-  prompt master_to_exit_address "Dial address for ${master_host} -> ${exit_host}" "${exit_public_address}"
-  prompt master_to_exit_server_name "TLS serverName for ${master_host} -> ${exit_host}" "${exit_cert_domain}"
+  prompt_int exit_bridge_inbound_port "Bridge inbound port on ${exit_host}" "$(spec_value_or_default "exit.bridge_inbound_port" "${DEFAULT_MASTER_TO_EXIT_PORT}")"
+  prompt master_to_exit_address "Dial address for ${master_host} -> ${exit_host}" "$(spec_value_or_default "master.to_exit_address" "${exit_public_address}")"
+  prompt master_to_exit_server_name "TLS serverName for ${master_host} -> ${exit_host}" "$(spec_value_or_default "master.to_exit_server_name" "${exit_cert_domain}")"
   prompt master_to_exit_uuid \
     "Service-user UUID for ${master_host} -> ${exit_host}" \
-    "REPLACE_$(placeholder_slug "${master_host}_TO_${exit_host}")_SERVICE_UUID"
+    "$(spec_value_or_default "master.to_exit_uuid" "REPLACE_$(placeholder_slug "${master_host}_TO_${exit_host}")_SERVICE_UUID")"
 
-  prompt_int exit_public_port "Direct client port on ${exit_host}" "${DEFAULT_EXIT_PUBLIC_DIRECT_PORT}"
-  prompt exit_host_remark "Host remark for direct access on ${exit_host}" "${DEFAULT_EXIT_HOST_REMARK}"
-  prompt exit_reality_target "Reality target for ${exit_host}" "${DEFAULT_EXIT_REALITY_TARGET}"
+  prompt_int exit_public_port "Direct client port on ${exit_host}" "$(spec_value_or_default "exit.public_port" "${DEFAULT_EXIT_PUBLIC_DIRECT_PORT}")"
+  prompt exit_host_remark "Host remark for direct access on ${exit_host}" "$(spec_value_or_default "exit.host_remark" "${DEFAULT_EXIT_HOST_REMARK}")"
+  prompt exit_reality_target "Reality target for ${exit_host}" "$(spec_value_or_default "exit.reality_target" "${DEFAULT_EXIT_REALITY_TARGET}")"
   prompt exit_reality_server_names_csv \
     "Reality serverNames for ${exit_host} (comma-separated)" \
-    "${DEFAULT_EXIT_REALITY_SERVER_NAMES}"
+    "$(spec_value_or_default "exit.reality_server_names" "${DEFAULT_EXIT_REALITY_SERVER_NAMES}")"
   exit_reality_server_names_csv="$(normalize_csv_list "${exit_reality_server_names_csv}")"
   generated_exit_private="REPLACE_EXIT_REALITY_PRIVATE_KEY"
   generated_exit_public="REPLACE_EXIT_REALITY_PUBLIC_KEY"
@@ -854,18 +990,72 @@ EOF
     generated_exit_private="$(printf '%s\n' "${generated_exit_output}" | sed -n '1p')"
     generated_exit_public="$(printf '%s\n' "${generated_exit_output}" | sed -n '2p')"
   fi
-  prompt exit_reality_private_key "Reality private key for ${exit_host}" "${generated_exit_private}"
-  prompt exit_reality_public_key "Reality public key for ${exit_host}" "${generated_exit_public}"
-  prompt exit_reality_short_id "Reality shortId for ${exit_host}" "${exit_reality_short_id_default}"
+  prompt exit_reality_private_key "Reality private key for ${exit_host}" "$(spec_value_or_default "exit.reality_private_key" "${generated_exit_private}")"
+  prompt exit_reality_public_key "Reality public key for ${exit_host}" "$(spec_value_or_default "exit.reality_public_key" "${generated_exit_public}")"
+  prompt exit_reality_short_id "Reality shortId for ${exit_host}" "$(spec_value_or_default "exit.reality_short_id" "${exit_reality_short_id_default}")"
+
+  master_home_json_block=""
+  home_exit_json_block=""
+  if [ "${enable_home_exit}" = "true" ]; then
+    prompt_int home_exit_bridge_inbound_port "Bridge inbound port on hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.bridge_inbound_port" "${DEFAULT_MASTER_TO_EXIT_PORT}")"
+    prompt master_to_home_ru_address "Dial address for ${master_host} -> ${home_exit_host}" "$(spec_value_or_default "master.to_home_ru_address" "${home_exit_public_address}")"
+    prompt master_to_home_ru_server_name "TLS serverName for ${master_host} -> ${home_exit_host}" "$(spec_value_or_default "master.to_home_ru_server_name" "${home_exit_cert_domain}")"
+    prompt master_to_home_ru_uuid \
+      "Service-user UUID for ${master_host} -> ${home_exit_host}" \
+      "$(spec_value_or_default "master.to_home_ru_uuid" "REPLACE_$(placeholder_slug "${master_host}_TO_${home_exit_host}")_SERVICE_UUID")"
+
+    prompt_int home_exit_public_port "Direct client port on hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.public_port" "${DEFAULT_HOME_EXIT_PUBLIC_PORT}")"
+    prompt home_exit_reality_target "Reality target for hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.reality_target" "${DEFAULT_HOME_EXIT_REALITY_TARGET}")"
+    prompt home_exit_reality_server_names_csv \
+      "Reality serverNames for hidden home-exit ${home_exit_host} (comma-separated)" \
+      "$(spec_value_or_default "home_exit.reality_server_names" "${DEFAULT_HOME_EXIT_REALITY_SERVER_NAMES}")"
+    home_exit_reality_server_names_csv="$(normalize_csv_list "${home_exit_reality_server_names_csv}")"
+    generated_home_exit_private="REPLACE_HOME_EXIT_REALITY_PRIVATE_KEY"
+    generated_home_exit_public="REPLACE_HOME_EXIT_REALITY_PUBLIC_KEY"
+    home_exit_short_id_default="$(generate_short_id)"
+    if generated_home_exit_output="$(generate_reality_keypair)"; then
+      generated_home_exit_private="$(printf '%s\n' "${generated_home_exit_output}" | sed -n '1p')"
+      generated_home_exit_public="$(printf '%s\n' "${generated_home_exit_output}" | sed -n '2p')"
+    fi
+    prompt home_exit_reality_private_key "Reality private key for hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.reality_private_key" "${generated_home_exit_private}")"
+    prompt home_exit_reality_public_key "Reality public key for hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.reality_public_key" "${generated_home_exit_public}")"
+    prompt home_exit_reality_short_id "Reality shortId for hidden home-exit ${home_exit_host}" "$(spec_value_or_default "home_exit.reality_short_id" "${home_exit_short_id_default}")"
+
+    master_home_json_block="$(cat <<EOF
+,
+    "to_home_ru_uuid": "$(json_escape "${master_to_home_ru_uuid}")",
+    "to_home_ru_address": "$(json_escape "${master_to_home_ru_address}")",
+    "to_home_ru_port": ${home_exit_bridge_inbound_port},
+    "to_home_ru_server_name": "$(json_escape "${master_to_home_ru_server_name}")"
+EOF
+)"
+
+    home_exit_json_block="$(cat <<EOF
+,
+  "home_exit": {
+    "host": "$(json_escape "${home_exit_host}")",
+    "public_address": "$(json_escape "${home_exit_public_address}")",
+    "cert_domain": "$(json_escape "${home_exit_cert_domain}")",
+    "public_port": ${home_exit_public_port},
+    "bridge_inbound_port": ${home_exit_bridge_inbound_port},
+    "reality_target": "$(json_escape "${home_exit_reality_target}")",
+    "reality_server_names": [$(csv_to_json_array "${home_exit_reality_server_names_csv}")],
+    "reality_private_key": "$(json_escape "${home_exit_reality_private_key}")",
+    "reality_public_key": "$(json_escape "${home_exit_reality_public_key}")",
+    "reality_short_id": "$(json_escape "${home_exit_reality_short_id}")"
+  }
+EOF
+)"
+  fi
 
   direct_exit_json_block=""
   if [ "${enable_direct_exit}" = "true" ]; then
-    prompt_int direct_exit_public_port "Direct-only client port on ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_PUBLIC_PORT}"
-    prompt direct_exit_host_remark "Host remark for direct-only access on ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_HOST_REMARK}"
-    prompt direct_exit_reality_target "Reality target for ${direct_exit_host}" "${DEFAULT_DIRECT_EXIT_REALITY_TARGET}"
+    prompt_int direct_exit_public_port "Direct-only client port on ${direct_exit_host}" "$(spec_value_or_default "direct_exit.public_port" "${DEFAULT_DIRECT_EXIT_PUBLIC_PORT}")"
+    prompt direct_exit_host_remark "Host remark for direct-only access on ${direct_exit_host}" "$(spec_value_or_default "direct_exit.host_remark" "${DEFAULT_DIRECT_EXIT_HOST_REMARK}")"
+    prompt direct_exit_reality_target "Reality target for ${direct_exit_host}" "$(spec_value_or_default "direct_exit.reality_target" "${DEFAULT_DIRECT_EXIT_REALITY_TARGET}")"
     prompt direct_exit_reality_server_names_csv \
       "Reality serverNames for ${direct_exit_host} (comma-separated)" \
-      "${DEFAULT_DIRECT_EXIT_REALITY_SERVER_NAMES}"
+      "$(spec_value_or_default "direct_exit.reality_server_names" "${DEFAULT_DIRECT_EXIT_REALITY_SERVER_NAMES}")"
     direct_exit_reality_server_names_csv="$(normalize_csv_list "${direct_exit_reality_server_names_csv}")"
     generated_direct_exit_private="REPLACE_DIRECT_EXIT_REALITY_PRIVATE_KEY"
     generated_direct_exit_public="REPLACE_DIRECT_EXIT_REALITY_PUBLIC_KEY"
@@ -874,9 +1064,9 @@ EOF
       generated_direct_exit_private="$(printf '%s\n' "${generated_direct_exit_output}" | sed -n '1p')"
       generated_direct_exit_public="$(printf '%s\n' "${generated_direct_exit_output}" | sed -n '2p')"
     fi
-    prompt direct_exit_reality_private_key "Reality private key for ${direct_exit_host}" "${generated_direct_exit_private}"
-    prompt direct_exit_reality_public_key "Reality public key for ${direct_exit_host}" "${generated_direct_exit_public}"
-    prompt direct_exit_reality_short_id "Reality shortId for ${direct_exit_host}" "${direct_exit_short_id_default}"
+    prompt direct_exit_reality_private_key "Reality private key for ${direct_exit_host}" "$(spec_value_or_default "direct_exit.reality_private_key" "${generated_direct_exit_private}")"
+    prompt direct_exit_reality_public_key "Reality public key for ${direct_exit_host}" "$(spec_value_or_default "direct_exit.reality_public_key" "${generated_direct_exit_public}")"
+    prompt direct_exit_reality_short_id "Reality shortId for ${direct_exit_host}" "$(spec_value_or_default "direct_exit.reality_short_id" "${direct_exit_short_id_default}")"
 
     direct_exit_json_block="$(cat <<EOF
 ,
@@ -900,6 +1090,7 @@ EOF
   "mode": "entry_master_exit",
   "entry": {
     "host": "$(json_escape "${entry_host}")",
+    "host_remark": "$(json_escape "${entry_host_remark}")",
     "public_address": "$(json_escape "${entry_public_address}")",
     "public_port": ${entry_public_port},
     "reality_target": "$(json_escape "${entry_reality_target}")",
@@ -908,9 +1099,9 @@ EOF
     "reality_public_key": "$(json_escape "${entry_reality_public_key}")",
     "reality_short_id": "$(json_escape "${entry_reality_short_id}")",
     "bridge_uuid": "$(json_escape "${entry_to_master_uuid}")",
-    "to_master_address": "$(json_escape "${bridge_master_host}")",
+    "to_master_address": "$(json_escape "${entry_to_master_address}")",
     "to_master_port": ${bridge_master_port},
-    "to_master_server_name": "$(json_escape "${bridge_master_host}")",
+    "to_master_server_name": "$(json_escape "${entry_to_master_server_name}")",
     "to_master_host": "$(json_escape "${bridge_master_host}")",
     "to_master_path": "$(json_escape "${bridge_master_path}")"
   },
@@ -920,12 +1111,7 @@ EOF
     "cert_domain": "$(json_escape "${master_cert_domain}")",
     "bridge_inbound_port": ${bridge_master_port},
     "bridge_host": "$(json_escape "${bridge_master_host}")",
-    "bridge_path": "$(json_escape "${bridge_master_path}")",
-    "wg_port": ${master_wg_port},
-    "wg_secret_key": "$(json_escape "${wg_secret_key}")",
-    "wg_peers": [
-${wg_peer_entries}
-    ],
+    "bridge_path": "$(json_escape "${bridge_master_path}")"${master_wg_json_block},
     "reality_moscow": {
       "port": ${master_public_port},
       "target": "$(json_escape "${master_reality_target}")",
@@ -945,9 +1131,15 @@ ${wg_peer_entries}
     "to_exit_uuid": "$(json_escape "${master_to_exit_uuid}")",
     "to_exit_address": "$(json_escape "${master_to_exit_address}")",
     "to_exit_port": ${exit_bridge_inbound_port},
-    "to_exit_server_name": "$(json_escape "${master_to_exit_server_name}")",
+    "to_exit_server_name": "$(json_escape "${master_to_exit_server_name}")"${master_home_json_block},
+    "route_home_ip_cidrs": [$(csv_to_json_array "${master_route_home_ip_cidrs_csv}")],
+    "route_home_geoip": [$(csv_to_json_array "${master_route_home_geoip_csv}")],
+    "route_home_geosite": [$(csv_to_json_array "${master_route_home_geosite_csv}")],
+    "route_ipv4_ip_cidrs": [$(csv_to_json_array "${master_route_ipv4_ip_cidrs_csv}")],
     "route_ipv4_geoip": [$(csv_to_json_array "${master_route_ipv4_geoip_csv}")],
-    "route_ipv4_geosite": [$(csv_to_json_array "${master_route_ipv4_geosite_csv}")]
+    "route_ipv4_geosite": [$(csv_to_json_array "${master_route_ipv4_geosite_csv}")],
+    "block_domains": [$(csv_to_json_array "${master_block_domains_csv}")],
+    "block_ports": [$(csv_to_json_array "${master_block_ports_csv}")]
   },
   "exit": {
     "host": "$(json_escape "${exit_host}")",
@@ -961,9 +1153,69 @@ ${wg_peer_entries}
     "reality_private_key": "$(json_escape "${exit_reality_private_key}")",
     "reality_public_key": "$(json_escape "${exit_reality_public_key}")",
     "reality_short_id": "$(json_escape "${exit_reality_short_id}")"
-  }${direct_exit_json_block}
+  }${home_exit_json_block}${direct_exit_json_block}
 }
 __SPEC_ENTRY_MASTER_EXIT__
+
+  python3 - "${TOPOLOGY_SPEC_FILE}" <<'__PY_NORMALIZE_SPEC__'
+import json
+import sys
+from pathlib import Path
+
+
+def format_json(value, indent=0):
+    pad = "  " * indent
+    next_pad = "  " * (indent + 1)
+
+    if isinstance(value, dict):
+        lines = ["{"]
+        items = list(value.items())
+        for index, (key, item) in enumerate(items):
+            suffix = "," if index < len(items) - 1 else ""
+            rendered = format_json(item, indent + 1)
+            key_json = json.dumps(key, ensure_ascii=False)
+            if "\n" not in rendered:
+                lines.append(f"{next_pad}{key_json}: {rendered}{suffix}")
+            else:
+                rendered_lines = rendered.splitlines()
+                lines.append(f"{next_pad}{key_json}: {rendered_lines[0]}")
+                lines.extend(rendered_lines[1:-1])
+                lines.append(f"{rendered_lines[-1]}{suffix}")
+        lines.append(f"{pad}}}")
+        return "\n".join(lines)
+
+    if isinstance(value, list):
+        if all(not isinstance(item, (dict, list)) for item in value):
+            inline = json.dumps(value, ensure_ascii=False)
+            if len(inline) <= 80:
+                return inline
+        lines = ["["]
+        for index, item in enumerate(value):
+            suffix = "," if index < len(value) - 1 else ""
+            rendered = format_json(item, indent + 1)
+            rendered_lines = rendered.splitlines()
+            if len(rendered_lines) == 1:
+                lines.append(f"{next_pad}{rendered_lines[0]}{suffix}")
+            else:
+                lines.append(f"{next_pad}{rendered_lines[0]}")
+                lines.extend(rendered_lines[1:-1])
+                lines.append(f"{rendered_lines[-1]}{suffix}")
+        lines.append(f"{pad}]")
+        return "\n".join(lines)
+
+    return json.dumps(value, ensure_ascii=False)
+
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+master = data.get("master", {})
+
+for key in ("route_home_ip_cidrs", "route_ipv4_ip_cidrs"):
+    if master.get(key) == []:
+        master.pop(key, None)
+
+path.write_text(format_json(data) + "\n", encoding="utf-8")
+__PY_NORMALIZE_SPEC__
 
   python3 "${ENTRY_MASTER_EXIT_RENDERER}" \
     "${TOPOLOGY_SPEC_FILE}" \

@@ -50,6 +50,13 @@ def write_json(path: Path, data: dict):
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+def display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
 def dns_config():
     return {
         "servers": [
@@ -74,6 +81,23 @@ def block_rule_private():
 
 def block_rule_bittorrent():
     return {"type": "field", "protocol": ["bittorrent"], "outboundTag": "BLOCK"}
+
+
+def block_rule_domains(domains):
+    return {"type": "field", "domain": domains, "outboundTag": "BLOCK"}
+
+
+def block_rule_ip(ip_entries):
+    return {"type": "field", "ip": ip_entries, "outboundTag": "BLOCK"}
+
+
+def block_rule_ports(ports, network="TCP,UDP"):
+    return {
+        "type": "field",
+        "network": network,
+        "port": ",".join(str(value) for value in ports),
+        "outboundTag": "BLOCK",
+    }
 
 
 def dns_rule():
@@ -195,14 +219,15 @@ def build_entry_profile(entry, master):
     }
 
 
-def build_master_profile(master, exit_node):
+def build_master_profile(master, exit_node, home_exit=None):
     wg_peers = [
         {
             "publicKey": item["public_key"],
             "allowedIPs": [item["allowed_ip"]],
         }
-        for item in master["wg_peers"]
+        for item in master.get("wg_peers", [])
     ]
+    wg_enabled = bool(master.get("wg_port") and master.get("wg_secret_key") and wg_peers)
 
     route_rules = [
         dns_rule(),
@@ -210,24 +235,60 @@ def build_master_profile(master, exit_node):
         block_rule_private(),
     ]
 
+    block_ip_entries = clean_list(master.get("block_ip_cidrs", []))
+    if block_ip_entries:
+        route_rules.append(block_rule_ip(block_ip_entries))
+
+    block_geosite_entries = [f"geosite:{value}" for value in clean_list(master.get("block_geosite", []))]
+    if block_geosite_entries:
+        route_rules.append(block_rule_domains(block_geosite_entries))
+
+    block_domain_entries = clean_list(master.get("block_domains", []))
+    if block_domain_entries:
+        route_rules.append(block_rule_domains(block_domain_entries))
+
+    block_port_entries = clean_list(master.get("block_ports", []))
+    if block_port_entries:
+        route_rules.append(block_rule_ports(block_port_entries))
+
+    for cidr in clean_list(master.get("route_home_ip_cidrs", [])):
+        if home_exit:
+            route_rules.append({"ip": [cidr], "type": "field", "balancerTag": "HOME_OR_MOSCOW"})
+
+    for code in clean_list(master.get("route_home_geoip", [])):
+        if home_exit:
+            route_rules.append({"ip": [f"geoip:{code}"], "type": "field", "balancerTag": "HOME_OR_MOSCOW"})
+
+    for selector in clean_list(master.get("route_home_geosite", [])):
+        if home_exit:
+            route_rules.append({"type": "field", "domain": [f"geosite:{selector}"], "balancerTag": "HOME_OR_MOSCOW"})
+
+    for cidr in clean_list(master.get("route_ipv4_ip_cidrs", [])):
+        route_rules.append({"ip": [cidr], "type": "field", "outboundTag": "IPv4"})
+
     for code in clean_list(master.get("route_ipv4_geoip", [])):
         route_rules.append({"ip": [f"geoip:{code}"], "type": "field", "outboundTag": "IPv4"})
 
     for selector in clean_list(master.get("route_ipv4_geosite", [])):
         route_rules.append({"type": "field", "domain": [f"geosite:{selector}"], "outboundTag": "IPv4"})
 
-    route_rules.extend(
-        [
-            {
-                "type": "field",
-                "inboundTag": ["BRIDGE_MASTER_IN"],
-                "outboundTag": "GRPC_TO_EXIT",
-            },
+    route_rules.append(
+        {
+            "type": "field",
+            "inboundTag": ["BRIDGE_MASTER_IN"],
+            "outboundTag": "GRPC_TO_EXIT",
+        }
+    )
+    if wg_enabled:
+        route_rules.append(
             {
                 "type": "field",
                 "inboundTag": ["WG_KEENETIC_IN"],
                 "outboundTag": "GRPC_TO_EXIT",
-            },
+            }
+        )
+    route_rules.extend(
+        [
             {
                 "type": "field",
                 "inboundTag": ["VLESS_REALITY_MOSCOW"],
@@ -241,50 +302,51 @@ def build_master_profile(master, exit_node):
         ]
     )
 
-    return {
-        "log": base_log(),
-        "dns": dns_config(),
-        "inbounds": [
-            {
-                "tag": "BRIDGE_MASTER_IN",
-                "port": int(master["bridge_inbound_port"]),
-                "listen": "0.0.0.0",
-                "protocol": "vless",
-                "settings": {
-                    "clients": [],
-                    "decryption": "none",
+    inbounds = [
+        {
+            "tag": "BRIDGE_MASTER_IN",
+            "port": int(master["bridge_inbound_port"]),
+            "listen": "0.0.0.0",
+            "protocol": "vless",
+            "settings": {
+                "clients": [],
+                "decryption": "none",
+            },
+            "sniffing": {
+                "enabled": True,
+                "routeOnly": True,
+                "destOverride": ["http", "tls", "quic", "fakedns"],
+                "metadataOnly": False,
+            },
+            "streamSettings": {
+                "network": "xhttp",
+                "security": "tls",
+                "tlsSettings": {
+                    "alpn": ["h2", "http/1.1"],
+                    "maxVersion": "1.3",
+                    "minVersion": "1.2",
+                    "certificates": [
+                        {
+                            "usage": "encipherment",
+                            "keyFile": f"/etc/letsencrypt/live/{master['cert_domain']}/privkey.pem",
+                            "certificateFile": f"/etc/letsencrypt/live/{master['cert_domain']}/fullchain.pem",
+                        }
+                    ],
                 },
-                "sniffing": {
-                    "enabled": True,
-                    "routeOnly": False,
-                    "destOverride": ["http", "tls", "quic", "fakedns"],
-                    "metadataOnly": False,
-                },
-                "streamSettings": {
-                    "network": "xhttp",
-                    "security": "tls",
-                    "tlsSettings": {
-                        "alpn": ["h2", "http/1.1"],
-                        "maxVersion": "1.3",
-                        "minVersion": "1.2",
-                        "certificates": [
-                            {
-                                "usage": "encipherment",
-                                "keyFile": f"/etc/letsencrypt/live/{master['cert_domain']}/privkey.pem",
-                                "certificateFile": f"/etc/letsencrypt/live/{master['cert_domain']}/fullchain.pem",
-                            }
-                        ],
-                    },
-                    "xhttpSettings": {
-                        "host": master["bridge_host"],
-                        "mode": "stream-one",
-                        "path": master["bridge_path"],
-                        "scMaxBufferedPosts": 30,
-                        "scMaxEachPostBytes": "1000000",
-                        "scStreamUpServerSecs": "20-80",
-                    },
+                "xhttpSettings": {
+                    "host": master["bridge_host"],
+                    "mode": "stream-one",
+                    "path": master["bridge_path"],
+                    "scMaxBufferedPosts": 30,
+                    "scMaxEachPostBytes": "1000000",
+                    "scStreamUpServerSecs": "20-80",
                 },
             },
+        }
+    ]
+
+    if wg_enabled:
+        inbounds.append(
             {
                 "tag": "WG_KEENETIC_IN",
                 "port": int(master["wg_port"]),
@@ -301,7 +363,11 @@ def build_master_profile(master, exit_node):
                     "destOverride": ["http", "tls", "quic"],
                     "metadataOnly": False,
                 },
-            },
+            }
+        )
+
+    inbounds.extend(
+        [
             {
                 "tag": "VLESS_REALITY_MOSCOW",
                 "port": int(master["reality_moscow"]["port"]),
@@ -313,7 +379,7 @@ def build_master_profile(master, exit_node):
                 },
                 "sniffing": {
                     "enabled": True,
-                    "routeOnly": False,
+                    "routeOnly": True,
                     "destOverride": ["http", "tls", "quic"],
                     "metadataOnly": False,
                 },
@@ -324,7 +390,7 @@ def build_master_profile(master, exit_node):
                         "show": False,
                         "xver": 0,
                         "target": master["reality_moscow"]["target"],
-                        "shortIds": [master["reality_moscow"]["short_id"], ""],
+                        "shortIds": [master["reality_moscow"]["short_id"]],
                         "privateKey": master["reality_moscow"]["private_key"],
                         "serverNames": master["reality_moscow"]["server_names"],
                     },
@@ -341,7 +407,7 @@ def build_master_profile(master, exit_node):
                 },
                 "sniffing": {
                     "enabled": True,
-                    "routeOnly": False,
+                    "routeOnly": True,
                     "destOverride": ["http", "tls", "quic"],
                     "metadataOnly": False,
                 },
@@ -352,59 +418,89 @@ def build_master_profile(master, exit_node):
                         "show": False,
                         "xver": 0,
                         "target": master["reality_direct_msk"]["target"],
-                        "shortIds": [master["reality_direct_msk"]["short_id"], ""],
+                        "shortIds": [master["reality_direct_msk"]["short_id"]],
                         "privateKey": master["reality_direct_msk"]["private_key"],
                         "serverNames": master["reality_direct_msk"]["server_names"],
                     },
                 },
             },
-        ],
-        "outbounds": [
+        ]
+    )
+
+    outbounds = [
+        {
+            "tag": "DIRECT",
+            "protocol": "freedom",
+            "settings": {
+                "domainStrategy": "UseIPv4",
+            },
+            "streamSettings": {
+                "sockopt": {
+                    "tcpMptcp": True,
+                    "penetrate": True,
+                    "tcpFastOpen": True,
+                }
+            },
+        },
+        {
+            "tag": "BLOCK",
+            "protocol": "blackhole",
+            "settings": {"response": {"type": "http"}},
+        },
+        {
+            "tag": "IPv4",
+            "protocol": "freedom",
+            "settings": {
+                "domainStrategy": "UseIPv4",
+            },
+            "streamSettings": {
+                "sockopt": {
+                    "tcpMptcp": True,
+                    "penetrate": True,
+                    "tcpFastOpen": True,
+                }
+            },
+        },
+    ]
+
+    if home_exit:
+        outbounds.append(
             {
-                "tag": "DIRECT",
-                "protocol": "freedom",
+                "tag": "GRPC_TO_HOME_RU",
+                "protocol": "vless",
                 "settings": {
-                    "noises": [
+                    "vnext": [
                         {
-                            "type": "rand",
-                            "delay": "10-16",
-                            "packet": "10-20",
-                            "applyTo": "ip",
+                            "port": int(master["to_home_ru_port"]),
+                            "users": [
+                                {
+                                    "id": master["to_home_ru_uuid"],
+                                    "encryption": "none",
+                                }
+                            ],
+                            "address": master["to_home_ru_address"],
                         }
-                    ],
-                    "domainStrategy": "AsIs",
+                    ]
                 },
                 "streamSettings": {
-                    "sockopt": {
-                        "tcpMptcp": True,
-                        "penetrate": True,
-                        "tcpFastOpen": True,
-                    }
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                        "alpn": ["h2"],
+                        "serverName": master["to_home_ru_server_name"],
+                        "fingerprint": "chrome",
+                        "allowInsecure": False,
+                    },
+                    "grpcSettings": {
+                        "multiMode": False,
+                        "serviceName": "",
+                    },
                 },
-            },
-            {"tag": "BLOCK", "protocol": "blackhole"},
-            {
-                "tag": "IPv4",
-                "protocol": "freedom",
-                "settings": {
-                    "noises": [
-                        {
-                            "type": "rand",
-                            "delay": "10-16",
-                            "packet": "10-20",
-                            "applyTo": "ip",
-                        }
-                    ],
-                    "domainStrategy": "UseIPv4",
-                },
-                "streamSettings": {
-                    "sockopt": {
-                        "tcpMptcp": True,
-                        "penetrate": True,
-                        "tcpFastOpen": True,
-                    }
-                },
-            },
+            }
+        )
+
+    outbounds.extend(
+        [
             {
                 "tag": "GRPC_TO_EXIT",
                 "protocol": "vless",
@@ -426,7 +522,7 @@ def build_master_profile(master, exit_node):
                     "network": "grpc",
                     "security": "tls",
                     "tlsSettings": {
-                        "alpn": ["h2", "http/1.1"],
+                        "alpn": ["h2"],
                         "serverName": master["to_exit_server_name"],
                         "fingerprint": "chrome",
                         "allowInsecure": False,
@@ -442,12 +538,41 @@ def build_master_profile(master, exit_node):
                 "protocol": "freedom",
                 "settings": {"redirect": "127.0.0.1:53"},
             },
-        ],
-        "routing": {
-            "rules": route_rules,
-            "domainStrategy": "AsIs",
-        },
+        ]
+    )
+
+    routing = {
+        "rules": route_rules,
+        "domainStrategy": "IPIfNonMatch" if home_exit else "AsIs",
     }
+
+    if home_exit:
+        routing["balancers"] = [
+            {
+                "tag": "HOME_OR_MOSCOW",
+                "selector": ["GRPC_TO_HOME_RU"],
+                "strategy": {"type": "random"},
+                "fallbackTag": "IPv4",
+            }
+        ]
+
+    profile = {
+        "log": base_log(),
+        "dns": dns_config(),
+        "inbounds": inbounds,
+        "outbounds": outbounds,
+        "routing": routing,
+    }
+
+    if home_exit:
+        profile["observatory"] = {
+            "probeUrl": "https://connectivitycheck.gstatic.com/generate_204",
+            "probeInterval": "15s",
+            "subjectSelector": ["GRPC_TO_HOME_RU"],
+            "enableConcurrency": False,
+        }
+
+    return profile
 
 
 def build_exit_profile(exit_node):
@@ -595,6 +720,150 @@ def build_exit_profile(exit_node):
     }
 
 
+def build_home_exit_profile(home_exit):
+    return {
+        "log": base_log(),
+        "dns": dns_config(),
+        "inbounds": [
+            {
+                "tag": "VLESS_HOME_REALITY_DIRECT",
+                "port": int(home_exit["public_port"]),
+                "listen": "0.0.0.0",
+                "protocol": "vless",
+                "settings": {
+                    "clients": [],
+                    "decryption": "none",
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls", "quic", "fakedns"],
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "reality",
+                    "tcpSettings": {
+                        "header": {"type": "none"},
+                        "acceptProxyProtocol": False,
+                    },
+                    "realitySettings": {
+                        "show": False,
+                        "xver": 0,
+                        "target": home_exit["reality_target"],
+                        "shortIds": [home_exit["reality_short_id"]],
+                        "privateKey": home_exit["reality_private_key"],
+                        "serverNames": home_exit["reality_server_names"],
+                    },
+                },
+            },
+            {
+                "tag": "BRIDGE_HOME_RU_IN",
+                "port": int(home_exit["bridge_inbound_port"]),
+                "listen": "0.0.0.0",
+                "protocol": "vless",
+                "settings": {
+                    "clients": [],
+                    "decryption": "none",
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls", "quic", "fakedns"],
+                },
+                "streamSettings": {
+                    "network": "grpc",
+                    "security": "tls",
+                    "tlsSettings": {
+                        "alpn": ["h2", "http/1.1"],
+                        "maxVersion": "1.3",
+                        "minVersion": "1.2",
+                        "serverName": home_exit["cert_domain"],
+                        "certificates": [
+                            {
+                                "usage": "encipherment",
+                                "keyFile": f"/etc/letsencrypt/live/{home_exit['cert_domain']}/privkey.pem",
+                                "certificateFile": f"/etc/letsencrypt/live/{home_exit['cert_domain']}/fullchain.pem",
+                            }
+                        ],
+                    },
+                    "grpcSettings": {
+                        "multiMode": False,
+                        "serviceName": "",
+                    },
+                },
+            },
+        ],
+        "outbounds": [
+            {
+                "tag": "DIRECT",
+                "protocol": "freedom",
+                "settings": {
+                    "noises": [
+                        {
+                            "type": "rand",
+                            "delay": "10-16",
+                            "packet": "10-20",
+                            "applyTo": "ip",
+                        }
+                    ],
+                    "domainStrategy": "AsIs",
+                },
+                "streamSettings": {
+                    "sockopt": {
+                        "tcpMptcp": True,
+                        "penetrate": True,
+                        "tcpFastOpen": True,
+                    }
+                },
+            },
+            {"tag": "BLOCK", "protocol": "blackhole"},
+            {
+                "tag": "IPv4",
+                "protocol": "freedom",
+                "settings": {
+                    "noises": [
+                        {
+                            "type": "rand",
+                            "delay": "10-16",
+                            "packet": "10-20",
+                            "applyTo": "ip",
+                        }
+                    ],
+                    "domainStrategy": "UseIPv4",
+                },
+                "streamSettings": {
+                    "sockopt": {
+                        "tcpMptcp": True,
+                        "penetrate": True,
+                        "tcpFastOpen": True,
+                    }
+                },
+            },
+            {
+                "tag": "DNS_OUT",
+                "protocol": "freedom",
+                "settings": {"redirect": "127.0.0.1:53"},
+            },
+        ],
+        "routing": {
+            "rules": [
+                dns_rule(),
+                block_rule_bittorrent(),
+                block_rule_private(),
+                {
+                    "type": "field",
+                    "inboundTag": ["BRIDGE_HOME_RU_IN"],
+                    "outboundTag": "IPv4",
+                },
+                {
+                    "type": "field",
+                    "inboundTag": ["VLESS_HOME_REALITY_DIRECT"],
+                    "outboundTag": "IPv4",
+                },
+            ],
+            "domainStrategy": "AsIs",
+        },
+    }
+
+
 def build_direct_exit_profile(direct_exit):
     return {
         "log": base_log(),
@@ -716,7 +985,9 @@ def main():
     entry = spec["entry"]
     master = spec["master"]
     exit_node = spec["exit"]
+    home_exit = spec.get("home_exit")
     direct_exit = spec.get("direct_exit")
+    entry_host_remark = entry.get("host_remark") or "WHITE LIST"
     exit_host_remark = exit_node.get("host_remark") or ("AMSTERDAM" if direct_exit else "SERBIA")
     direct_exit_host_remark = (
         (direct_exit.get("host_remark") or "SERBIA") if direct_exit else None
@@ -732,13 +1003,13 @@ def main():
             "udp_ports": [],
         },
         master["host"]: {
-            "roles": ["transit", "direct", "wireguard"],
+            "roles": ["transit", "direct"] + (["wireguard"] if master.get("wg_port") else []),
             "tcp_ports": [
                 int(master["bridge_inbound_port"]),
                 int(master["reality_moscow"]["port"]),
                 int(master["reality_direct_msk"]["port"]),
             ],
-            "udp_ports": [int(master["wg_port"])],
+            "udp_ports": [int(master["wg_port"])] if master.get("wg_port") else [],
         },
         exit_node["host"]: {
             "roles": ["exit", "direct"],
@@ -746,6 +1017,12 @@ def main():
             "udp_ports": [],
         },
     }
+    if home_exit:
+        host_ports[home_exit["host"]] = {
+            "roles": ["home_exit"],
+            "tcp_ports": [int(home_exit["public_port"]), int(home_exit["bridge_inbound_port"])],
+            "udp_ports": [],
+        }
     if direct_exit:
         host_ports[direct_exit["host"]] = {
             "roles": ["direct"],
@@ -764,13 +1041,18 @@ def main():
     entry_profile_file = profiles_dir / f"01-entry-{entry['host']}.profile.json"
     master_profile_file = profiles_dir / f"02-master-{master['host']}.profile.json"
     exit_profile_file = profiles_dir / f"03-exit-{exit_node['host']}.profile.json"
+    home_exit_profile_file = (
+        profiles_dir / f"04-home-exit-{home_exit['host']}.profile.json" if home_exit else None
+    )
     direct_exit_profile_file = (
-        profiles_dir / f"04-direct-exit-{direct_exit['host']}.profile.json" if direct_exit else None
+        profiles_dir / f"05-direct-exit-{direct_exit['host']}.profile.json" if direct_exit else None
     )
 
     write_json(entry_profile_file, build_entry_profile(entry, master))
-    write_json(master_profile_file, build_master_profile(master, exit_node))
+    write_json(master_profile_file, build_master_profile(master, exit_node, home_exit))
     write_json(exit_profile_file, build_exit_profile(exit_node))
+    if home_exit and home_exit_profile_file:
+        write_json(home_exit_profile_file, build_home_exit_profile(home_exit))
     if direct_exit and direct_exit_profile_file:
         write_json(direct_exit_profile_file, build_direct_exit_profile(direct_exit))
 
@@ -810,7 +1092,7 @@ def main():
         ],
         "hosts": [
             {
-                "remark": "WHITE LIST",
+                "remark": entry_host_remark,
                 "profile": "ENTRY_NODE",
                 "inbound": "VLESS_TCP_REALITY",
                 "address": entry["public_address"],
@@ -852,7 +1134,10 @@ def main():
                 ),
             },
             {"name": "Bridge Master Squad", "inbounds": ["BRIDGE_MASTER_IN"]},
-            {"name": "Bridge Exit Squad", "inbounds": ["BRIDGE_EXIT_IN"]},
+            {
+                "name": "Bridge Exit Squad",
+                "inbounds": clean_list(["BRIDGE_EXIT_IN"] + (["BRIDGE_HOME_RU_IN"] if home_exit else [])),
+            },
         ],
         "system_users": [
             {
@@ -872,9 +1157,17 @@ def main():
             "regular_user_internal_squads": ["Public Squad", "Direct Exit Squad"],
             "advanced_host_overrides": "empty/default",
         },
+        "master_routing": {
+            "route_ipv4_geoip": clean_list(master.get("route_ipv4_geoip", [])),
+            "route_ipv4_geosite": clean_list(master.get("route_ipv4_geosite", [])),
+            "block_ip_cidrs": clean_list(master.get("block_ip_cidrs", [])),
+            "block_geosite": clean_list(master.get("block_geosite", [])),
+            "block_domains": clean_list(master.get("block_domains", [])),
+            "block_ports": clean_list(master.get("block_ports", [])),
+        },
         "client_values": [
             {
-                "host": "WHITE LIST",
+                "host": entry_host_remark,
                 "public_key": entry["reality_public_key"],
                 "short_id": entry["reality_short_id"],
                 "server_names": [entry["reality_server_name"]],
@@ -903,6 +1196,23 @@ def main():
             },
         ],
     }
+    if home_exit:
+        topology_data["nodes"].append(
+            {
+                "host": home_exit["host"],
+                "profile": "HOME_EXIT_NODE",
+                "public_address": home_exit["public_address"],
+                "node_port": 2222,
+            }
+        )
+        topology_data["system_users"].append(
+            {
+                "username": "bridge_master_to_home_ru",
+                "internal_squads": ["Bridge Exit Squad"],
+                "used_by": "MASTER_NODE -> GRPC_TO_HOME_RU",
+                "service_uuid": master["to_home_ru_uuid"],
+            }
+        )
     if direct_exit:
         topology_data["nodes"].append(
             {
@@ -938,13 +1248,17 @@ def main():
         f"- MASTER_NODE -> {master['host']} ({master['public_address']}:2222)",
         f"- EXIT_NODE -> {exit_node['host']} ({exit_node['public_address']}:2222)",
     ]
+    if home_exit:
+        summary_node_lines.append(
+            f"- HOME_EXIT_NODE -> {home_exit['host']} ({home_exit['public_address']}:2222)"
+        )
     if direct_exit:
         summary_node_lines.append(
             f"- DIRECT_EXIT -> {direct_exit['host']} ({direct_exit['public_address']}:2222)"
         )
 
     summary_host_lines = [
-        f"- WHITE LIST -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
+        f"- {entry_host_remark} -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
         f"- MOSCOW -> {master['public_address']}:{master['reality_moscow']['port']} ({master['host']})",
         f"- DIRECT MOSCOW -> {master['public_address']}:{master['reality_direct_msk']['port']} ({master['host']})",
         f"- {exit_host_remark} -> {exit_node['public_address']}:{exit_node['public_port']} ({exit_node['host']})",
@@ -955,7 +1269,7 @@ def main():
         )
 
     summary_client_lines = [
-        f"- WHITE LIST: public_key={entry['reality_public_key']}, shortId={entry['reality_short_id']}",
+        f"- {entry_host_remark}: public_key={entry['reality_public_key']}, shortId={entry['reality_short_id']}",
         f"- MOSCOW: public_key={master['reality_moscow']['public_key']}, shortId={master['reality_moscow']['short_id']}",
         f"- DIRECT MOSCOW: public_key={master['reality_direct_msk']['public_key']}, shortId={master['reality_direct_msk']['short_id']}",
         f"- {exit_host_remark}: public_key={exit_node['reality_public_key']}, shortId={exit_node['reality_short_id']}",
@@ -967,9 +1281,23 @@ def main():
 
     summary_port_lines = [
         f"- {entry['host']}: {entry['public_port']}/tcp",
-        f"- {master['host']}: {master['bridge_inbound_port']}/tcp, {master['reality_moscow']['port']}/tcp, {master['reality_direct_msk']['port']}/tcp, {master['wg_port']}/udp",
+        f"- {master['host']}: "
+        + ", ".join(
+            clean_list(
+                [
+                    f"{master['bridge_inbound_port']}/tcp",
+                    f"{master['reality_moscow']['port']}/tcp",
+                    f"{master['reality_direct_msk']['port']}/tcp",
+                    f"{master['wg_port']}/udp" if master.get("wg_port") else None,
+                ]
+            )
+        ),
         f"- {exit_node['host']}: {exit_node['public_port']}/tcp, {exit_node['bridge_inbound_port']}/tcp",
     ]
+    if home_exit:
+        summary_port_lines.append(
+            f"- {home_exit['host']}: {home_exit['public_port']}/tcp, {home_exit['bridge_inbound_port']}/tcp"
+        )
     if direct_exit:
         summary_port_lines.append(f"- {direct_exit['host']}: {direct_exit['public_port']}/tcp")
 
@@ -978,8 +1306,9 @@ def main():
         "",
         "## Mode",
         "",
-        "- entry -> master -> exit + WireGuard",
-        "- optional direct-only exit profile",
+        "- entry -> master -> exit",
+        "- optional hidden home-exit with master-side fallback",
+        "- optional dedicated direct-only exit profile",
         "",
         "## Nodes",
         "",
@@ -995,7 +1324,8 @@ def main():
         "- Direct Exit Squad -> "
         + ", ".join(clean_list(["VLESS_REALITY_DIRECT_MSK", "VLESS_REALITY_DIRECT"] + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else []))),
         "- Bridge Master Squad -> BRIDGE_MASTER_IN",
-        "- Bridge Exit Squad -> BRIDGE_EXIT_IN",
+        "- Bridge Exit Squad -> "
+        + ", ".join(clean_list(["BRIDGE_EXIT_IN"] + (["BRIDGE_HOME_RU_IN"] if home_exit else []))),
         "",
         "## Client values",
         "",
@@ -1008,20 +1338,26 @@ def main():
         "## Manual follow-up",
         "",
         "1. Import ENTRY_NODE, MASTER_NODE, EXIT_NODE"
+        + (", HOME_EXIT_NODE" if home_exit else "")
         + (", DIRECT_EXIT" if direct_exit else "")
         + " into Remnawave Config Profiles.",
         "2. Bind profiles to nodes "
         + ", ".join(
             [entry["host"], master["host"], exit_node["host"]]
+            + ([home_exit["host"]] if home_exit else [])
             + ([direct_exit["host"]] if direct_exit else [])
         )
         + ".",
-        "3. Create hosts WHITE LIST, MOSCOW, DIRECT MOSCOW, "
+        "3. Create hosts "
+        + entry_host_remark
+        + ", MOSCOW, DIRECT MOSCOW, "
         + exit_host_remark
         + (f", {direct_exit_host_remark}" if direct_exit else "")
         + ".",
         "4. Create/update Internal Squads: Public Squad, Direct Exit Squad, Bridge Master Squad, Bridge Exit Squad.",
-        "5. Create/update service users bridge_entry_to_master and bridge_master_to_exit.",
+        "5. Create/update service users bridge_entry_to_master, bridge_master_to_exit"
+        + (", bridge_master_to_home_ru" if home_exit else "")
+        + ".",
         "6. Put regular users into Public Squad + Direct Exit Squad.",
         "7. Apply firewall/node changes:",
         "   - npm run ansible:run:check",
@@ -1029,11 +1365,12 @@ def main():
         "",
         "## Generated files",
         "",
-        f"- {entry_profile_file}",
-        f"- {master_profile_file}",
-        f"- {exit_profile_file}",
-        *([f"- {direct_exit_profile_file}"] if direct_exit and direct_exit_profile_file else []),
-        f"- {topology_vars_file}",
+        f"- {display_path(entry_profile_file)}",
+        f"- {display_path(master_profile_file)}",
+        f"- {display_path(exit_profile_file)}",
+        *([f"- {display_path(home_exit_profile_file)}"] if home_exit and home_exit_profile_file else []),
+        *([f"- {display_path(direct_exit_profile_file)}"] if direct_exit and direct_exit_profile_file else []),
+        f"- {display_path(topology_vars_file)}",
     ]
     summary_file.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
 

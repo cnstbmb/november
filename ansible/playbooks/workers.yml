@@ -4,6 +4,8 @@
   roles:
     - stubby
     - certbot
+    - role: worker_landing
+      when: enable_worker_landing | default(false) | bool
     - role: remnawave_node
       when: enable_remnawave_node | default(true) | bool
     - role: socks5_proxy

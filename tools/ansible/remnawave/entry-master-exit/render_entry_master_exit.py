@@ -104,6 +104,10 @@ def dns_rule():
     return {"port": "53", "type": "field", "network": "TCP,UDP", "outboundTag": "DNS_OUT"}
 
 
+def enabled_block(value):
+    return bool(value and value.get("enabled", True))
+
+
 def build_entry_profile(entry, master):
     return {
         "log": base_log(),
@@ -220,6 +224,7 @@ def build_entry_profile(entry, master):
 
 
 def build_master_profile(master, exit_node, home_exit=None):
+    xhttp_moscow = master.get("xhttp_moscow") if enabled_block(master.get("xhttp_moscow")) else None
     wg_peers = [
         {
             "publicKey": item["public_key"],
@@ -301,6 +306,14 @@ def build_master_profile(master, exit_node, home_exit=None):
             },
         ]
     )
+    if xhttp_moscow:
+        route_rules.append(
+            {
+                "type": "field",
+                "inboundTag": [xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW")],
+                "outboundTag": xhttp_moscow.get("outbound", "GRPC_TO_EXIT"),
+            }
+        )
 
     inbounds = [
         {
@@ -426,6 +439,51 @@ def build_master_profile(master, exit_node, home_exit=None):
             },
         ]
     )
+    if xhttp_moscow:
+        inbounds.append(
+            {
+                "tag": xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW"),
+                "port": int(xhttp_moscow["port"]),
+                "listen": xhttp_moscow.get("listen", "127.0.0.1"),
+                "protocol": "vless",
+                "settings": {
+                    "clients": [],
+                    "decryption": "none",
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "routeOnly": True,
+                    "destOverride": ["http", "tls", "quic"],
+                    "metadataOnly": False,
+                },
+                "streamSettings": {
+                    "network": "xhttp",
+                    "security": xhttp_moscow.get("security", "none"),
+                    "xhttpSettings": {
+                        "host": xhttp_moscow["host"],
+                        "mode": xhttp_moscow.get("mode", "stream-one"),
+                        "path": xhttp_moscow["path"],
+                        "scMaxBufferedPosts": 30,
+                        "scMaxEachPostBytes": "1000000",
+                        "scStreamUpServerSecs": "20-80",
+                    },
+                },
+            }
+        )
+        if xhttp_moscow.get("security") == "tls":
+            inbounds[-1]["streamSettings"]["tlsSettings"] = {
+                "alpn": xhttp_moscow.get("alpn", ["h2", "http/1.1"]),
+                "maxVersion": "1.3",
+                "minVersion": "1.2",
+                "serverName": xhttp_moscow["host"],
+                "certificates": [
+                    {
+                        "usage": "encipherment",
+                        "keyFile": f"/etc/letsencrypt/live/{master['cert_domain']}/privkey.pem",
+                        "certificateFile": f"/etc/letsencrypt/live/{master['cert_domain']}/fullchain.pem",
+                    }
+                ],
+            }
 
     outbounds = [
         {
@@ -987,6 +1045,7 @@ def main():
     exit_node = spec["exit"]
     home_exit = spec.get("home_exit")
     direct_exit = spec.get("direct_exit")
+    xhttp_moscow = master.get("xhttp_moscow") if enabled_block(master.get("xhttp_moscow")) else None
     entry_host_remark = entry.get("host_remark") or "WHITE LIST"
     exit_host_remark = exit_node.get("host_remark") or ("AMSTERDAM" if direct_exit else "SERBIA")
     direct_exit_host_remark = (
@@ -1103,8 +1162,8 @@ def main():
                 "remark": "MOSCOW",
                 "profile": "MASTER_NODE",
                 "inbound": "VLESS_REALITY_MOSCOW",
-                "address": master["public_address"],
-                "port": int(master["reality_moscow"]["port"]),
+                "address": master["reality_moscow"].get("public_address", master["public_address"]),
+                "port": int(master["reality_moscow"].get("public_port", master["reality_moscow"]["port"])),
                 "node": master["host"],
             },
             {
@@ -1196,6 +1255,34 @@ def main():
             },
         ],
     }
+    if xhttp_moscow:
+        topology_data["hosts"].insert(
+            2,
+            {
+                "remark": xhttp_moscow.get("remark", "MOSCOW XHTTP"),
+                "profile": "MASTER_NODE",
+                "inbound": xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW"),
+                "address": xhttp_moscow.get("public_address", master["host"]),
+                "port": int(xhttp_moscow.get("public_port", 443)),
+                "node": master["host"],
+            },
+        )
+        topology_data["squads"].append(
+            {
+                "name": xhttp_moscow.get("squad", "XHTTP Canary Squad"),
+                "inbounds": [xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW")],
+            }
+        )
+        topology_data["client_values"].insert(
+            2,
+            {
+                "host": xhttp_moscow.get("remark", "MOSCOW XHTTP"),
+                "network": "xhttp",
+                "security": xhttp_moscow.get("security", "tls"),
+                "server_names": [xhttp_moscow["host"]],
+                "path": xhttp_moscow["path"],
+            },
+        )
     if home_exit:
         topology_data["nodes"].append(
             {
@@ -1259,10 +1346,15 @@ def main():
 
     summary_host_lines = [
         f"- {entry_host_remark} -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
-        f"- MOSCOW -> {master['public_address']}:{master['reality_moscow']['port']} ({master['host']})",
+        f"- MOSCOW -> {master['reality_moscow'].get('public_address', master['public_address'])}:{master['reality_moscow'].get('public_port', master['reality_moscow']['port'])} ({master['host']})",
         f"- DIRECT MOSCOW -> {master['public_address']}:{master['reality_direct_msk']['port']} ({master['host']})",
         f"- {exit_host_remark} -> {exit_node['public_address']}:{exit_node['public_port']} ({exit_node['host']})",
     ]
+    if xhttp_moscow:
+        summary_host_lines.insert(
+            2,
+            f"- {xhttp_moscow.get('remark', 'MOSCOW XHTTP')} -> {xhttp_moscow.get('public_address', master['host'])}:{xhttp_moscow.get('public_port', 443)} ({master['host']})",
+        )
     if direct_exit:
         summary_host_lines.append(
             f"- {direct_exit_host_remark} -> {direct_exit['public_address']}:{direct_exit['public_port']} ({direct_exit['host']})"
@@ -1274,6 +1366,11 @@ def main():
         f"- DIRECT MOSCOW: public_key={master['reality_direct_msk']['public_key']}, shortId={master['reality_direct_msk']['short_id']}",
         f"- {exit_host_remark}: public_key={exit_node['reality_public_key']}, shortId={exit_node['reality_short_id']}",
     ]
+    if xhttp_moscow:
+        summary_client_lines.insert(
+            2,
+            f"- {xhttp_moscow.get('remark', 'MOSCOW XHTTP')}: network=xhttp, sni={xhttp_moscow['host']}, path={xhttp_moscow['path']}",
+        )
     if direct_exit:
         summary_client_lines.append(
             f"- {direct_exit_host_remark}: public_key={direct_exit['reality_public_key']}, shortId={direct_exit['reality_short_id']}"

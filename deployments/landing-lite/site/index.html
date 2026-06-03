@@ -6,380 +6,1008 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta
       name="description"
-      content="Константин Хименков: frontend-разработка, обучение китайскому, переводы и сопровождение закупок из Китая."
+      content="Константин Хименков: web-разработка, fintech-интерфейсы, техническая коммуникация и сопровождение деловых задач с Китаем."
     />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <link rel="canonical" href="https://konstantin.himenkov.ru/" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ru_RU" />
-    <meta property="og:title" content="Frontend, китайский, закупки из Китая" />
+    <meta property="og:title" content="Константин Хименков | Web, fintech, China ops" />
     <meta
       property="og:description"
-      content="Frontend, китайский, переводы и сопровождение закупок из Китая."
+      content="Строгая web-разработка, банковские интерфейсы, деловая коммуникация и Китай в одном рабочем контуре."
     />
     <meta property="og:url" content="https://konstantin.himenkov.ru/" />
     <meta
       property="og:image"
-      content="https://konstantin.himenkov.ru/og-image.svg"
+      content="https://konstantin.himenkov.ru/assets/executive-network-hero.jpg"
     />
-    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Frontend, китайский, закупки из Китая" />
+    <meta name="twitter:title" content="Константин Хименков | Web, fintech, China ops" />
     <meta
       name="twitter:description"
-      content="Частные услуги: frontend, китайский, переводы и сопровождение закупок из Китая."
+      content="Web-разработка, fintech, интеграционная коммуникация и сопровождение задач с Китаем."
     />
     <meta
       name="twitter:image"
-      content="https://konstantin.himenkov.ru/og-image.svg"
+      content="https://konstantin.himenkov.ru/assets/executive-network-hero.jpg"
     />
-    <title>Константин Хименков | Frontend, китайский, закупки из Китая</title>
+    <title>Константин Хименков | Web, fintech, China ops</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --bg: #07111f;
-        --ink: #edf4ff;
-        --muted: #adc0d8;
-        --brand: #53d1ff;
-        --brand-2: #89e5ff;
-        --accent: #ffd166;
-        --line: rgba(121, 186, 255, 0.28);
-        --card: rgba(8, 23, 38, 0.76);
+        --bg: #090a0b;
+        --surface: #111315;
+        --surface-2: #181b1f;
+        --ink: #f5f2ea;
+        --muted: #a8a69f;
+        --soft: #d6d1c4;
+        --gold: #c8a35d;
+        --gold-2: #f1d08a;
+        --teal: #48c7bd;
+        --red: #b63838;
+        --line: rgba(245, 242, 234, 0.12);
+        --line-strong: rgba(241, 208, 138, 0.42);
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
       }
 
       * {
         box-sizing: border-box;
       }
 
-      html,
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
         min-height: 100%;
-      }
-
-      body {
-        font-family: "Sora", sans-serif;
+        font-family: "Inter", system-ui, sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(circle at 80% -10%, #1c3858 0%, transparent 40%),
-          radial-gradient(circle at -10% 10%, #18442f 0%, transparent 35%),
-          linear-gradient(150deg, #081325, #050b14 70%);
+          linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+          radial-gradient(circle at 92% 12%, rgba(200, 163, 93, 0.2), transparent 32%),
+          radial-gradient(circle at 12% 0%, rgba(72, 199, 189, 0.13), transparent 28%),
+          var(--bg);
+        background-size: 42px 42px, 42px 42px, auto, auto, auto;
       }
 
-      .noise {
+      body::before {
+        content: "";
         position: fixed;
         inset: 0;
+        z-index: -1;
         pointer-events: none;
-        opacity: 0.14;
-        background-image:
-          linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-        background-size: 40px 40px;
+        background: linear-gradient(180deg, rgba(9, 10, 11, 0.04), rgba(9, 10, 11, 0.92));
+      }
+
+      a {
+        color: inherit;
       }
 
       .page {
+        overflow: hidden;
+      }
+
+      .nav {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        z-index: 20;
+        width: min(1180px, calc(100% - 32px));
+        transform: translateX(-50%);
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 24px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(14, 15, 17, 0.72);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 12px 44px rgba(0, 0, 0, 0.24);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+        font-weight: 800;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(200, 163, 93, 0.2), rgba(72, 199, 189, 0.08)),
+          #101214;
+        color: var(--gold-2);
+        font-family: "Manrope", sans-serif;
+        font-weight: 800;
+      }
+
+      .nav-links {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+      }
+
+      .nav-links a,
+      .nav-contact {
+        color: var(--soft);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .nav-links a:hover,
+      .nav-contact:hover {
+        color: var(--gold-2);
+      }
+
+      .hero {
+        position: relative;
+        min-height: 92vh;
+        padding: 138px 0 58px;
+        isolation: isolate;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          linear-gradient(90deg, rgba(9, 10, 11, 0.96) 0%, rgba(9, 10, 11, 0.76) 42%, rgba(9, 10, 11, 0.22) 100%),
+          linear-gradient(0deg, rgba(9, 10, 11, 0.96) 0%, rgba(9, 10, 11, 0.12) 48%, rgba(9, 10, 11, 0.78) 100%),
+          url("/assets/executive-network-hero.jpg") center right / cover no-repeat;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        z-index: -1;
+        height: 160px;
+        background: linear-gradient(0deg, var(--bg), transparent);
+      }
+
+      .wrap {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 720px) minmax(260px, 1fr);
+        gap: 34px;
+        align-items: end;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--gold-2);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 34px;
+        height: 1px;
+        background: var(--gold-2);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1,
+      h2,
+      .metric strong {
+        font-family: "Manrope", "Inter", sans-serif;
+      }
+
+      h1 {
+        max-width: 790px;
+        margin-top: 18px;
+        font-size: clamp(42px, 7vw, 92px);
+        line-height: 0.92;
+        font-weight: 800;
+      }
+
+      .lead {
+        max-width: 620px;
+        margin-top: 24px;
+        color: var(--soft);
+        font-size: clamp(16px, 2vw, 20px);
+        line-height: 1.65;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 48px;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 14px 18px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .button-primary {
+        color: #12110d;
+        background: linear-gradient(135deg, var(--gold-2), var(--gold));
+        box-shadow: 0 12px 42px rgba(200, 163, 93, 0.28);
+      }
+
+      .button-secondary {
+        color: var(--ink);
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .hero-panel {
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(15, 17, 19, 0.78);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(16px);
+      }
+
+      .signal {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 14px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .signal:first-child {
+        padding-top: 0;
+      }
+
+      .signal:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .signal-icon,
+      .domain-icon {
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(241, 208, 138, 0.28);
+        border-radius: 8px;
+        background: rgba(241, 208, 138, 0.06);
+        color: var(--gold-2);
+      }
+
+      .signal-icon {
+        width: 42px;
+        height: 42px;
+      }
+
+      .signal b {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      .signal span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      section {
+        padding: 74px 0;
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(260px, 0.55fr);
+        gap: 34px;
+        align-items: end;
+        margin-bottom: 32px;
+      }
+
+      h2 {
+        font-size: clamp(30px, 5vw, 56px);
+        line-height: 1;
+        font-weight: 800;
+      }
+
+      .section-head p,
+      .muted {
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.035);
+        overflow: hidden;
+      }
+
+      .metric {
+        min-height: 156px;
+        padding: 22px;
+        border-right: 1px solid var(--line);
+      }
+
+      .metric:last-child {
+        border-right: 0;
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--gold-2);
+        font-size: clamp(30px, 4vw, 48px);
+        line-height: 1;
+      }
+
+      .metric span {
+        color: var(--soft);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .domains {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .domain {
+        min-height: 260px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+          var(--surface);
+        transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+      }
+
+      .domain:hover {
+        transform: translateY(-4px);
+        border-color: var(--line-strong);
+        background:
+          linear-gradient(180deg, rgba(241, 208, 138, 0.1), rgba(255, 255, 255, 0.02)),
+          var(--surface);
+      }
+
+      .domain-icon {
+        width: 46px;
+        height: 46px;
+        margin-bottom: 22px;
+      }
+
+      .domain h3 {
+        margin-bottom: 12px;
+        font-size: 20px;
+        line-height: 1.12;
+      }
+
+      .domain p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.62;
+      }
+
+      .marquee {
+        padding: 20px 0;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .marquee-track {
+        display: flex;
+        width: max-content;
+        gap: 10px;
+        animation: drift 34s linear infinite;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 9px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--soft);
+        background: rgba(17, 19, 21, 0.82);
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .badge::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--teal);
+        box-shadow: 0 0 18px rgba(72, 199, 189, 0.72);
+      }
+
+      @keyframes drift {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      .process {
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      .quote {
+        position: sticky;
+        top: 104px;
+        padding: 28px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background:
+          linear-gradient(150deg, rgba(200, 163, 93, 0.18), rgba(72, 199, 189, 0.06)),
+          var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .quote p {
+        font-family: "Manrope", sans-serif;
+        font-size: clamp(24px, 3.4vw, 38px);
+        font-weight: 800;
+        line-height: 1.02;
+      }
+
+      .quote span {
+        display: block;
+        margin-top: 18px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .steps {
+        display: grid;
+        gap: 12px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 68px 1fr;
+        gap: 20px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .step-num {
+        color: var(--gold-2);
+        font-family: "Manrope", sans-serif;
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .step h3 {
+        margin-bottom: 9px;
+        font-size: 21px;
+      }
+
+      .step p {
+        color: var(--muted);
+        line-height: 1.62;
+      }
+
+      .china-band {
+        position: relative;
+        padding: 52px;
+        border: 1px solid rgba(182, 56, 56, 0.28);
+        border-radius: 8px;
+        background:
+          linear-gradient(120deg, rgba(182, 56, 56, 0.18), rgba(200, 163, 93, 0.1), rgba(72, 199, 189, 0.06)),
+          var(--surface-2);
+        overflow: hidden;
+      }
+
+      .china-band::after {
+        content: "中国";
+        position: absolute;
+        right: 28px;
+        bottom: -36px;
+        color: rgba(245, 242, 234, 0.05);
+        font-size: clamp(120px, 18vw, 240px);
+        font-weight: 900;
+        line-height: 0.8;
+      }
+
+      .china-band .content {
         position: relative;
         z-index: 1;
-        width: min(1100px, calc(100% - 30px));
-        margin: 30px auto 44px;
+        max-width: 720px;
       }
 
-      .box {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 24px;
-        margin-bottom: 12px;
-        backdrop-filter: blur(4px);
+      .china-band h2 {
+        margin-bottom: 18px;
+      }
+
+      .china-points {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 26px;
+      }
+
+      .point {
+        padding: 10px 12px;
+        border: 1px solid rgba(245, 242, 234, 0.14);
+        border-radius: 8px;
+        color: var(--soft);
+        background: rgba(0, 0, 0, 0.22);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .cta {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 28px;
+        align-items: center;
+        padding: 42px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background:
+          linear-gradient(135deg, rgba(241, 208, 138, 0.16), rgba(72, 199, 189, 0.05)),
+          #101214;
+        box-shadow: var(--shadow);
+      }
+
+      .cta h2 {
+        margin-bottom: 14px;
+      }
+
+      .footer {
+        padding: 30px 0 42px;
+        color: rgba(245, 242, 234, 0.48);
+        font-size: 13px;
+      }
+
+      .reveal {
         opacity: 0;
-        transform: translateY(12px);
-        animation: slide 0.5s ease-out forwards;
+        transform: translateY(18px);
+        animation: reveal 0.7s ease forwards;
       }
 
-      .box:nth-child(2) {
+      .reveal:nth-child(2) {
         animation-delay: 0.08s;
       }
 
-      .box:nth-child(3) {
+      .reveal:nth-child(3) {
         animation-delay: 0.16s;
       }
 
-      .box:nth-child(4) {
-        animation-delay: 0.24s;
-      }
-
-      .box:nth-child(5) {
-        animation-delay: 0.32s;
-      }
-
-      @keyframes slide {
+      @keyframes reveal {
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
 
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: #cbe9ff;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1.4px;
-      }
+      @media (max-width: 980px) {
+        .nav {
+          grid-template-columns: 1fr auto;
+        }
 
-      h1,
-      h2,
-      h3 {
-        margin: 0;
-        font-family: "Space Grotesk", sans-serif;
-      }
+        .nav-links {
+          display: none;
+        }
 
-      h1 {
-        margin-top: 10px;
-        font-size: clamp(34px, 6vw, 64px);
-        line-height: 1.03;
-      }
-
-      h2 {
-        font-size: clamp(24px, 4vw, 34px);
-        margin-bottom: 12px;
-      }
-
-      .lead {
-        margin-top: 12px;
-        color: var(--muted);
-        max-width: 860px;
-        font-size: clamp(15px, 1.8vw, 18px);
-      }
-
-      .hero-cta {
-        margin-top: 16px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .mail {
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 12px 18px;
-        border-radius: 10px;
-        color: #081525;
-        background: linear-gradient(120deg, var(--brand), var(--brand-2));
-        font-weight: 800;
-      }
-
-      .hero-hint {
-        color: var(--muted);
-        font-size: 13px;
-      }
-
-      .services {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .service {
-        border: 1px solid rgba(121, 186, 255, 0.28);
-        border-radius: 12px;
-        padding: 14px;
-        background: rgba(7, 23, 39, 0.78);
-      }
-
-      .service h3 {
-        margin-bottom: 8px;
-        font-size: 18px;
-      }
-
-      .service p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .list {
-        margin: 0;
-        padding-left: 18px;
-      }
-
-      .list li {
-        margin-bottom: 8px;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .line {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .pill {
-        background: rgba(83, 209, 255, 0.14);
-        color: #d8f5ff;
-        border: 1px solid rgba(83, 209, 255, 0.32);
-        border-radius: 999px;
-        padding: 7px 10px;
-        font-size: 12px;
-      }
-
-      .final-cta {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 12px;
-      }
-
-      .final-cta p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .accent {
-        color: var(--accent);
-      }
-
-      .seo-block {
-        display: grid;
-        gap: 12px;
-      }
-
-      .seo-block p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      @media (max-width: 860px) {
-        .services {
+        .hero-grid,
+        .section-head,
+        .process,
+        .cta {
           grid-template-columns: 1fr;
         }
 
-        .final-cta {
-          grid-template-columns: 1fr;
+        .hero-panel {
+          max-width: 520px;
+        }
+
+        .metrics,
+        .domains {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .metric:nth-child(2) {
+          border-right: 0;
+        }
+
+        .metric:nth-child(-n + 2) {
+          border-bottom: 1px solid var(--line);
+        }
+
+        .quote {
+          position: static;
         }
       }
 
-      @media (max-width: 760px) {
-        .box {
-          padding: 18px;
+      @media (max-width: 640px) {
+        .nav {
+          top: 10px;
+          width: calc(100% - 20px);
+        }
+
+        .brand span:not(.brand-mark) {
+          display: none;
+        }
+
+        .hero {
+          min-height: auto;
+          padding: 116px 0 44px;
+        }
+
+        .hero::before {
+          background:
+            linear-gradient(90deg, rgba(9, 10, 11, 0.98) 0%, rgba(9, 10, 11, 0.78) 100%),
+            linear-gradient(0deg, rgba(9, 10, 11, 0.98) 0%, rgba(9, 10, 11, 0.24) 58%, rgba(9, 10, 11, 0.82) 100%),
+            url("/assets/executive-network-hero.jpg") center / cover no-repeat;
+        }
+
+        section {
+          padding: 46px 0;
+        }
+
+        .metrics,
+        .domains {
+          grid-template-columns: 1fr;
+        }
+
+        .metric,
+        .metric:nth-child(2) {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .metric:last-child {
+          border-bottom: 0;
+        }
+
+        .domain {
+          min-height: auto;
+        }
+
+        .step {
+          grid-template-columns: 1fr;
+        }
+
+        .china-band,
+        .cta {
+          padding: 28px;
+        }
+
+        .hero-actions {
+          display: grid;
+        }
+
+        .button {
+          width: 100%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
         }
       }
     </style>
   </head>
   <body>
-    <div class="noise"></div>
-    <main class="page">
-      <section class="box">
-        <div class="tag">Frontend • Chinese • Procurement</div>
-        <h1>Решаю цифровые и языковые задачи в одном рабочем контуре</h1>
-        <p class="lead">
-          Работаю с проектами, где нужно собрать аккуратный web-интерфейс,
-          выстроить коммуникацию на китайском и сопроводить закупку товара из
-          Китая. Без потери контекста между разными исполнителями.
-        </p>
-        <div class="hero-cta">
-          <a class="mail" href="mailto:konstantin@himenkov.ru">konstantin@himenkov.ru</a>
-          <span class="hero-hint">Единственный канал связи — почта.</span>
+    <div class="page">
+      <nav class="nav" aria-label="Основная навигация">
+        <a class="brand" href="#top" aria-label="Константин Хименков">
+          <span class="brand-mark">KH</span>
+          <span>Konstantin Khimenkov</span>
+        </a>
+        <div class="nav-links">
+          <a href="#domains">Экспертиза</a>
+          <a href="#process">Формат</a>
+          <a href="#china">Китай</a>
         </div>
-      </section>
+        <a class="nav-contact" href="mailto:konstantin@himenkov.ru">Связаться</a>
+      </nav>
 
-      <section class="box">
-        <h2>Ключевые направления</h2>
-        <div class="services">
-          <article class="service">
-            <h3>Frontend-разработка</h3>
-            <p>
-              Лендинги и интерфейсы под конкретную бизнес-цель: четкая структура,
-              аккуратная адаптивность, чистая верстка и понятный сценарий для
-              пользователя.
+      <header class="hero" id="top">
+        <div class="wrap hero-grid">
+          <div class="reveal">
+            <div class="eyebrow">Web • Fintech • China ops</div>
+            <h1>Разработка и деловая коммуникация для задач, где важен контекст</h1>
+            <p class="lead">
+              Собираю строгие web-интерфейсы, помогаю с технической перепиской,
+              банковскими и B2B-сценариями, а также сопровождаю рабочие задачи
+              с китайскими поставщиками без распада процесса на случайных подрядчиков.
             </p>
-          </article>
-          <article class="service">
-            <h3>Обучение китайскому</h3>
-            <p>
-              Индивидуальные занятия под задачу: разговорная практика, деловая
-              переписка, чтение профильных материалов и языковая база для
-              работы с Китаем.
-            </p>
-          </article>
-          <article class="service">
-            <h3>Переводы</h3>
-            <p>
-              Китайский ↔ русский для деловой коммуникации: переписка,
-              спецификации, описания, рабочие документы и вычитка формулировок.
-            </p>
-          </article>
-          <article class="service">
-            <h3>Сопровождение закупок из Китая</h3>
-            <p>
-              Помощь на практическом уровне: от запроса поставщику до
-              согласования ключевых параметров заказа и условий отгрузки.
-            </p>
-          </article>
+            <div class="hero-actions">
+              <a class="button button-primary" href="mailto:konstantin@himenkov.ru">
+                Обсудить задачу
+              </a>
+              <a class="button button-secondary" href="#domains">Посмотреть профиль</a>
+            </div>
+          </div>
+
+          <aside class="hero-panel reveal" aria-label="Рабочие сигналы">
+            <div class="signal">
+              <div class="signal-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 18h16M6 14l4-4 4 3 4-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <b>Интерфейсы под деньги и операции</b>
+                <span>Кабинеты, лендинги, продуктовые страницы, админки и формы с понятной логикой.</span>
+              </div>
+            </div>
+            <div class="signal">
+              <div class="signal-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3l8 4v6c0 4.5-3.2 7.2-8 8-4.8-.8-8-3.5-8-8V7l8-4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                  <path d="M9 12l2 2 4-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <b>Строгая подача для серьезных рынков</b>
+                <span>Финансовый тон, чистая структура, отсутствие визуального шума и случайных обещаний.</span>
+              </div>
+            </div>
+            <div class="signal">
+              <div class="signal-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 7h16M6 7v11h12V7M9 7V5h6v2M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <b>Китайская операционная часть</b>
+                <span>Запросы, переводы, спецификации, условия поставки и деловая переписка на китайском.</span>
+              </div>
+            </div>
+          </aside>
         </div>
-      </section>
+      </header>
 
-      <section class="box">
-        <h2>Что входит в сопровождение закупки</h2>
-        <ol class="list">
-          <li>Сбор и структурирование требований к товару перед запросом поставщику.</li>
-          <li>Коммуникация с фабрикой/поставщиком на китайском языке и уточнение деталей.</li>
-          <li>Сверка коммерческих условий: MOQ, цены, сроки производства, упаковка.</li>
-          <li>Перевод и пояснение ключевых пунктов, чтобы решение принималось на понятных данных.</li>
-        </ol>
-      </section>
+      <main>
+        <section class="wrap">
+          <div class="metrics reveal">
+            <div class="metric">
+              <strong>01</strong>
+              <span>Единая точка входа для web, языка, поставок и рабочих документов.</span>
+            </div>
+            <div class="metric">
+              <strong>B2B</strong>
+              <span>Подача под предпринимателей, операционные команды и управленцев.</span>
+            </div>
+            <div class="metric">
+              <strong>CN</strong>
+              <span>Китайский контур: коммуникация, перевод, уточнение условий и спецификаций.</span>
+            </div>
+            <div class="metric">
+              <strong>UI</strong>
+              <span>Аккуратная frontend-разработка без лишнего визуального театра.</span>
+            </div>
+          </div>
+        </section>
 
-      <section class="box">
-        <h2>Формат взаимодействия</h2>
-        <div class="line">
-          <span class="pill">Письмо с задачей</span>
-          <span class="pill">Уточнение объема и сроков</span>
-          <span class="pill">Рабочий план по этапам</span>
-          <span class="pill">Сдача и финальная доработка</span>
-        </div>
-      </section>
+        <section class="wrap" id="domains">
+          <div class="section-head">
+            <h2>Сильные стороны на стыке рынков</h2>
+            <p>
+              Подхожу к задачам как к деловому контуру: интерфейс, смысл,
+              коммуникация, документы и ожидаемый результат должны работать вместе.
+            </p>
+          </div>
 
-      <section class="box">
-        <h2>География и профильные ниши</h2>
-        <div class="seo-block">
-          <p>
-            Работаю онлайн с клиентами из городов: Москва, Санкт-Петербург,
-            Екатеринбург, Казань, Новосибирск.
-          </p>
-          <div class="line">
-            <span class="pill">E-commerce</span>
-            <span class="pill">B2B и поставки</span>
-            <span class="pill">Образовательные проекты</span>
-            <span class="pill">Импорт и внешнеэкономические задачи</span>
-            <span class="pill">Локализация интерфейсов</span>
+          <div class="domains">
+            <article class="domain reveal">
+              <div class="domain-icon" aria-hidden="true">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 5h16v14H4V5Z" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M8 9h8M8 13h5M8 17h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <h3>Web-разработка</h3>
+              <p>Лендинги, интерфейсы и продуктовые страницы, которые выглядят дороже обычной верстки и выдерживают деловую аудиторию.</p>
+            </article>
+            <article class="domain reveal">
+              <div class="domain-icon" aria-hidden="true">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 10l8-5 8 5M6 10v9M10 10v9M14 10v9M18 10v9M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h3>Fintech и банки</h3>
+              <p>Строгие сценарии для финансовых интерфейсов: ясные состояния, понятные формы, аккуратная работа с доверием и риском.</p>
+            </article>
+            <article class="domain reveal">
+              <div class="domain-icon" aria-hidden="true">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M12 5v14M7 7c3 3 7 3 10 0M7 17c3-3 7-3 10 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+              </div>
+              <h3>Big tech контекст</h3>
+              <p>Умею говорить на языке продуктовых команд: требования, сроки, аккуратная реализация, проверяемый результат и здравый компромисс.</p>
+            </article>
+            <article class="domain reveal">
+              <div class="domain-icon" aria-hidden="true">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 8h14M7 8v11h10V8M9 8V6a3 3 0 0 1 6 0v2M8 13h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <h3>Китай и закупки</h3>
+              <p>Коммуникация с поставщиками, перевод деловых материалов, уточнение MOQ, сроков, упаковки, комплектации и условий отгрузки.</p>
+            </article>
+          </div>
+        </section>
+
+        <div class="marquee" aria-label="Темы проектов">
+          <div class="marquee-track">
+            <span class="badge">Private web interfaces</span>
+            <span class="badge">Banking UX</span>
+            <span class="badge">B2B landing systems</span>
+            <span class="badge">China sourcing</span>
+            <span class="badge">Technical translation</span>
+            <span class="badge">Vendor communication</span>
+            <span class="badge">Product pages</span>
+            <span class="badge">Operational dashboards</span>
+            <span class="badge">Private web interfaces</span>
+            <span class="badge">Banking UX</span>
+            <span class="badge">B2B landing systems</span>
+            <span class="badge">China sourcing</span>
+            <span class="badge">Technical translation</span>
+            <span class="badge">Vendor communication</span>
+            <span class="badge">Product pages</span>
+            <span class="badge">Operational dashboards</span>
           </div>
         </div>
-      </section>
 
-      <section class="box">
-        <h2>Контакт</h2>
-        <div class="final-cta">
-          <p>
-            Для старта пришлите на почту краткое описание задачи,
-            <span class="accent">ожидаемый результат</span> и желаемый срок.
-          </p>
-          <a class="mail" href="mailto:konstantin@himenkov.ru">konstantin@himenkov.ru</a>
+        <section class="wrap" id="process">
+          <div class="process">
+            <aside class="quote">
+              <p>Дорого выглядит не шум. Дорого выглядит контроль.</p>
+              <span>
+                Хороший лендинг, рабочий интерфейс или закупочная коммуникация
+                должны быстро снижать неопределенность: что делаем, кто отвечает,
+                какие данные нужны и где следующий шаг.
+              </span>
+            </aside>
+
+            <div class="steps">
+              <article class="step">
+                <div class="step-num">01</div>
+                <div>
+                  <h3>Разбор задачи</h3>
+                  <p>Фиксирую цель, аудиторию, ограничения, ожидаемый результат и точки риска до начала работы.</p>
+                </div>
+              </article>
+              <article class="step">
+                <div class="step-num">02</div>
+                <div>
+                  <h3>Структура и сценарий</h3>
+                  <p>Собираю логику страницы, интерфейса или деловой переписки так, чтобы решение читалось без лишних объяснений.</p>
+                </div>
+              </article>
+              <article class="step">
+                <div class="step-num">03</div>
+                <div>
+                  <h3>Реализация</h3>
+                  <p>Делаю аккуратный frontend, подготавливаю материалы, переводы, запросы поставщикам или рабочие документы.</p>
+                </div>
+              </article>
+              <article class="step">
+                <div class="step-num">04</div>
+                <div>
+                  <h3>Финальная доводка</h3>
+                  <p>Проверяю адаптивность, смысл, тон, формулировки и практическую пригодность результата для следующего шага.</p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="wrap" id="china">
+          <div class="china-band">
+            <div class="content">
+              <div class="eyebrow">China desk</div>
+              <h2>Когда Китай нужен не для картинки, а для сделки</h2>
+              <p class="muted">
+                Помогаю перевести задачу на язык поставщика: сформулировать
+                запрос, уточнить характеристики, разобрать коммерческие условия
+                и не потерять смысл в переписке. Это особенно полезно, когда
+                web, продукт, закупка и деловая коммуникация связаны между собой.
+              </p>
+              <div class="china-points">
+                <span class="point">中文 / русский</span>
+                <span class="point">MOQ и спецификации</span>
+                <span class="point">Поставщики и фабрики</span>
+                <span class="point">Условия производства</span>
+                <span class="point">B2B-переписка</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="wrap">
+          <div class="cta">
+            <div>
+              <h2>Задачу можно отправить сразу</h2>
+              <p class="muted">
+                Пришлите краткий контекст, желаемый результат, сроки и все материалы,
+                которые уже есть. Отвечу по объему, формату и следующему шагу.
+              </p>
+            </div>
+            <a class="button button-primary" href="mailto:konstantin@himenkov.ru">
+              konstantin@himenkov.ru
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="wrap">
+          © 2026 Konstantin Khimenkov. Web development, fintech interfaces, China sourcing support.
         </div>
-      </section>
-    </main>
+      </footer>
+    </div>
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -387,19 +1015,22 @@
         "name": "Konstantin Khimenkov",
         "url": "https://konstantin.himenkov.ru/",
         "email": "konstantin@himenkov.ru",
-        "description": "Frontend-разработка, обучение китайскому языку, переводы и сопровождение закупок товаров из Китая.",
+        "description": "Web-разработка, frontend-интерфейсы, fintech-сценарии, деловая коммуникация, китайский язык, переводы и сопровождение закупок из Китая.",
         "serviceType": [
+          "Web development",
           "Frontend development",
-          "Chinese language tutoring",
+          "Fintech interface development",
           "Chinese-Russian translation",
-          "China sourcing support"
+          "China sourcing support",
+          "Business communication support"
         ],
         "areaServed": [
           "Moscow",
           "Saint Petersburg",
           "Yekaterinburg",
           "Kazan",
-          "Novosibirsk"
+          "Novosibirsk",
+          "Online"
         ]
       }
     </script>

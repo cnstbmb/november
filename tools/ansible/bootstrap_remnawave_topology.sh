@@ -40,7 +40,7 @@ DEFAULT_EXIT_DIRECT_XHTTP_PATH="/static/chunks/main-91ac4d.js"
 # Entry -> master -> exit mode with optional hidden home-exit, optional
 # WireGuard on master, and optional dedicated direct-only exit.
 DEFAULT_ENTRY_PUBLIC_PORT="443"
-DEFAULT_ENTRY_HOST_REMARK="WHITE LIST PRO"
+DEFAULT_ENTRY_HOST_REMARK="ENTRY"
 DEFAULT_ENTRY_REALITY_TARGET="sun6-22.userapi.com:443"
 DEFAULT_ENTRY_REALITY_SERVER_NAME="sun6-22.userapi.com"
 DEFAULT_ENTRY_TO_MASTER_PORT="5335"

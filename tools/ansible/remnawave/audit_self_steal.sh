@@ -15,10 +15,13 @@ MOSCOW_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_MOSCOW_ADDRESS:-@moscow.himenkov.
 MOSCOW_SUBSCRIPTION_SNI="${REMNAWAVE_AUDIT_MOSCOW_SNI:-moscow.himenkov.ru}"
 MOSCOW_SUBSCRIPTION_HOST="${REMNAWAVE_AUDIT_MOSCOW_HOST:-moscow.himenkov.ru}"
 MOSCOW_SUBSCRIPTION_PATH="${REMNAWAVE_AUDIT_MOSCOW_PATH:-%2Ffluegergeheimer-xhttp}"
-ENTRY_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_ENTRY_ADDRESS:-@pro.himenkov.ru:443}"
-ENTRY_SUBSCRIPTION_SNI="${REMNAWAVE_AUDIT_ENTRY_SNI:-pro.himenkov.ru}"
-ENTRY_SUBSCRIPTION_HOST="${REMNAWAVE_AUDIT_ENTRY_HOST:-pro.himenkov.ru}"
-ENTRY_SUBSCRIPTION_PATH="${REMNAWAVE_AUDIT_ENTRY_PATH:-%2Ffluegergeheimer-pro-xhttp}"
+ENTRY_AUDIT_ENABLED="${REMNAWAVE_AUDIT_ENTRY_ENABLED:-false}"
+ENTRY_SUBSCRIPTION_REMARK="${REMNAWAVE_AUDIT_ENTRY_REMARK:-ENTRY}"
+ENTRY_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_ENTRY_ADDRESS:-}"
+ENTRY_SUBSCRIPTION_SNI="${REMNAWAVE_AUDIT_ENTRY_SNI:-}"
+ENTRY_SUBSCRIPTION_HOST="${REMNAWAVE_AUDIT_ENTRY_HOST:-}"
+ENTRY_SUBSCRIPTION_PATH="${REMNAWAVE_AUDIT_ENTRY_PATH:-}"
+ENTRY_CONFIG_PATH="${REMNAWAVE_AUDIT_ENTRY_CONFIG_PATH:-}"
 EXIT_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_EXIT_ADDRESS:-@himenkov.ru:443}"
 EXIT_SUBSCRIPTION_SNI="${REMNAWAVE_AUDIT_EXIT_SNI:-himenkov.ru}"
 EXIT_SUBSCRIPTION_HOST="${REMNAWAVE_AUDIT_EXIT_HOST:-himenkov.ru}"
@@ -272,9 +275,9 @@ check_subscription_entry_line() {
   local line
   local entry_network
 
-  line="$(line_for_remark "WHITE%20LIST%20PRO")"
+  line="$(line_for_remark "${ENTRY_SUBSCRIPTION_REMARK}")"
   if [ -z "${line}" ]; then
-    fail "subscription WHITE LIST PRO: link not found"
+    fail "subscription ENTRY: link not found"
     return
   fi
 
@@ -282,34 +285,34 @@ check_subscription_entry_line() {
 
   if [ "${entry_network}" = "xhttp" ]; then
     case "${line}" in
-      *"${ENTRY_SUBSCRIPTION_ADDRESS}"*) pass "subscription WHITE LIST PRO: address ${ENTRY_SUBSCRIPTION_ADDRESS}" ;;
-      *) fail "subscription WHITE LIST PRO: expected address ${ENTRY_SUBSCRIPTION_ADDRESS}" ;;
+      *"${ENTRY_SUBSCRIPTION_ADDRESS}"*) pass "subscription ENTRY: address ${ENTRY_SUBSCRIPTION_ADDRESS}" ;;
+      *) fail "subscription ENTRY: expected address ${ENTRY_SUBSCRIPTION_ADDRESS}" ;;
     esac
 
     case "${line}" in
-      *"type=xhttp"*) pass "subscription WHITE LIST PRO: type xhttp" ;;
-      *) fail "subscription WHITE LIST PRO: expected type=xhttp" ;;
+      *"type=xhttp"*) pass "subscription ENTRY: type xhttp" ;;
+      *) fail "subscription ENTRY: expected type=xhttp" ;;
     esac
 
     case "${line}" in
-      *"path=${ENTRY_SUBSCRIPTION_PATH}"*) pass "subscription WHITE LIST PRO: path ${ENTRY_SUBSCRIPTION_PATH}" ;;
-      *) fail "subscription WHITE LIST PRO: expected path ${ENTRY_SUBSCRIPTION_PATH}" ;;
+      *"path=${ENTRY_SUBSCRIPTION_PATH}"*) pass "subscription ENTRY: path ${ENTRY_SUBSCRIPTION_PATH}" ;;
+      *) fail "subscription ENTRY: expected path ${ENTRY_SUBSCRIPTION_PATH}" ;;
     esac
 
     case "${line}" in
-      *"host=${ENTRY_SUBSCRIPTION_HOST}"*) pass "subscription WHITE LIST PRO: host ${ENTRY_SUBSCRIPTION_HOST}" ;;
-      *) fail "subscription WHITE LIST PRO: expected host ${ENTRY_SUBSCRIPTION_HOST}" ;;
+      *"host=${ENTRY_SUBSCRIPTION_HOST}"*) pass "subscription ENTRY: host ${ENTRY_SUBSCRIPTION_HOST}" ;;
+      *) fail "subscription ENTRY: expected host ${ENTRY_SUBSCRIPTION_HOST}" ;;
     esac
 
     case "${line}" in
-      *"sni=${ENTRY_SUBSCRIPTION_SNI}"*) pass "subscription WHITE LIST PRO: sni ${ENTRY_SUBSCRIPTION_SNI}" ;;
-      *) fail "subscription WHITE LIST PRO: expected sni ${ENTRY_SUBSCRIPTION_SNI}" ;;
+      *"sni=${ENTRY_SUBSCRIPTION_SNI}"*) pass "subscription ENTRY: sni ${ENTRY_SUBSCRIPTION_SNI}" ;;
+      *) fail "subscription ENTRY: expected sni ${ENTRY_SUBSCRIPTION_SNI}" ;;
     esac
     return
   fi
 
   entry_sids="$(json_value "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.realitySettings.shortIds | join("|")')"
-  check_subscription_line "WHITE LIST PRO" "WHITE%20LIST%20PRO" "@84.201.141.43:443" "pro.himenkov.ru" "${entry_sids}"
+  check_subscription_line "ENTRY" "${ENTRY_SUBSCRIPTION_REMARK}" "${ENTRY_SUBSCRIPTION_ADDRESS}" "${ENTRY_SUBSCRIPTION_SNI}" "${entry_sids}"
 }
 
 check_subscription_exit_line() {
@@ -409,28 +412,34 @@ section "Public fallback"
 check_http_status "sub.moscow.himenkov.ru root" "sub.moscow.himenkov.ru:443:5.42.111.142" "https://sub.moscow.himenkov.ru/"
 check_http_status "moscow.himenkov.ru root" "moscow.himenkov.ru:443:5.42.111.142" "https://moscow.himenkov.ru/"
 check_http_status "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:5.42.111.142" "https://sub.moscow.himenkov.ru:10443/"
-check_http_status "WHITE LIST PRO fallback" "pro.himenkov.ru:443:84.201.141.43" "https://pro.himenkov.ru/"
+if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
+  check_http_status "ENTRY fallback" "${ENTRY_SUBSCRIPTION_SNI#@}:443:${ENTRY_SUBSCRIPTION_ADDRESS#@}" "https://${ENTRY_SUBSCRIPTION_SNI}/"
+fi
 check_http_status "AMSTERDAM fallback" "himenkov.ru:443:109.234.34.227" "https://himenkov.ru/"
 
 section "Header camouflage"
 check_headers_clean "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:5.42.111.142" "https://sub.moscow.himenkov.ru:10443/"
 check_headers_clean "moscow.himenkov.ru root" "moscow.himenkov.ru:443:5.42.111.142" "https://moscow.himenkov.ru/"
-check_headers_clean "WHITE LIST PRO fallback" "pro.himenkov.ru:443:84.201.141.43" "https://pro.himenkov.ru/"
+if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
+  check_headers_clean "ENTRY fallback" "${ENTRY_SUBSCRIPTION_SNI#@}:443:${ENTRY_SUBSCRIPTION_ADDRESS#@}" "https://${ENTRY_SUBSCRIPTION_SNI}/"
+fi
 check_headers_clean "AMSTERDAM fallback" "himenkov.ru:443:109.234.34.227" "https://himenkov.ru/"
 
 section "Local config files"
-if [ "$(json_value "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.network' 2>/dev/null)" = "xhttp" ]; then
-  check_json_value "ENTRY_NODE network" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.network' "xhttp"
-  entry_security="$(json_value "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.security')"
-  case "${entry_security}" in
-    tls|none) pass "ENTRY_NODE security: ${entry_security}" ;;
-    *) fail "ENTRY_NODE security: expected tls or none, got '${entry_security}'" ;;
-  esac
-  check_json_value "ENTRY_NODE xhttp host" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.xhttpSettings.host' "pro.himenkov.ru"
-  check_json_value "ENTRY_NODE xhttp path" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.xhttpSettings.path' "/fluegergeheimer-pro-xhttp"
-else
-  check_json_value "ENTRY_NODE target" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.realitySettings.target // .streamSettings.realitySettings.dest' "127.0.0.1:9443"
-  check_json_value "ENTRY_NODE serverName" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.realitySettings.serverNames[0]' "pro.himenkov.ru"
+if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
+  if [ "$(json_value "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.network' 2>/dev/null)" = "xhttp" ]; then
+    check_json_value "ENTRY_NODE network" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.network' "xhttp"
+    entry_security="$(json_value "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.security')"
+    case "${entry_security}" in
+      tls|none) pass "ENTRY_NODE security: ${entry_security}" ;;
+      *) fail "ENTRY_NODE security: expected tls or none, got '${entry_security}'" ;;
+    esac
+    check_json_value "ENTRY_NODE xhttp host" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.xhttpSettings.host' "${ENTRY_SUBSCRIPTION_HOST}"
+    check_json_value "ENTRY_NODE xhttp path" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.xhttpSettings.path' "${ENTRY_CONFIG_PATH}"
+  else
+    check_json_value "ENTRY_NODE target" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.realitySettings.target // .streamSettings.realitySettings.dest' "127.0.0.1:9443"
+    check_json_value "ENTRY_NODE serverName" "${ROOT_DIR}/.private/configs/ENTRY_NODE.json" '.inbounds[] | select(.tag=="VLESS_TCP_REALITY") | .streamSettings.realitySettings.serverNames[0]' "${ENTRY_SUBSCRIPTION_SNI}"
+  fi
 fi
 check_json_value "MASTER MOSCOW target" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_MOSCOW") | .streamSettings.realitySettings.target' "127.0.0.1:443"
 check_json_value "MASTER MOSCOW serverName" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_MOSCOW") | .streamSettings.realitySettings.serverNames[0]' "sub.moscow.himenkov.ru"
@@ -486,7 +495,9 @@ else
     check_subscription_absent "DIRECT MOSCOW" "DIRECT%20MOSCOW"
     check_subscription_exit_line
     check_subscription_absent "HOME" "HOME"
-    check_subscription_entry_line
+    if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
+      check_subscription_entry_line
+    fi
     check_subscription_no_xhttp_canary
 
     if grep -Eiq 'borsaistanbul\.com|apple\.com|cloud\.cdn\.yandex|sun6-22\.userapi\.com' "${SUB_DECODED}"; then

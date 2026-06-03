@@ -15,6 +15,50 @@
     policy: allow
     direction: outgoing
 
+- name: Deny configured ingress TCP ports before allow rules
+  ansible.builtin.ufw:
+    insert: 1
+    rule: deny
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ firewall_deny_tcp_ports | default([]) }}"
+  when:
+    - firewall_deny_tcp_ports is defined
+    - firewall_deny_tcp_ports | length > 0
+
+- name: Drop non-loopback ingress TCP ports before UFW chains
+  ansible.builtin.shell: >
+    iptables -C INPUT ! -i lo -p tcp --dport {{ item }} -j DROP
+    || iptables -I INPUT 1 ! -i lo -p tcp --dport {{ item }} -j DROP
+  loop: "{{ firewall_drop_non_loopback_tcp_ports | default([]) }}"
+  changed_when: "'Bad rule' in firewall_drop_non_loopback_result.stderr"
+  register: firewall_drop_non_loopback_result
+  when:
+    - firewall_drop_non_loopback_tcp_ports is defined
+    - firewall_drop_non_loopback_tcp_ports | length > 0
+
+- name: Drop non-loopback ingress TCP ports before UFW IPv6 chains
+  ansible.builtin.shell: >
+    ip6tables -C INPUT ! -i lo -p tcp --dport {{ item }} -j DROP
+    || ip6tables -I INPUT 1 ! -i lo -p tcp --dport {{ item }} -j DROP
+  loop: "{{ firewall_drop_non_loopback_tcp_ports | default([]) }}"
+  changed_when: "'Bad rule' in firewall_drop_non_loopback_ipv6_result.stderr"
+  register: firewall_drop_non_loopback_ipv6_result
+  when:
+    - firewall_drop_non_loopback_tcp_ports is defined
+    - firewall_drop_non_loopback_tcp_ports | length > 0
+
+- name: Allow configured CIDR ingress TCP ports before drop rules
+  ansible.builtin.shell: >
+    iptables -C INPUT -s {{ item.cidr }} -p tcp --dport {{ item.port }} -j ACCEPT
+    || iptables -I INPUT 1 -s {{ item.cidr }} -p tcp --dport {{ item.port }} -j ACCEPT
+  loop: "{{ firewall_allow_cidr_tcp_ports | default([]) }}"
+  changed_when: "'Bad rule' in firewall_allow_cidr_tcp_result.stderr"
+  register: firewall_allow_cidr_tcp_result
+  when:
+    - firewall_allow_cidr_tcp_ports is defined
+    - firewall_allow_cidr_tcp_ports | length > 0
+
 - name: Allow SSH
   ansible.builtin.ufw:
     rule: allow

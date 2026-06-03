@@ -78,7 +78,7 @@
   when:
     - enable_adguard | bool
     - not (adguard_manage_config | bool)
-    - adguard_home_config_stat.stat.exists
+    - adguard_home_config_stat.stat.exists | default(false)
     - not ansible_check_mode
 
 - name: Allow AdGuard Home DNS (TCP)

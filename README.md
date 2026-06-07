@@ -12,6 +12,34 @@
 - `tools/ansible/` — интерактивная генерация private inventory/vars и запуск playbooks.
 - `algorithms/` — отдельные алгоритмические задачи/эксперименты.
 
+## Целевая структура монорепы
+
+Я бы выделил 3 npm-проекта:
+
+- `backend` — рабочее приложение API.
+- `frontend` — рабочее Angular-приложение.
+- `algorithms` — отдельный экспериментальный TypeScript-пакет с Jest-тестами.
+
+Если делать следующий шаг с физическим переносом директорий, оптимальная целевая схема:
+
+```text
+apps/
+  backend/
+  frontend/
+packages/
+  algorithms/
+infra/
+  ansible/
+  ansible-template/
+deployments/
+  dev/
+  prod/
+  landing-lite/
+tools/
+```
+
+Инфраструктуру и deploy-конфиги лучше не делать npm workspace-пакетами: у них другой жизненный цикл, другие зависимости и выше риск случайно смешать runtime-сборку с операционными скриптами.
+
 ## Ключевые возможности
 
 - Единый набор npm-команд из корня для backend/frontend/build/deploy.

@@ -450,7 +450,7 @@ check_json_value "MASTER MOSCOW xhttp security" "${ROOT_DIR}/.private/configs/MA
 check_json_value "MASTER MOSCOW xhttp listen" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .listen' "0.0.0.0"
 check_json_value "MASTER MOSCOW xhttp host" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.host' "moscow.himenkov.ru"
 check_json_value "MASTER MOSCOW xhttp path" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.path' "/fluegergeheimer-xhttp"
-check_json_value "MASTER MOSCOW xhttp outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("VLESS_XHTTP_MOSCOW")) and (.domain? | not)) | .outboundTag' "GRPC_TO_EXIT"
+check_json_value "MASTER MOSCOW xhttp outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("VLESS_XHTTP_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "GRPC_TO_EXIT"
 check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
 check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru"))) | .balancerTag' "HOME_OR_MOSCOW"
 check_json_value "MASTER Home fallback to Moscow" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .fallbackTag' "IPv4"
@@ -459,7 +459,10 @@ if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*po
 else
   fail "MASTER 10085 firewall: missing Docker bridge CIDR allow"
 fi
-if rg -U 'username: "bridge_master_to_exit"[\s\S]*- "Bridge Exit Squad"' "${ROOT_DIR}/.private/ansible/prod/remnawave-topology/topology.yml" >/dev/null; then
+TOPOLOGY_FILE="${ROOT_DIR}/.private/ansible/prod/remnawave-topology/topology.yml"
+if [ ! -f "${TOPOLOGY_FILE}" ]; then
+  warn "bridge_master_to_exit: topology.yml is absent, skipping local topology check"
+elif rg -U 'username: "bridge_master_to_exit"[\s\S]*- "Bridge Exit Squad"' "${TOPOLOGY_FILE}" >/dev/null; then
   pass "bridge_master_to_exit: has Bridge Exit Squad"
 else
   fail "bridge_master_to_exit: missing Bridge Exit Squad"

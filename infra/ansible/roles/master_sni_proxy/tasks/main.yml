@@ -1,0 +1,108 @@
+- name: Resolve master SNI proxy settings
+  ansible.builtin.set_fact:
+    master_sni_proxy_dir_effective: "{{ master_sni_proxy_dir | default('/opt/master-sni-proxy') }}"
+    master_sni_proxy_compose_file_effective: "{{ master_sni_proxy_compose_file | default((master_sni_proxy_dir | default('/opt/master-sni-proxy')) ~ '/docker-compose.yml') }}"
+    master_sni_proxy_haproxy_config_effective: "{{ master_sni_proxy_haproxy_config | default((master_sni_proxy_dir | default('/opt/master-sni-proxy')) ~ '/haproxy.cfg') }}"
+    master_sni_proxy_rollback_script_effective: "{{ master_sni_proxy_rollback_script | default('/root/rollback-master-sni-proxy-canary.sh') }}"
+    master_sni_proxy_project_name_effective: "{{ master_sni_proxy_project_name | default('master-sni-proxy') }}"
+    master_sni_proxy_container_name_effective: "{{ master_sni_proxy_container_name | default('master-sni-proxy') }}"
+    master_sni_proxy_image_effective: "{{ master_sni_proxy_image | default('haproxy:2.9-alpine') }}"
+    master_sni_proxy_listen_port_effective: "{{ master_sni_proxy_listen_port | default(4443) }}"
+    master_sni_proxy_xray_backend_host_effective: "{{ master_sni_proxy_xray_backend_host | default('127.0.0.1') }}"
+    master_sni_proxy_xray_backend_port_effective: "{{ master_sni_proxy_xray_backend_port | default(10443) }}"
+    master_sni_proxy_xhttp_backend_host_effective: "{{ master_sni_proxy_xhttp_backend_host | default('127.0.0.1') }}"
+    master_sni_proxy_xhttp_backend_port_effective: "{{ master_sni_proxy_xhttp_backend_port | default(10085) }}"
+    master_sni_proxy_nginx_backend_host_effective: "{{ master_sni_proxy_nginx_backend_host | default('127.0.0.1') }}"
+    master_sni_proxy_nginx_backend_port_effective: "{{ master_sni_proxy_nginx_backend_port | default(443) }}"
+    master_sni_proxy_vpn_server_names_effective: >-
+      {{
+        master_sni_proxy_vpn_server_names
+        if (master_sni_proxy_vpn_server_names is defined and master_sni_proxy_vpn_server_names is sequence and master_sni_proxy_vpn_server_names is not string)
+        else (
+          [master_sni_proxy_vpn_server_names]
+          if (master_sni_proxy_vpn_server_names is defined and master_sni_proxy_vpn_server_names | length > 0)
+          else ['moscow.himenkov.ru']
+        )
+      }}
+    master_sni_proxy_xhttp_server_names_effective: >-
+      {{
+        master_sni_proxy_xhttp_server_names
+        if (master_sni_proxy_xhttp_server_names is defined and master_sni_proxy_xhttp_server_names is sequence and master_sni_proxy_xhttp_server_names is not string)
+        else (
+          [master_sni_proxy_xhttp_server_names]
+          if (master_sni_proxy_xhttp_server_names is defined and master_sni_proxy_xhttp_server_names | length > 0)
+          else []
+        )
+      }}
+
+- name: Validate master SNI proxy settings
+  ansible.builtin.assert:
+    that:
+      - master_sni_proxy_listen_port_effective | int > 0
+      - master_sni_proxy_xray_backend_port_effective | int > 0
+      - master_sni_proxy_xhttp_backend_port_effective | int > 0
+      - master_sni_proxy_nginx_backend_port_effective | int > 0
+      - master_sni_proxy_vpn_server_names_effective | length > 0
+    fail_msg: "Master SNI proxy settings are incomplete."
+
+- name: Ensure master SNI proxy directory exists
+  ansible.builtin.file:
+    path: "{{ master_sni_proxy_dir_effective }}"
+    state: directory
+    mode: "0755"
+
+- name: Render master SNI proxy HAProxy config
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: "{{ master_sni_proxy_haproxy_config_effective }}"
+    mode: "0644"
+  register: master_sni_proxy_haproxy_template
+
+- name: Render master SNI proxy compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ master_sni_proxy_compose_file_effective }}"
+    mode: "0644"
+  register: master_sni_proxy_compose_template
+
+- name: Install master SNI proxy canary rollback script
+  ansible.builtin.template:
+    src: rollback-master-sni-proxy-canary.sh.j2
+    dest: "{{ master_sni_proxy_rollback_script_effective }}"
+    mode: "0750"
+
+- name: Allow master SNI proxy canary ingress
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ master_sni_proxy_listen_port_effective | string }}"
+    proto: tcp
+
+- name: Validate master SNI proxy compose config
+  ansible.builtin.command: >
+    docker compose -f {{ master_sni_proxy_compose_file_effective }}
+    --project-name {{ master_sni_proxy_project_name_effective }}
+    config -q
+  args:
+    chdir: "{{ master_sni_proxy_dir_effective }}"
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Recreate master SNI proxy when config changed
+  ansible.builtin.command: >
+    docker compose -f {{ master_sni_proxy_compose_file_effective }}
+    --project-name {{ master_sni_proxy_project_name_effective }}
+    down
+  args:
+    chdir: "{{ master_sni_proxy_dir_effective }}"
+  when:
+    - not ansible_check_mode
+    - master_sni_proxy_haproxy_template is changed or master_sni_proxy_compose_template is changed
+
+- name: Run master SNI proxy canary stack
+  ansible.builtin.command: >
+    docker compose -f {{ master_sni_proxy_compose_file_effective }}
+    --project-name {{ master_sni_proxy_project_name_effective }}
+    up -d
+  args:
+    chdir: "{{ master_sni_proxy_dir_effective }}"
+  when: not ansible_check_mode

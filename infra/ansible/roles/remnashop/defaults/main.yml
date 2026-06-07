@@ -1,0 +1,69 @@
+enable_remnashop: false
+remnashop_dir: "/opt/remnashop"
+remnashop_mode: "internal"
+remnashop_app_port: 5000
+remnashop_host_packages:
+  - ripgrep
+remnashop_env_url: "https://raw.githubusercontent.com/snoups/remnashop/refs/heads/main/.env.example"
+remnashop_env_src: ""
+remnashop_env_dest: "{{ remnashop_dir }}/.env"
+remnashop_env_overrides: {}
+remnashop_compose_src: ""
+remnashop_compose_cache_path: "/tmp/remnashop-{{ remnashop_mode }}-docker-compose.yml"
+remnashop_compose_internal_url: "https://raw.githubusercontent.com/snoups/remnashop/refs/heads/main/docker-compose.prod.internal.yml"
+remnashop_compose_external_url: "https://raw.githubusercontent.com/snoups/remnashop/refs/heads/main/docker-compose.prod.external.yml"
+remnashop_image: ""
+remnashop_pull_policy: "missing"
+remnashop_validate_env: true
+remnashop_manage_sysctl: true
+remnashop_disable_ipv6: false
+remnashop_extra_hosts: []
+remnashop_sysctl_file: "/etc/sysctl.d/99-remnashop.conf"
+remnashop_sysctl_settings:
+  net.core.somaxconn: "1024"
+  vm.overcommit_memory: "1"
+remnashop_override_compose_enabled: true
+remnashop_override_compose_file: "{{ remnashop_dir }}/docker-compose.override.yml"
+remnashop_db_stop_grace_period: "60s"
+remnashop_redis_stop_grace_period: "30s"
+remnashop_hotfix_dashboard_cpu_threads_translation: true
+remnashop_hotfix_user_trial_toggle_translation: true
+remnashop_hotfix_stale_telegram_callbacks: true
+remnashop_hotfix_telegram_polling: false
+remnashop_telegram_polling_enabled: false
+remnashop_telegram_polling_drop_pending_updates: false
+remnashop_telegram_webhook_repair: true
+remnashop_telegram_webhook_drop_pending_updates: false
+remnashop_telegram_webhook_max_connections: 1
+remnashop_telegram_webhook_ip_address: ""
+remnashop_telegram_webhook_allowed_updates:
+  - "message"
+  - "inline_query"
+  - "callback_query"
+  - "pre_checkout_query"
+  - "my_chat_member"
+  - "business_message"
+remnashop_ru_messages_file: "{{ remnashop_dir }}/assets/translations/ru/messages.ftl"
+remnashop_ru_buttons_file: "{{ remnashop_dir }}/assets/translations/ru/buttons.ftl"
+remnashop_wait_for_stack: true
+remnashop_wait_delay: 3
+remnashop_wait_timeout: 120
+remnashop_wait_status_codes:
+  - 200
+  - 404
+  - 405
+remnashop_required_env_vars:
+  - "APP_DOMAIN"
+  - "APP_LOCALES"
+  - "APP_CRYPT_KEY"
+  - "BOT_TOKEN"
+  - "BOT_SECRET_TOKEN"
+  - "BOT_OWNER_ID"
+  - "BOT_SUPPORT_USERNAME"
+  - "REMNAWAVE_HOST"
+  - "REMNAWAVE_TOKEN"
+  - "REMNAWAVE_WEBHOOK_SECRET"
+  - "DATABASE_USER"
+  - "DATABASE_PASSWORD"
+  - "DATABASE_NAME"
+  - "REDIS_PASSWORD"

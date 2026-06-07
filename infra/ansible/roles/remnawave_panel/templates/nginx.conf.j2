@@ -1,0 +1,273 @@
+{% macro render_xhttp_locations(server_name) -%}
+{% for xhttp_location in remnawave_panel_xhttp_proxy_locations_effective %}
+{% if server_name in (xhttp_location.server_names | default([])) %}
+    location {{ xhttp_location.path }} {
+        client_max_body_size 0;
+        client_body_timeout {{ xhttp_location.client_body_timeout | default('5m') }};
+        grpc_read_timeout {{ xhttp_location.read_timeout | default('315s') }};
+        grpc_send_timeout {{ xhttp_location.send_timeout | default('5m') }};
+        grpc_socket_keepalive on;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_pass grpc://{{ xhttp_location.upstream }};
+    }
+
+{% endif %}
+{% endfor %}
+{%- endmacro %}
+
+{% macro deny_hidden_files() -%}
+    location ~ /\.(?!(?:well-known(?:/|$)|app-config-v2\.json$)) {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+{%- endmacro %}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ remnawave_panel_domain_effective }};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+{% if remnawave_subscription_page_enabled_effective %}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ remnawave_subscription_page_domain_effective }};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{% endif %}
+
+{% if remnawave_panel_landing_enabled_effective and remnawave_panel_landing_server_names_effective | length > 0 %}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ remnawave_panel_landing_server_names_effective | join(' ') }};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{% endif %}
+
+{% if enable_remnashop | default(false) | bool and remnashop_domain_effective | length > 0 %}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ remnashop_domain_effective }};
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{% endif %}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ remnawave_panel_domain_effective }};
+
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/privkey.pem;
+
+    ssl_buffer_size 8k;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_header_timeout 5m;
+    client_body_timeout 5m;
+    keepalive_timeout 5m;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+{{ render_xhttp_locations(remnawave_panel_domain_effective) }}
+{{ deny_hidden_files() }}
+    location / {
+        set $remnawave_upstream remnawave:{{ remnawave_panel_app_port_effective }};
+        proxy_pass http://$remnawave_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+}
+
+{% if remnawave_subscription_page_enabled_effective %}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ remnawave_subscription_page_domain_effective }};
+
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/privkey.pem;
+
+    ssl_buffer_size 8k;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_header_timeout 5m;
+    client_body_timeout 5m;
+    keepalive_timeout 5m;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+{% if remnawave_panel_landing_enabled_effective %}
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location = / {
+        try_files /index.html =404;
+    }
+
+    location = /favicon.ico {
+        try_files /favicon.svg =204;
+        access_log off;
+        log_not_found off;
+    }
+{% endif %}
+
+    location = /assets/.app-config-v2.json {
+        set $remnawave_subscription_upstream {{ remnawave_subscription_page_container_name_effective }}:{{ remnawave_subscription_page_app_port_effective }};
+        proxy_pass http://$remnawave_subscription_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    location ^~ /assets/ {
+        alias /usr/share/nginx/subscription-page/assets/;
+        try_files $uri =404;
+    }
+
+{{ render_xhttp_locations(remnawave_subscription_page_domain_effective) }}
+{{ deny_hidden_files() }}
+    location / {
+        set $remnawave_subscription_upstream {{ remnawave_subscription_page_container_name_effective }}:{{ remnawave_subscription_page_app_port_effective }};
+        proxy_pass http://$remnawave_subscription_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+}
+{% endif %}
+
+{% if remnawave_panel_landing_enabled_effective and remnawave_panel_landing_server_names_effective | length > 0 %}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ remnawave_panel_landing_server_names_effective | join(' ') }};
+
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/privkey.pem;
+
+    ssl_buffer_size 8k;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+{% for landing_server_name in remnawave_panel_landing_server_names_effective %}
+{{ render_xhttp_locations(landing_server_name) }}
+{% endfor %}
+{{ deny_hidden_files() }}
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+{% endif %}
+
+{% if enable_remnashop | default(false) | bool and remnashop_domain_effective | length > 0 %}
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ remnashop_domain_effective }};
+
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/privkey.pem;
+
+    ssl_buffer_size 8k;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    client_header_timeout 5m;
+    client_body_timeout 5m;
+    keepalive_timeout 5m;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+{% if remnawave_panel_landing_enabled_effective %}
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location = / {
+        try_files /index.html =404;
+    }
+
+    location = /favicon.ico {
+        try_files /favicon.svg =204;
+        access_log off;
+        log_not_found off;
+    }
+{% endif %}
+
+{{ render_xhttp_locations(remnashop_domain_effective) }}
+{{ deny_hidden_files() }}
+    location / {
+        set $remnashop_upstream remnashop:{{ remnashop_app_port_effective }};
+        proxy_pass http://$remnashop_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+}
+{% endif %}

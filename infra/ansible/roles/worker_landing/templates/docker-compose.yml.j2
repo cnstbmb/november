@@ -1,0 +1,29 @@
+services:
+  landing:
+    image: nginx:mainline-alpine
+    container_name: "{{ worker_landing_project_name_effective }}"
+    restart: unless-stopped
+{% if worker_landing_network_mode_host_effective %}
+    network_mode: host
+{% else %}
+    ports:
+      - "{% if worker_landing_http_bind_effective not in ['', '0.0.0.0'] %}{{ worker_landing_http_bind_effective }}:{% endif %}{{ worker_landing_http_port_effective }}:80"
+{% if worker_landing_enable_https_effective %}
+      - "{% if worker_landing_https_bind_effective not in ['', '0.0.0.0'] %}{{ worker_landing_https_bind_effective }}:{% endif %}{{ worker_landing_https_port_effective }}:443"
+{% endif %}
+{% if worker_landing_xhttp_proxy_locations_effective | length > 0 %}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+{% endif %}
+{% endif %}
+    volumes:
+      - "{{ worker_landing_dest_dir_effective }}/site:/usr/share/nginx/html:ro"
+      - "{{ worker_landing_nginx_conf_effective }}:/etc/nginx/conf.d/default.conf:ro"
+{% if worker_landing_enable_https_effective %}
+      - "/etc/letsencrypt:/etc/letsencrypt:ro"
+{% endif %}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

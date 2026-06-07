@@ -1,0 +1,2 @@
+- name: Apply remnashop sysctl settings
+  ansible.builtin.command: sysctl --system

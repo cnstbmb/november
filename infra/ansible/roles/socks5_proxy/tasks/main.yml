@@ -1,0 +1,62 @@
+- name: Install SOCKS5 proxy package
+  ansible.builtin.apt:
+    name: "{{ socks5_proxy_package }}"
+    state: present
+
+- name: Resolve SOCKS5 proxy settings
+  ansible.builtin.set_fact:
+    socks5_proxy_external_interface_effective: >-
+      {{
+        socks5_proxy_external_interface
+        if (socks5_proxy_external_interface | default('', true) | length > 0)
+        else ansible_facts['default_ipv4']['interface']
+      }}
+    socks5_proxy_client_ips_effective: >-
+      {{
+        socks5_proxy_client_ips
+        if (socks5_proxy_client_ips | default([]) | length > 0)
+        else (
+          (groups['master'] | default([]))
+          | map('extract', hostvars, 'ansible_host')
+          | list
+        )
+      }}
+
+- name: Validate SOCKS5 proxy settings
+  ansible.builtin.assert:
+    that:
+      - socks5_proxy_external_interface_effective | length > 0
+      - socks5_proxy_client_ips_effective | length > 0
+    fail_msg: >-
+      SOCKS5 proxy requires an external interface and at least one allowed client IP.
+      Set socks5_proxy_external_interface or ensure inventory has a master host with ansible_host.
+
+- name: Render SOCKS5 proxy config
+  ansible.builtin.template:
+    src: danted.conf.j2
+    dest: "{{ socks5_proxy_config_path }}"
+    mode: "0644"
+  register: socks5_proxy_config_template
+
+- name: Allow SOCKS5 proxy ingress from approved client IPs
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ socks5_proxy_listen_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ socks5_proxy_client_ips_effective }}"
+
+- name: Restart SOCKS5 proxy when config changed
+  ansible.builtin.service:
+    name: "{{ socks5_proxy_service_name }}"
+    state: restarted
+  when:
+    - socks5_proxy_config_template is changed
+    - not ansible_check_mode
+
+- name: Ensure SOCKS5 proxy service is enabled and running
+  ansible.builtin.service:
+    name: "{{ socks5_proxy_service_name }}"
+    state: started
+    enabled: true
+  when: not ansible_check_mode

@@ -1,0 +1,5 @@
+# Managed by Ansible for remnashop host tuning.
+# These settings remove Valkey/Redis startup warnings and improve connection backlog handling.
+{% for key, value in remnashop_sysctl_settings | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}

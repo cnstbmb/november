@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+COMPOSE_FILE={{ master_sni_proxy_compose_file_effective | quote }}
+PROJECT={{ master_sni_proxy_project_name_effective | quote }}
+WORKDIR={{ master_sni_proxy_dir_effective | quote }}
+LISTEN_PORT={{ master_sni_proxy_listen_port_effective | quote }}
+PANEL_COMPOSE_FILE={{ (remnawave_panel_compose_file_effective | default('/opt/remnawave-panel/docker-compose.yml')) | quote }}
+PANEL_PROJECT={{ (remnawave_panel_project_name_effective | default('remnawave-panel')) | quote }}
+PANEL_WORKDIR={{ (remnawave_panel_dir_effective | default('/opt/remnawave-panel')) | quote }}
+PANEL_RESTORE_PUBLIC_443={{ ((master_sni_proxy_listen_port_effective | int) == 443) | ternary('true', 'false') | quote }}
+
+cd "${WORKDIR}"
+docker compose -f "${COMPOSE_FILE}" --project-name "${PROJECT}" down || true
+
+if command -v ufw >/dev/null 2>&1; then
+  if [ "${LISTEN_PORT}" != "443" ]; then
+    ufw delete allow "${LISTEN_PORT}/tcp" || true
+  fi
+fi
+
+if [ "${PANEL_RESTORE_PUBLIC_443}" = "true" ] && [ -f "${PANEL_COMPOSE_FILE}" ]; then
+  cp "${PANEL_COMPOSE_FILE}" "${PANEL_COMPOSE_FILE}.pre-sni-rollback.$(date +%Y%m%d%H%M%S)"
+  sed -i -E 's#- "127\.0\.0\.1:[0-9]+:443"#- "443:443"#' "${PANEL_COMPOSE_FILE}"
+  cd "${PANEL_WORKDIR}"
+  docker compose -f "${PANEL_COMPOSE_FILE}" --project-name "${PANEL_PROJECT}" up -d || true
+  echo "Master SNI proxy stopped. Remnawave panel nginx was restored to public 443 in docker-compose."
+else
+  echo "Master SNI proxy canary stopped. Production 443/nginx was not changed by this rollback."
+fi

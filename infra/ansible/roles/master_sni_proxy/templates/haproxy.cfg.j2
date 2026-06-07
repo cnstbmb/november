@@ -1,0 +1,37 @@
+global
+    log stdout format raw local0
+    maxconn 4096
+
+defaults
+    mode tcp
+    log global
+    option tcplog
+    timeout connect 5s
+    timeout client 2m
+    timeout server 2m
+
+frontend tls_canary
+    bind 0.0.0.0:{{ master_sni_proxy_listen_port_effective }}
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+
+{% if master_sni_proxy_xhttp_server_names_effective | length > 0 %}
+    acl sni_xhttp req.ssl_sni -i {{ master_sni_proxy_xhttp_server_names_effective | join(' ') }}
+{% endif %}
+    acl sni_vpn req.ssl_sni -i {{ master_sni_proxy_vpn_server_names_effective | join(' ') }}
+{% if master_sni_proxy_xhttp_server_names_effective | length > 0 %}
+    use_backend xray_xhttp if sni_xhttp
+{% endif %}
+    use_backend xray_reality if sni_vpn
+    default_backend nginx_tls
+
+{% if master_sni_proxy_xhttp_server_names_effective | length > 0 %}
+backend xray_xhttp
+    server xray_xhttp {{ master_sni_proxy_xhttp_backend_host_effective }}:{{ master_sni_proxy_xhttp_backend_port_effective }} check inter 5s fall 2 rise 2
+
+{% endif %}
+backend xray_reality
+    server xray {{ master_sni_proxy_xray_backend_host_effective }}:{{ master_sni_proxy_xray_backend_port_effective }} check inter 5s fall 2 rise 2
+
+backend nginx_tls
+    server nginx {{ master_sni_proxy_nginx_backend_host_effective }}:{{ master_sni_proxy_nginx_backend_port_effective }} check inter 5s fall 2 rise 2

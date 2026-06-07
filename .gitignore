@@ -1,5 +1,6 @@
 compiled
 pg-data
+.DS_Store
 
 # Logs
 logs
@@ -109,15 +110,6 @@ dist
 .idea/
 
 configs
-/ansible/*
-!/ansible/roles/
-/ansible/roles/*
-!/ansible/roles/monitoring/
-!/ansible/roles/monitoring/**
-!/ansible/roles/monitoring_agent/
-!/ansible/roles/monitoring_agent/**
-!/ansible/roles/backups/
-!/ansible/roles/backups/**
 .private/
 
 .vscode

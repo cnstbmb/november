@@ -1,0 +1,278 @@
+- name: Resolve Remnawave panel settings
+  ansible.builtin.set_fact:
+    remnawave_panel_dir_effective: "{{ remnawave_panel_dir | default('/opt/remnawave-panel') }}"
+    remnawave_panel_compose_file_effective: "{{ remnawave_panel_compose_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/docker-compose.yml') }}"
+    remnawave_panel_env_file_effective: "{{ remnawave_panel_env_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/.env') }}"
+    remnawave_panel_nginx_conf_file_effective: "{{ remnawave_panel_nginx_conf_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/nginx.conf') }}"
+    remnawave_panel_project_name_effective: "{{ remnawave_panel_project_name | default('remnawave-panel') }}"
+    remnawave_panel_proxy_container_name_effective: "{{ remnawave_panel_proxy_container_name | default('remnawave-panel-proxy') }}"
+    remnawave_panel_domain_effective: "{{ remnawave_panel_domain | default('', true) }}"
+    remnawave_panel_frontend_domain_effective: "{{ remnawave_panel_frontend_domain | default(remnawave_panel_domain, true) }}"
+    remnawave_panel_app_port_effective: "{{ remnawave_panel_app_port | default(3000) }}"
+    remnawave_panel_metrics_port_effective: "{{ remnawave_panel_metrics_port | default(3001) }}"
+    remnawave_panel_http_port_effective: "{{ remnawave_panel_http_port | default(80) }}"
+    remnawave_panel_https_port_effective: "{{ remnawave_panel_https_port | default(443) }}"
+    remnawave_panel_https_ports_effective: >-
+      {{
+        remnawave_panel_https_ports
+        if (remnawave_panel_https_ports is defined and remnawave_panel_https_ports is sequence and remnawave_panel_https_ports is not string)
+        else (
+          [remnawave_panel_https_port]
+          if remnawave_panel_https_port is defined
+          else [443]
+        )
+      }}
+    remnawave_panel_tls_cert_name_effective: >-
+      {{
+        remnawave_panel_tls_cert_name
+        | default(
+            (
+              certbot_domains_effective | first
+            )
+            if (certbot_domains_effective is defined and certbot_domains_effective | length > 0)
+            else remnawave_panel_domain,
+            true
+          )
+      }}
+
+- name: Resolve Remnawave subscription page settings
+  ansible.builtin.set_fact:
+    remnawave_subscription_page_enabled_effective: "{{ enable_remnawave_subscription_page | default(false) | bool }}"
+    remnawave_subscription_page_domain_effective: "{{ remnawave_subscription_page_domain | default('', true) }}"
+    remnawave_subscription_page_app_port_effective: "{{ remnawave_subscription_page_app_port | default(3010) }}"
+    remnawave_subscription_page_container_name_effective: "{{ remnawave_subscription_page_container_name | default('remnawave-subscription-page') }}"
+    remnawave_subscription_page_env_file_effective: "{{ remnawave_subscription_page_env_file | default((remnawave_panel_dir_effective) ~ '/subscription-page.env') }}"
+    remnawave_subscription_page_panel_url_effective: "{{ remnawave_subscription_page_panel_url | default('http://remnawave:' ~ (remnawave_panel_app_port_effective | string), true) }}"
+    remnawave_subscription_page_custom_sub_prefix_effective: "{{ remnawave_subscription_page_custom_sub_prefix | default('', true) }}"
+    remnawave_subscription_page_static_dest_dir_effective: "{{ remnawave_subscription_page_static_dest_dir | default(remnawave_panel_dir_effective ~ '/subscription-page-frontend') }}"
+    remnawave_panel_sub_public_domain_effective: >-
+      {{
+        remnawave_panel_sub_public_domain
+        | default(
+            (remnawave_subscription_page_domain | default('', true))
+            if (
+              (enable_remnawave_subscription_page | default(false) | bool) and
+              ((remnawave_subscription_page_domain | default('', true)) | length > 0)
+            )
+            else remnawave_panel_domain_effective ~ '/api/sub',
+            true
+          )
+      }}
+
+- name: Resolve Remnawave panel landing settings
+  ansible.builtin.set_fact:
+    remnawave_panel_landing_enabled_effective: "{{ remnawave_panel_landing_enabled | default(remnawave_subscription_page_enabled_effective) | bool }}"
+    remnawave_panel_landing_server_names_effective: >-
+      {{
+        remnawave_panel_landing_server_names
+        if (remnawave_panel_landing_server_names is defined and remnawave_panel_landing_server_names is sequence and remnawave_panel_landing_server_names is not string)
+        else (
+          [remnawave_panel_landing_server_names]
+          if (remnawave_panel_landing_server_names is defined and remnawave_panel_landing_server_names | length > 0)
+          else []
+        )
+      }}
+    remnawave_panel_landing_src_dir_effective: >-
+      {{
+        remnawave_panel_landing_src_dir
+        if (
+          remnawave_panel_landing_src_dir is defined and
+          remnawave_panel_landing_src_dir | regex_search('^/')
+        )
+        else (
+          (repo_root ~ '/' ~ remnawave_panel_landing_src_dir)
+          if (
+            remnawave_panel_landing_src_dir is defined and
+            remnawave_panel_landing_src_dir | length > 0
+          )
+          else (repo_root ~ '/deployments/landing-lite/site')
+        )
+      }}
+    remnawave_panel_landing_dest_dir_effective: "{{ remnawave_panel_landing_dest_dir | default(remnawave_panel_dir_effective ~ '/landing-site') }}"
+
+- name: Resolve Remnawave bot proxy settings
+  ansible.builtin.set_fact:
+    remnashop_domain_effective: "{{ remnashop_domain | default('', true) }}"
+    remnashop_app_port_effective: "{{ remnashop_app_port | default(5000) }}"
+
+- name: Resolve Remnawave XHTTP proxy settings
+  ansible.builtin.set_fact:
+    remnawave_panel_xhttp_proxy_locations_effective: "{{ remnawave_panel_xhttp_proxy_locations | default([]) }}"
+
+- name: Validate Remnawave panel settings
+  ansible.builtin.assert:
+    that:
+      - enable_remnawave_panel | default(false) | bool
+      - enable_certbot | default(false) | bool
+      - remnawave_panel_domain_effective | length > 0
+      - remnawave_panel_postgres_user | default('') | length > 0
+      - remnawave_panel_postgres_password | default('') | length > 0
+      - remnawave_panel_postgres_db | default('') | length > 0
+      - remnawave_panel_jwt_auth_secret | default('') | length > 0
+      - remnawave_panel_jwt_api_tokens_secret | default('') | length > 0
+      - remnawave_panel_metrics_user | default('') | length > 0
+      - remnawave_panel_metrics_pass | default('') | length > 0
+      - remnawave_panel_webhook_secret | default('') | length == 64
+    fail_msg: >-
+      Remnawave panel is enabled, but required vars are missing or invalid.
+      Required: enable_certbot=true, remnawave_panel_domain, database creds,
+      JWT secrets, metrics credentials, 64-char remnawave_panel_webhook_secret.
+
+- name: Validate Remnawave subscription page settings
+  ansible.builtin.assert:
+    that:
+      - enable_remnawave_panel | default(false) | bool
+      - remnawave_subscription_page_domain_effective | length > 0
+      - remnawave_subscription_page_api_token | default('') | length > 0
+    fail_msg: >-
+      Remnawave subscription page is enabled, but required vars are missing.
+      Required: enable_remnawave_panel=true, remnawave_subscription_page_domain,
+      remnawave_subscription_page_api_token.
+  when: remnawave_subscription_page_enabled_effective
+
+- name: Validate Remnawave bot proxy settings
+  ansible.builtin.assert:
+    that:
+      - remnashop_domain_effective | length > 0
+    fail_msg: >-
+      remnashop is enabled, but remnashop_domain is empty.
+      Set remnashop_domain (for example bot.moscow.himenkov.ru) before starting the panel proxy.
+  when: enable_remnashop | default(false) | bool
+
+- name: Ensure Remnawave external network exists
+  ansible.builtin.command: docker network create {{ remnawave_network_name | default('remnawave-network') }}
+  register: remnawave_panel_network_create
+  changed_when: remnawave_panel_network_create.rc == 0
+  failed_when:
+    - remnawave_panel_network_create.rc != 0
+    - "'already exists' not in remnawave_panel_network_create.stderr"
+  when: not ansible_check_mode
+
+- name: Ensure Remnawave panel directory exists
+  ansible.builtin.file:
+    path: "{{ remnawave_panel_dir_effective }}"
+    state: directory
+    mode: "0755"
+
+- name: Ensure Remnawave panel landing source directory exists on control-node
+  ansible.builtin.stat:
+    path: "{{ remnawave_panel_landing_src_dir_effective }}"
+  delegate_to: localhost
+  become: false
+  register: remnawave_panel_landing_src_dir_stat
+  when: remnawave_panel_landing_enabled_effective
+
+- name: Validate Remnawave panel landing source directory exists on control-node
+  ansible.builtin.assert:
+    that:
+      - remnawave_panel_landing_src_dir_stat.stat.exists
+      - remnawave_panel_landing_src_dir_stat.stat.isdir
+    fail_msg: "Remnawave panel landing source dir not found: {{ remnawave_panel_landing_src_dir_effective }}"
+  when: remnawave_panel_landing_enabled_effective
+
+- name: Ensure Remnawave panel landing destination directory exists
+  ansible.builtin.file:
+    path: "{{ remnawave_panel_landing_dest_dir_effective }}"
+    state: directory
+    mode: "0755"
+  when: remnawave_panel_landing_enabled_effective
+
+- name: Ensure Remnawave subscription page static destination directory exists
+  ansible.builtin.file:
+    path: "{{ remnawave_subscription_page_static_dest_dir_effective }}"
+    state: directory
+    mode: "0755"
+  when: remnawave_subscription_page_enabled_effective
+
+- name: Copy Remnawave panel landing static site
+  ansible.builtin.copy:
+    src: "{{ remnawave_panel_landing_src_dir_effective }}/"
+    dest: "{{ remnawave_panel_landing_dest_dir_effective }}/"
+    mode: "0644"
+  register: remnawave_panel_landing_copy
+  when: remnawave_panel_landing_enabled_effective
+
+- name: Ensure Remnawave panel TLS certificate exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/fullchain.pem"
+  register: remnawave_panel_fullchain_stat
+
+- name: Ensure Remnawave panel TLS private key exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ remnawave_panel_tls_cert_name_effective }}/privkey.pem"
+  register: remnawave_panel_privkey_stat
+
+- name: Validate Remnawave panel TLS files exist
+  ansible.builtin.assert:
+    that:
+      - remnawave_panel_fullchain_stat.stat.exists
+      - remnawave_panel_privkey_stat.stat.exists
+    fail_msg: >-
+      TLS certificate files for {{ remnawave_panel_tls_cert_name_effective }} are missing on master.
+      Ensure certbot issued the certificate before remnawave_panel starts the proxy.
+
+- name: Render Remnawave panel env file
+  ansible.builtin.template:
+    src: remnawave-panel.env.j2
+    dest: "{{ remnawave_panel_env_file_effective }}"
+    mode: "0600"
+  register: remnawave_panel_env_template
+
+- name: Render Remnawave subscription page env file
+  ansible.builtin.template:
+    src: subscription-page.env.j2
+    dest: "{{ remnawave_subscription_page_env_file_effective }}"
+    mode: "0600"
+  register: remnawave_subscription_page_env_template
+  when: remnawave_subscription_page_enabled_effective
+
+- name: Render Remnawave panel nginx config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ remnawave_panel_nginx_conf_file_effective }}"
+    mode: "0644"
+  register: remnawave_panel_nginx_template
+
+- name: Render Remnawave panel compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ remnawave_panel_compose_file_effective }}"
+    mode: "0644"
+  register: remnawave_panel_compose_template
+
+- name: Recreate Remnawave panel stack when config changed
+  ansible.builtin.command: >
+    docker compose -f {{ remnawave_panel_compose_file_effective }}
+    --project-name {{ remnawave_panel_project_name_effective }}
+    down
+  args:
+    chdir: "{{ remnawave_panel_dir_effective }}"
+  when:
+    - not ansible_check_mode
+    - (
+        (remnawave_panel_env_template is defined and remnawave_panel_env_template is changed) or
+        (remnawave_subscription_page_env_template is defined and remnawave_subscription_page_env_template is changed) or
+        (remnawave_panel_landing_copy is defined and remnawave_panel_landing_copy is changed) or
+        (remnawave_panel_nginx_template is defined and remnawave_panel_nginx_template is changed) or
+        (remnawave_panel_compose_template is defined and remnawave_panel_compose_template is changed)
+      )
+
+- name: Run Remnawave panel stack
+  ansible.builtin.command: >
+    docker compose -f {{ remnawave_panel_compose_file_effective }}
+    --project-name {{ remnawave_panel_project_name_effective }}
+    up -d
+    {% if remnawave_panel_pull_policy | default('missing') | length > 0 %}
+    --pull {{ remnawave_panel_pull_policy | default('missing') }}
+    {% endif %}
+  args:
+    chdir: "{{ remnawave_panel_dir_effective }}"
+  when: not ansible_check_mode
+
+- name: Copy Remnawave subscription page frontend assets from container
+  ansible.builtin.command: >
+    docker cp {{ remnawave_subscription_page_container_name_effective }}:/opt/app/frontend/.
+    {{ remnawave_subscription_page_static_dest_dir_effective }}/
+  when:
+    - remnawave_subscription_page_enabled_effective
+    - not ansible_check_mode

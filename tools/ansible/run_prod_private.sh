@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 INVENTORY_PATH="${ROOT_DIR}/.private/ansible/prod/hosts.yml"
-PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/site.yml"
+PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/site.yml"
 ANSIBLE_CONFIG_DEFAULT="${ROOT_DIR}/ansible.cfg"
-ROLES_PATH_DEFAULT="${ROOT_DIR}/ansible/roles"
+ROLES_PATH_DEFAULT="${ROOT_DIR}/infra/ansible/roles"
 LOCAL_TMP_DEFAULT="${ROOT_DIR}/.tmp/ansible-local"
 SSH_COMMON_ARGS_DEFAULT="-o BatchMode=no -o KbdInteractiveAuthentication=yes"
 CHECK_MODE=false
@@ -75,10 +75,10 @@ EOF
 resolve_playbook() {
   local value="$1"
   case "${value}" in
-    site) echo "${ROOT_DIR}/ansible/playbooks/site.yml" ;;
-    base) echo "${ROOT_DIR}/ansible/playbooks/base.yml" ;;
-    master) echo "${ROOT_DIR}/ansible/playbooks/master.yml" ;;
-    workers) echo "${ROOT_DIR}/ansible/playbooks/workers.yml" ;;
+    site) echo "${ROOT_DIR}/infra/ansible/playbooks/site.yml" ;;
+    base) echo "${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
+    master) echo "${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
+    workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
     *) echo "${value}" ;;
   esac
 }
@@ -93,10 +93,10 @@ choose_playbook_menu() {
   read -r -p "Введите номер [1-4, default: 1]: " choice
   choice="${choice:-1}"
   case "${choice}" in
-    1) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/site.yml" ;;
-    2) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/base.yml" ;;
-    3) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/master.yml" ;;
-    4) PLAYBOOK_PATH="${ROOT_DIR}/ansible/playbooks/workers.yml" ;;
+    1) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/site.yml" ;;
+    2) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
+    3) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
+    4) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
     *) echo "Некорректный выбор: ${choice}"; exit 1 ;;
   esac
 }

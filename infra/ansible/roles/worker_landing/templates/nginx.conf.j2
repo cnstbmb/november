@@ -1,0 +1,59 @@
+{% macro render_xhttp_locations() -%}
+{% for xhttp_location in worker_landing_xhttp_proxy_locations_effective %}
+    location {{ xhttp_location.path }} {
+        client_max_body_size 0;
+        client_body_timeout {{ xhttp_location.client_body_timeout | default('5m') }};
+        grpc_read_timeout {{ xhttp_location.read_timeout | default('315s') }};
+        grpc_send_timeout {{ xhttp_location.send_timeout | default('5m') }};
+        grpc_socket_keepalive on;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP $remote_addr;
+        grpc_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_pass grpc://{{ xhttp_location.upstream }};
+    }
+
+{% endfor %}
+{%- endmacro %}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+{% if worker_landing_enable_https_effective %}
+    location / {
+        return 301 https://$host$request_uri;
+    }
+{% else %}
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+{% endif %}
+}
+{% if worker_landing_enable_https_effective %}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ worker_landing_domain_effective }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ worker_landing_domain_effective }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ worker_landing_domain_effective }}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+{{ render_xhttp_locations() }}
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+{% endif %}

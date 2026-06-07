@@ -1,0 +1,739 @@
+- name: Validate remnashop mode
+  ansible.builtin.assert:
+    that:
+      - remnashop_mode in ['internal', 'external']
+    fail_msg: "remnashop_mode must be either 'internal' or 'external'"
+
+- name: Resolve remnashop compose URL
+  ansible.builtin.set_fact:
+    remnashop_compose_url: >-
+      {{
+        remnashop_compose_internal_url
+        if remnashop_mode == 'internal'
+        else remnashop_compose_external_url
+      }}
+
+- name: Ensure remnashop directory exists
+  ansible.builtin.file:
+    path: "{{ remnashop_dir }}"
+    state: directory
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Install remnashop host packages
+  ansible.builtin.apt:
+    name: "{{ remnashop_host_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - remnashop_host_packages | length > 0
+    - not ansible_check_mode
+
+- name: Render remnashop sysctl file
+  ansible.builtin.template:
+    src: sysctl.conf.j2
+    dest: "{{ remnashop_sysctl_file }}"
+    mode: "0644"
+  notify: Apply remnashop sysctl settings
+  when:
+    - remnashop_manage_sysctl | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop sysctl changes before starting the stack
+  ansible.builtin.meta: flush_handlers
+  when:
+    - remnashop_manage_sysctl | bool
+    - not ansible_check_mode
+
+- name: Ensure remnashop compose file exists on control-node when provided
+  ansible.builtin.stat:
+    path: "{{ remnashop_compose_src }}"
+  delegate_to: localhost
+  become: false
+  register: remnashop_compose_src_stat
+  when: remnashop_compose_src | length > 0
+
+- name: Validate remnashop compose file exists on control-node
+  ansible.builtin.assert:
+    that:
+      - remnashop_compose_src_stat.stat.exists
+      - remnashop_compose_src_stat.stat.isreg
+    fail_msg: "Remnashop compose file not found: {{ remnashop_compose_src }}"
+  when: remnashop_compose_src | length > 0
+
+- name: Download remnashop compose file on control-node when local source is not provided
+  ansible.builtin.get_url:
+    url: "{{ remnashop_compose_url }}"
+    dest: "{{ remnashop_compose_cache_path }}"
+    mode: "0644"
+  delegate_to: localhost
+  become: false
+  when:
+    - remnashop_compose_src | length == 0
+    - not ansible_check_mode
+
+- name: Resolve remnashop compose source path
+  ansible.builtin.set_fact:
+    remnashop_compose_src_effective: >-
+      {{
+        remnashop_compose_src
+        if (remnashop_compose_src | length > 0)
+        else remnashop_compose_cache_path
+      }}
+  when: not ansible_check_mode
+
+- name: Copy remnashop compose file from control-node
+  ansible.builtin.copy:
+    src: "{{ remnashop_compose_src_effective }}"
+    dest: "{{ remnashop_dir }}/docker-compose.yml"
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Render remnashop compose override file
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
+    dest: "{{ remnashop_override_compose_file }}"
+    mode: "0644"
+  when:
+    - remnashop_override_compose_enabled | bool
+    - not ansible_check_mode
+
+- name: Ensure remnashop env file exists on control-node when provided
+  ansible.builtin.stat:
+    path: "{{ remnashop_env_src }}"
+  delegate_to: localhost
+  become: false
+  register: remnashop_env_src_stat
+  when: remnashop_env_src | length > 0
+
+- name: Validate remnashop env file exists on control-node
+  ansible.builtin.assert:
+    that:
+      - remnashop_env_src_stat.stat.exists
+      - remnashop_env_src_stat.stat.isreg
+    fail_msg: "Remnashop env file not found: {{ remnashop_env_src }}"
+  when: remnashop_env_src | length > 0
+
+- name: Copy remnashop env file from control-node
+  ansible.builtin.copy:
+    src: "{{ remnashop_env_src }}"
+    dest: "{{ remnashop_env_dest }}"
+    mode: "0600"
+  when:
+    - remnashop_env_src | length > 0
+    - not ansible_check_mode
+
+- name: Download remnashop env example if private env file is not provided
+  ansible.builtin.get_url:
+    url: "{{ remnashop_env_url }}"
+    dest: "{{ remnashop_env_dest }}"
+    mode: "0600"
+    force: false
+  when:
+    - remnashop_env_src | length == 0
+    - not ansible_check_mode
+
+- name: Apply remnashop env overrides
+  ansible.builtin.lineinfile:
+    path: "{{ remnashop_env_dest }}"
+    regexp: "^{{ item.key | regex_escape }}="
+    line: "{{ item.key }}={{ item.value }}"
+    insertafter: EOF
+    mode: "0600"
+  loop: "{{ remnashop_env_overrides | dict2items }}"
+  when:
+    - remnashop_env_overrides | length > 0
+    - not ansible_check_mode
+
+- name: Ensure remnawave network exists for internal mode
+  ansible.builtin.command: docker network create remnawave-network
+  register: remnashop_network_create
+  changed_when: remnashop_network_create.rc == 0
+  failed_when:
+    - remnashop_network_create.rc != 0
+    - "'already exists' not in remnashop_network_create.stderr"
+  when:
+    - remnashop_mode == 'internal'
+    - not ansible_check_mode
+
+- name: Read remnashop env file
+  ansible.builtin.slurp:
+    path: "{{ remnashop_env_dest }}"
+  register: remnashop_env_file
+  when:
+    - remnashop_validate_env | bool
+    - not ansible_check_mode
+
+- name: Ensure remnashop env file is configured
+  ansible.builtin.assert:
+    that:
+      - "'change_me' not in (remnashop_env_file.content | b64decode)"
+    fail_msg: >-
+      remnashop .env still contains placeholder values.
+      Update {{ remnashop_env_dest }} and rerun the playbook.
+  when:
+    - remnashop_validate_env | bool
+    - not ansible_check_mode
+
+- name: Cache remnashop env content
+  ansible.builtin.set_fact:
+    remnashop_env_content: "{{ remnashop_env_file.content | b64decode }}"
+  when:
+    - remnashop_validate_env | bool
+    - not ansible_check_mode
+
+- name: Ensure required remnashop env variables are set
+  ansible.builtin.assert:
+    that:
+      - remnashop_env_content is search('(?m)^' ~ item ~ '=.+$')
+    fail_msg: >-
+      remnashop env variable {{ item }} is missing or empty in {{ remnashop_env_dest }}.
+      Populate required variables (see upstream .env.example) and rerun the playbook.
+  loop: "{{ remnashop_required_env_vars }}"
+  when:
+    - remnashop_validate_env | bool
+    - not ansible_check_mode
+
+- name: Run remnashop stack
+  ansible.builtin.command: >
+    docker compose up -d
+    {% if remnashop_pull_policy | default('missing') | length > 0 %}
+    --pull {{ remnashop_pull_policy | default('missing') }}
+    {% endif %}
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when: not ansible_check_mode
+
+- name: Wait for remnashop services to be running
+  ansible.builtin.command: docker compose ps --status running --services
+  args:
+    chdir: "{{ remnashop_dir }}"
+  register: remnashop_running_services
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until:
+    - "'remnashop' in remnashop_running_services.stdout_lines"
+    - "'remnashop-db' in remnashop_running_services.stdout_lines"
+    - "'remnashop-redis' in remnashop_running_services.stdout_lines"
+    - "'remnashop-taskiq-worker' in remnashop_running_services.stdout_lines"
+    - "'remnashop-taskiq-scheduler' in remnashop_running_services.stdout_lines"
+  when:
+    - remnashop_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint on localhost
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe.status in remnashop_wait_status_codes
+  when:
+    - remnashop_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop stale Telegram callback hotfix
+  ansible.builtin.shell: |
+    docker compose exec -T remnashop /opt/remnashop/.venv/bin/python - <<'PY'
+    from pathlib import Path
+
+    changed = False
+
+    notification_path = Path("/opt/remnashop/src/telegram/routers/extra/notification.py")
+    notification_text = notification_path.read_text()
+    notification_updated = notification_text
+    if "from aiogram.exceptions import TelegramBadRequest\n" not in notification_updated:
+        notification_updated = notification_updated.replace(
+            "from aiogram import F, Router\n",
+            "from aiogram import F, Router\nfrom aiogram.exceptions import TelegramBadRequest\n",
+            1,
+        )
+
+    notification_default = """    await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+        await callback.answer()
+    """
+    notification_answer_first = """    await callback.answer()
+        await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+    """
+    notification_new = """    try:
+            await callback.answer()
+        except TelegramBadRequest as exc:
+            if "query is too old" not in str(exc):
+                raise
+
+        await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+    """
+    if notification_new not in notification_updated:
+        for old in (notification_default, notification_answer_first):
+            if old in notification_updated:
+                notification_updated = notification_updated.replace(old, notification_new, 1)
+                break
+        else:
+            print("notification callback block not found; assuming upstream layout changed")
+
+    if notification_updated != notification_text:
+        notification_path.write_text(notification_updated)
+        changed = True
+
+    error_path = Path("/opt/remnashop/src/telegram/middlewares/error.py")
+    error_text = error_path.read_text()
+    error_old = """        if isinstance(
+            event.exception,
+            (
+                InvalidStackIdError,
+                OutdatedIntent,
+                UnknownIntent,
+                UnknownState,
+            ),
+        ):
+            return await handler(event, data)
+    """
+    error_new = """        if isinstance(
+            event.exception,
+            (
+                InvalidStackIdError,
+                OutdatedIntent,
+                UnknownIntent,
+                UnknownState,
+            ),
+        ):
+            return
+    """
+    if error_new not in error_text:
+        if error_old not in error_text:
+            print("dialog stale-intent error block not found; assuming upstream layout changed")
+        else:
+            error_text = error_text.replace(error_old, error_new, 1)
+            error_path.write_text(error_text)
+            changed = True
+
+    print(f"changed={changed}")
+    PY
+  args:
+    chdir: "{{ remnashop_dir }}"
+  register: remnashop_stale_telegram_callbacks_hotfix
+  changed_when: "'changed=True' in remnashop_stale_telegram_callbacks_hotfix.stdout"
+  when:
+    - remnashop_hotfix_stale_telegram_callbacks | bool
+    - not ansible_check_mode
+
+- name: Restart remnashop after stale Telegram callback hotfix
+  ansible.builtin.command: docker compose restart remnashop
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when:
+    - remnashop_stale_telegram_callbacks_hotfix is defined
+    - remnashop_stale_telegram_callbacks_hotfix.changed
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint after stale Telegram callback hotfix
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe_after_stale_telegram_callbacks_hotfix
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe_after_stale_telegram_callbacks_hotfix.status in remnashop_wait_status_codes
+  when:
+    - remnashop_stale_telegram_callbacks_hotfix is defined
+    - remnashop_stale_telegram_callbacks_hotfix.changed
+    - remnashop_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop Telegram polling hotfix
+  ansible.builtin.shell: |
+    docker compose exec -T remnashop /opt/remnashop/.venv/bin/python - <<'PY'
+    import py_compile
+    from pathlib import Path
+
+    path = Path("/opt/remnashop/src/lifespan.py")
+    text = path.read_text()
+    changed = False
+
+    def ensure_replace(old: str, new: str, label: str) -> None:
+        global text, changed
+        if new in text:
+            return
+        if old not in text:
+            raise SystemExit(f"{label} block not found")
+        text = text.replace(old, new, 1)
+        changed = True
+
+    if "from contextlib import asynccontextmanager, suppress\n" not in text:
+        ensure_replace(
+            "from contextlib import asynccontextmanager\n",
+            "from contextlib import asynccontextmanager, suppress\n",
+            "contextlib import",
+        )
+
+    if "from aiogram import Bot, Dispatcher\n" not in text:
+        ensure_replace(
+            "from aiogram import Dispatcher\n",
+            "from aiogram import Bot, Dispatcher\n",
+            "aiogram import",
+        )
+
+    if "import os\n" not in text:
+        ensure_replace("import asyncio\n", "import asyncio\nimport os\n", "os import")
+
+    helper = '''
+
+    async def _poll_telegram_updates(
+        endpoint: TelegramWebhookEndpoint,
+        bot: Bot,
+        allowed_updates: list[str],
+    ) -> None:
+        offset = None
+        logger.info("Telegram polling loop started")
+
+        while True:
+            try:
+                updates = await bot.get_updates(
+                    offset=offset,
+                    timeout=30,
+                    allowed_updates=allowed_updates,
+                    request_timeout=35,
+                )
+                for update in updates:
+                    offset = update.update_id + 1
+                    await endpoint._feed_update(bot, update)
+            except asyncio.CancelledError:
+                logger.info("Telegram polling loop stopped")
+                raise
+            except Exception as e:
+                logger.warning(f"Telegram polling loop error: {e}")
+                await asyncio.sleep(5)
+    '''
+
+    if "async def _poll_telegram_updates(" not in text:
+        marker = "\n\n@asynccontextmanager\nasync def lifespan"
+        if marker not in text:
+            raise SystemExit("lifespan marker not found")
+        text = text.replace(marker, helper + marker, 1)
+        changed = True
+
+    ensure_replace(
+        """async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        dispatcher: Dispatcher = app.state.dispatcher
+    """,
+        """async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        polling_enabled = False
+        polling_task: asyncio.Task[None] | None = None
+        allowed_updates: list[str] = []
+        bot: Bot | None = None
+
+        dispatcher: Dispatcher = app.state.dispatcher
+    """,
+        "lifespan local polling state",
+    )
+
+    ensure_replace(
+        """        allowed_updates = dispatcher.resolve_used_update_types()
+            webhook_info: WebhookInfo = await webhook_service.setup_webhook(allowed_updates)
+
+            if webhook_service.has_error(webhook_info):
+    """,
+        """        allowed_updates = dispatcher.resolve_used_update_types()
+            polling_enabled = os.getenv("BOT_POLLING", "").lower() in {"1", "true", "yes", "on"}
+            polling_drop_pending_updates = os.getenv(
+                "BOT_POLLING_DROP_PENDING_UPDATES", "false"
+            ).lower() in {"1", "true", "yes", "on"}
+            bot = await startup_container.get(Bot)
+
+            if polling_enabled:
+                await bot.delete_webhook(drop_pending_updates=polling_drop_pending_updates)
+                webhook_info: WebhookInfo = await bot.get_webhook_info()
+                logger.info("Telegram polling mode enabled; webhook disabled")
+            else:
+                webhook_info = await webhook_service.setup_webhook(allowed_updates)
+
+            if not polling_enabled and webhook_service.has_error(webhook_info):
+    """,
+        "webhook setup",
+    )
+
+    ensure_replace(
+        """    await telegram_webhook_endpoint.startup()
+
+        logger.opt(colors=True).info(
+    """,
+        """    await telegram_webhook_endpoint.startup()
+
+        if polling_enabled:
+            if bot is None:
+                raise RuntimeError("Bot is not initialized for polling mode")
+            polling_task = asyncio.create_task(
+                _poll_telegram_updates(telegram_webhook_endpoint, bot, allowed_updates)
+            )
+
+        logger.opt(colors=True).info(
+    """,
+        "polling startup",
+    )
+
+    ensure_replace(
+        """    await event_bus.shutdown()
+        await telegram_webhook_endpoint.shutdown()
+    """,
+        """    if polling_task is not None:
+            polling_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await polling_task
+
+        await event_bus.shutdown()
+        await telegram_webhook_endpoint.shutdown()
+    """,
+        "polling shutdown",
+    )
+
+    if changed:
+        path.write_text(text)
+
+    py_compile.compile(str(path), doraise=True)
+    print(f"changed={changed}")
+    PY
+  args:
+    chdir: "{{ remnashop_dir }}"
+  register: remnashop_telegram_polling_hotfix
+  changed_when: "'changed=True' in remnashop_telegram_polling_hotfix.stdout"
+  when:
+    - remnashop_hotfix_telegram_polling | bool
+    - not ansible_check_mode
+
+- name: Restart remnashop after Telegram polling hotfix
+  ansible.builtin.command: docker compose restart remnashop
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when:
+    - remnashop_telegram_polling_hotfix is defined
+    - remnashop_telegram_polling_hotfix.changed
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint after Telegram polling hotfix
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe_after_telegram_polling_hotfix
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe_after_telegram_polling_hotfix.status in remnashop_wait_status_codes
+  when:
+    - remnashop_telegram_polling_hotfix is defined
+    - remnashop_telegram_polling_hotfix.changed
+    - remnashop_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Check Russian remnashop translations file for dashboard hotfix
+  ansible.builtin.stat:
+    path: "{{ remnashop_ru_messages_file }}"
+  register: remnashop_ru_messages_stat
+  when:
+    - remnashop_hotfix_dashboard_cpu_threads_translation | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop dashboard cpu_threads translation hotfix
+  ansible.builtin.replace:
+    path: "{{ remnashop_ru_messages_file }}"
+    regexp: |-
+      (?ms)([ \t]*• <b>ЦПУ</b>: \{ \$cpu_cores \} \{ \$cpu_cores ->\n[ \t]*\[one\] ядро\n[ \t]*\[few\] ядра\n[ \t]*\*\[more\] ядер\n[ \t]*\}) \{ \$cpu_threads \} \{ \$cpu_threads ->\n[ \t]*\[one\] поток\n[ \t]*\[few\] потока\n[ \t]*\*\[more\] потоков\n[ \t]*\}
+    replace: '\1'
+  register: remnashop_dashboard_translation_hotfix
+  when:
+    - remnashop_hotfix_dashboard_cpu_threads_translation | bool
+    - not ansible_check_mode
+    - remnashop_ru_messages_stat.stat.exists | default(false) | bool
+    - remnashop_ru_messages_stat.stat.isreg | default(false) | bool
+
+- name: Restart remnashop after dashboard translation hotfix
+  ansible.builtin.command: docker compose restart remnashop
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when:
+    - remnashop_dashboard_translation_hotfix is defined
+    - remnashop_dashboard_translation_hotfix.changed
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint after dashboard translation hotfix
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe_after_hotfix
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe_after_hotfix.status in remnashop_wait_status_codes
+  when:
+    - remnashop_dashboard_translation_hotfix is defined
+    - remnashop_dashboard_translation_hotfix.changed
+    - not ansible_check_mode
+
+- name: Check Russian remnashop buttons file for user trial toggle hotfix
+  ansible.builtin.stat:
+    path: "{{ remnashop_ru_buttons_file }}"
+  register: remnashop_ru_buttons_stat
+  when:
+    - remnashop_hotfix_user_trial_toggle_translation | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop user trial toggle translation hotfix
+  ansible.builtin.shell: |
+    python3 - <<'PY'
+    from pathlib import Path
+
+    path = Path({{ remnashop_ru_buttons_file | to_json }})
+    text = path.read_text(encoding="utf-8")
+    changed = False
+
+    if "    .trial-toggle =" not in text:
+        marker = "\n    .block = { $is_blocked ->\n"
+        insert = (
+            "    .trial-toggle = { $is_trial_available ->\n"
+            "    [1] 🧪 Пробник: доступен\n"
+            "    *[0] 🧪 Пробник: не доступен\n"
+            "    }\n"
+        )
+        if marker not in text:
+            raise SystemExit("btn-user .block marker not found in Russian buttons translations")
+        text = text.replace(marker, "\n" + insert + marker, 1)
+        path.write_text(text, encoding="utf-8")
+        changed = True
+
+    print(f"changed={changed}")
+    PY
+  register: remnashop_user_trial_toggle_translation_hotfix
+  changed_when: "'changed=True' in remnashop_user_trial_toggle_translation_hotfix.stdout"
+  when:
+    - remnashop_hotfix_user_trial_toggle_translation | bool
+    - not ansible_check_mode
+    - remnashop_ru_buttons_stat.stat.exists | default(false) | bool
+    - remnashop_ru_buttons_stat.stat.isreg | default(false) | bool
+
+- name: Restart remnashop after user trial toggle translation hotfix
+  ansible.builtin.command: docker compose restart remnashop
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when:
+    - remnashop_user_trial_toggle_translation_hotfix is defined
+    - remnashop_user_trial_toggle_translation_hotfix.changed
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint after user trial toggle translation hotfix
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe_after_user_trial_toggle_hotfix
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe_after_user_trial_toggle_hotfix.status in remnashop_wait_status_codes
+  when:
+    - remnashop_user_trial_toggle_translation_hotfix is defined
+    - remnashop_user_trial_toggle_translation_hotfix.changed
+    - not ansible_check_mode
+
+- name: Repair remnashop Telegram webhook registration
+  ansible.builtin.shell: |
+    docker compose exec -T remnashop /opt/remnashop/.venv/bin/python - <<'PY'
+    import asyncio
+    import datetime as dt
+    import json
+    import os
+
+    import aiohttp
+    from aiohttp_socks import ProxyConnector
+
+    ALLOWED_UPDATES = {{ remnashop_telegram_webhook_allowed_updates | to_json }}
+    DROP_PENDING_UPDATES = {{ (remnashop_telegram_webhook_drop_pending_updates | bool) | ternary('True', 'False') }}
+    MAX_CONNECTIONS = {{ remnashop_telegram_webhook_max_connections | int }}
+    IP_ADDRESS = {{ remnashop_telegram_webhook_ip_address | default('', true) | to_json }}
+
+    async def main() -> None:
+        token = os.environ["BOT_TOKEN"]
+        secret = os.environ["BOT_SECRET_TOKEN"]
+        domain = os.environ["APP_DOMAIN"]
+        proxy = os.getenv("BOT_PROXY_URL")
+        connector = ProxyConnector.from_url(proxy) if proxy else None
+        webhook_url = f"https://{domain}/api/v1/telegram"
+
+        payload = {
+            "url": webhook_url,
+            "allowed_updates": ALLOWED_UPDATES,
+            "secret_token": secret,
+            "drop_pending_updates": DROP_PENDING_UPDATES,
+            "max_connections": MAX_CONNECTIONS,
+        }
+        if IP_ADDRESS:
+            payload["ip_address"] = IP_ADDRESS
+
+        async with aiohttp.ClientSession(
+            connector=connector,
+            timeout=aiohttp.ClientTimeout(total=20),
+        ) as session:
+            async with session.post(
+                f"https://api.telegram.org/bot{token}/setWebhook",
+                json=payload,
+            ) as response:
+                set_webhook = await response.json()
+            async with session.get(
+                f"https://api.telegram.org/bot{token}/getWebhookInfo",
+            ) as response:
+                webhook_info = await response.json()
+
+        if not set_webhook.get("ok"):
+            raise SystemExit(json.dumps(set_webhook, ensure_ascii=False))
+
+        result = webhook_info.get("result", {})
+        last_error_date = result.get("last_error_date")
+        last_error_date_msk = None
+        if last_error_date:
+            last_error_date_msk = dt.datetime.fromtimestamp(
+                last_error_date,
+                dt.timezone(dt.timedelta(hours=3)),
+            ).isoformat()
+
+        print(json.dumps({
+            "setWebhook": set_webhook.get("description"),
+            "url": result.get("url"),
+            "pending_update_count": result.get("pending_update_count"),
+            "last_error_date_msk": last_error_date_msk,
+            "last_error_message": result.get("last_error_message"),
+            "ip_address": result.get("ip_address"),
+            "max_connections": result.get("max_connections"),
+            "drop_pending_updates": DROP_PENDING_UPDATES,
+        }, ensure_ascii=False, indent=2))
+
+    asyncio.run(main())
+    PY
+  args:
+    chdir: "{{ remnashop_dir }}"
+  register: remnashop_telegram_webhook_repair_result
+  changed_when: false
+  when:
+    - remnashop_telegram_webhook_repair | bool
+    - not remnashop_telegram_polling_enabled | bool
+    - not ansible_check_mode

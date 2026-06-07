@@ -292,7 +292,7 @@ tools/ansible/warmup_prod_private.sh --limit workers
 tools/ansible/run_prod_private.sh --playbook base --limit master
 tools/ansible/run_prod_private.sh --playbook master
 tools/ansible/run_prod_private.sh --playbook workers --check
-tools/ansible/run_prod_private.sh --playbook ansible/playbooks/master.yml
+tools/ansible/run_prod_private.sh --playbook infra/ansible/playbooks/master.yml
 ```
 
 После переустановки ОС на master сначала прогоните `base` (установка Docker/UFW и базовой настройки),

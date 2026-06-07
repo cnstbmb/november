@@ -1,0 +1,14 @@
+services:
+  master-sni-proxy:
+    image: "{{ master_sni_proxy_image_effective }}"
+    container_name: "{{ master_sni_proxy_container_name_effective }}"
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - "{{ master_sni_proxy_haproxy_config_effective }}:/usr/local/etc/haproxy/haproxy.cfg:ro"
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-db"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

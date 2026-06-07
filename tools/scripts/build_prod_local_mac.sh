@@ -9,11 +9,11 @@ SCRIPT_START_TIME="$(date +%s)"
 echo "Build local Docker images for macOS (linux/arm64, no push)"
 
 echo "Building backend image..."
-cd "${ROOT_DIR}/backend"
+cd "${ROOT_DIR}/apps/backend"
 npm run build:docker:local:mac
 
 echo "Building frontend image..."
-cd "${ROOT_DIR}/frontend"
+cd "${ROOT_DIR}/apps/frontend"
 npm run build:docker:local:mac
 
 SCRIPT_END_TIME="$(date +%s)"

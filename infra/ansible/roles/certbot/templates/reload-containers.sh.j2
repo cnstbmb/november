@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v docker >/dev/null 2>&1; then
+  exit 0
+fi
+
+reload_container() {
+  local name="$1"
+
+  if [ -z "${name}" ]; then
+    return 0
+  fi
+
+  if ! docker inspect "${name}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [ "$(docker inspect -f '{% raw %}{{.State.Running}}{% endraw %}' "${name}" 2>/dev/null || echo false)" != "true" ]; then
+    return 0
+  fi
+
+  docker kill -s HUP "${name}" >/dev/null 2>&1 || true
+}
+
+{% for container_name in certbot_reload_containers_effective %}
+reload_container {{ container_name | quote }}
+{% endfor %}

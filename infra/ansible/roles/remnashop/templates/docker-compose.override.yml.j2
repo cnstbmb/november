@@ -1,0 +1,50 @@
+services:
+{% if remnashop_image | default('', true) | length > 0 %}
+  remnashop:
+    image: "{{ remnashop_image }}"
+{% if remnashop_disable_ipv6 | bool %}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+{% endif %}
+{% if remnashop_extra_hosts | default([]) | length > 0 %}
+    extra_hosts:
+{% for host_entry in remnashop_extra_hosts %}
+      - "{{ host_entry }}"
+{% endfor %}
+{% endif %}
+
+  remnashop-taskiq-worker:
+    image: "{{ remnashop_image }}"
+{% if remnashop_disable_ipv6 | bool %}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+{% endif %}
+{% if remnashop_extra_hosts | default([]) | length > 0 %}
+    extra_hosts:
+{% for host_entry in remnashop_extra_hosts %}
+      - "{{ host_entry }}"
+{% endfor %}
+{% endif %}
+
+  remnashop-taskiq-scheduler:
+    image: "{{ remnashop_image }}"
+{% if remnashop_disable_ipv6 | bool %}
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+{% endif %}
+{% if remnashop_extra_hosts | default([]) | length > 0 %}
+    extra_hosts:
+{% for host_entry in remnashop_extra_hosts %}
+      - "{{ host_entry }}"
+{% endfor %}
+{% endif %}
+
+{% endif %}
+  remnashop-db:
+    stop_grace_period: "{{ remnashop_db_stop_grace_period }}"
+
+  remnashop-redis:
+    stop_grace_period: "{{ remnashop_redis_stop_grace_period }}"

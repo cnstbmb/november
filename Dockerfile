@@ -5,15 +5,15 @@ WORKDIR /home/app/server
 COPY ./tools/scripts/build_prod.sh ./tools/scripts/build_prod.sh
 COPY ./package.json ./package.json
 
-COPY frontend frontend
-COPY backend backend
+COPY apps/frontend apps/frontend
+COPY apps/backend apps/backend
 
-WORKDIR /home/app/server/backend
+WORKDIR /home/app/server/apps/backend
 
 RUN npm i
 RUN node ./node_modules/typescript/bin/tsc
 
-WORKDIR /home/app/server/frontend
+WORKDIR /home/app/server/apps/frontend
 RUN npm i
 RUN npm run build:prod
 RUN cp -r dist/** ../backend/compiled/static
@@ -27,8 +27,8 @@ FROM node:20.19.6-alpine
 
 WORKDIR /home/app/server
 
-COPY --from=builder /home/app/server/backend/node_modules node_modules
-COPY --from=clean /home/app/server/backend/compiled .
+COPY --from=builder /home/app/server/apps/backend/node_modules node_modules
+COPY --from=clean /home/app/server/apps/backend/compiled .
 
 ENV PORT 3000
 ENV NODE_ENV prod

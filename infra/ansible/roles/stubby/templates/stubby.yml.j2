@@ -1,0 +1,25 @@
+resolution_type: {{ stubby_resolution_type }}
+
+dns_transport_list:
+{% for transport in stubby_dns_transport_list %}
+  - {{ transport }}
+{% endfor %}
+
+tls_authentication: {{ stubby_tls_authentication }}
+tls_query_padding_blocksize: {{ stubby_tls_query_padding_blocksize }}
+edns_client_subnet_private: {{ stubby_edns_client_subnet_private }}
+
+round_robin_upstreams: {{ stubby_round_robin_upstreams }}
+idle_timeout: {{ stubby_idle_timeout }}
+
+listen_addresses:
+{% for listen_address in stubby_listen_addresses %}
+  - {{ listen_address }}
+{% endfor %}
+
+upstream_recursive_servers:
+{% for upstream in stubby_upstream_recursive_servers_effective %}
+  - address_data: {{ upstream.address_data }}
+    tls_auth_name: {{ upstream.tls_auth_name | to_json }}
+    tls_port: {{ upstream.tls_port }}
+{% endfor %}

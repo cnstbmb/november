@@ -1,0 +1,34 @@
+logoutput: {{ socks5_proxy_log_output }}
+
+internal: {{ socks5_proxy_listen_address }} port = {{ socks5_proxy_listen_port }}
+external: {{ socks5_proxy_external_interface_effective }}
+
+socksmethod: none
+
+user.privileged: root
+user.notprivileged: nobody
+
+{% for client_ip in socks5_proxy_client_ips_effective %}
+client pass {
+  from: {{ client_ip }}/32 to: 0.0.0.0/0
+  log: error connect disconnect
+}
+
+{% endfor %}
+client block {
+  from: 0.0.0.0/0 to: 0.0.0.0/0
+  log: connect error
+}
+
+{% for client_ip in socks5_proxy_client_ips_effective %}
+socks pass {
+  from: {{ client_ip }}/32 to: 0.0.0.0/0
+  command: connect
+  log: error connect disconnect
+}
+
+{% endfor %}
+socks block {
+  from: 0.0.0.0/0 to: 0.0.0.0/0
+  log: connect error
+}

@@ -4,23 +4,21 @@
 
 ## Что есть в проекте
 
-- `backend/` — Node.js/TypeScript API (Express + PostgreSQL, миграции, утилиты).
-- `frontend/` — Angular приложение.
+- `apps/backend/` — Node.js/TypeScript API (Express + PostgreSQL, миграции, утилиты).
+- `apps/frontend/` — Angular приложение.
 - `deployments/prod/` — основной production docker-compose стек (master-нода).
 - `deployments/landing-lite/` — отдельный легковесный лендинг (не для master).
-- `ansible/` — плейбуки и роли для настройки master/workers.
+- `infra/ansible/` — плейбуки и роли для настройки master/workers.
 - `tools/ansible/` — интерактивная генерация private inventory/vars и запуск playbooks.
-- `algorithms/` — отдельные алгоритмические задачи/эксперименты.
+- `packages/algorithms/` — отдельные алгоритмические задачи/эксперименты.
 
-## Целевая структура монорепы
+## Структура монорепы
 
-Я бы выделил 3 npm-проекта:
+Выделены 3 npm workspace-проекта:
 
 - `backend` — рабочее приложение API.
 - `frontend` — рабочее Angular-приложение.
 - `algorithms` — отдельный экспериментальный TypeScript-пакет с Jest-тестами.
-
-Если делать следующий шаг с физическим переносом директорий, оптимальная целевая схема:
 
 ```text
 apps/
@@ -43,6 +41,7 @@ tools/
 ## Ключевые возможности
 
 - Единый набор npm-команд из корня для backend/frontend/build/deploy.
+- npm workspaces для backend, frontend и algorithms.
 - Интерактивный bootstrap Ansible-конфигов в `.private/ansible/prod`.
 - Запуск Ansible через `npm run ansible:*` с `--check` и выбором playbook.
 - Отдельный боевой `landing-lite` стек с финальной страницей `deployments/landing-lite/site/index.html`.
@@ -137,7 +136,7 @@ Bootstrap по умолчанию создаёт `.private/ansible/prod/remnasho
 
 ## Инфраструктурные заметки
 
-- Подробности по Ansible: `ansible/README.md`.
+- Подробности по Ansible: `infra/ansible/README.md`.
 - Подробности по `landing-lite`: `deployments/landing-lite/README.md`.
 - Для SSH через Cloudflare используйте `DNS only` запись (без проксирования), если нужен прямой SSH.
 - Боевые переменные и inventory держите в `.private/` (папка в `.gitignore`).

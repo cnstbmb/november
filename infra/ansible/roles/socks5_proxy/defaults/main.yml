@@ -1,0 +1,11 @@
+enable_socks5_proxy: false
+
+socks5_proxy_package: "dante-server"
+socks5_proxy_service_name: "danted"
+socks5_proxy_config_path: "/etc/danted.conf"
+
+socks5_proxy_listen_address: "0.0.0.0"
+socks5_proxy_listen_port: 1080
+socks5_proxy_external_interface: ""
+socks5_proxy_client_ips: []
+socks5_proxy_log_output: "syslog"

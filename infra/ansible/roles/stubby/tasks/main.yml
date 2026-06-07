@@ -1,0 +1,84 @@
+- name: Install stubby
+  ansible.builtin.apt:
+    name: stubby
+    state: present
+
+- name: Resolve stubby master host
+  ansible.builtin.set_fact:
+    stubby_master_host_effective: "{{ (groups['master'] | default([])) | first | default('') }}"
+  when: stubby_manage_config | bool
+
+- name: Resolve stubby upstream settings
+  ansible.builtin.set_fact:
+    stubby_upstream_address_effective: >-
+      {{
+        stubby_upstream_address
+        if (stubby_upstream_address is defined and stubby_upstream_address | length > 0)
+        else (
+          hostvars[stubby_master_host_effective].ansible_host
+          | default(stubby_master_host_effective)
+        )
+      }}
+    stubby_tls_auth_name_effective: >-
+      {{
+        stubby_tls_auth_name
+        if (stubby_tls_auth_name is defined and stubby_tls_auth_name | length > 0)
+        else (
+          (
+            hostvars[stubby_master_host_effective].certbot_domains
+            | default([stubby_master_host_effective])
+          ) | first
+        )
+      }}
+  when: stubby_manage_config | bool
+
+- name: Validate stubby upstream settings
+  ansible.builtin.assert:
+    that:
+      - stubby_master_host_effective | length > 0
+      - stubby_upstream_address_effective | length > 0
+      - stubby_tls_auth_name_effective | length > 0
+    fail_msg: >-
+      Stubby requires a master host and a TLS name for upstream DoT.
+      Ensure inventory has a master host and host_vars/<master>/certbot.yml defines certbot_domains.
+  when: stubby_manage_config | bool
+
+- name: Build stubby upstream list
+  ansible.builtin.set_fact:
+    stubby_upstream_recursive_servers_effective: >-
+      {{
+        stubby_upstream_recursive_servers
+        if (stubby_upstream_recursive_servers is defined and stubby_upstream_recursive_servers | length > 0)
+        else [
+          {
+            'address_data': stubby_upstream_address_effective,
+            'tls_auth_name': stubby_tls_auth_name_effective,
+            'tls_port': (stubby_tls_port | int)
+          }
+        ]
+      }}
+  when: stubby_manage_config | bool
+
+- name: Render stubby config
+  ansible.builtin.template:
+    src: stubby.yml.j2
+    dest: "{{ stubby_config_path }}"
+    mode: "0644"
+  register: stubby_config_template
+  when: stubby_manage_config | bool
+
+- name: Restart stubby when config changed
+  ansible.builtin.service:
+    name: stubby
+    state: restarted
+  when:
+    - not ansible_check_mode
+    - stubby_manage_config | bool
+    - stubby_config_template is changed
+
+- name: Ensure stubby service is enabled and running
+  ansible.builtin.service:
+    name: stubby
+    state: started
+    enabled: true
+  when: not ansible_check_mode

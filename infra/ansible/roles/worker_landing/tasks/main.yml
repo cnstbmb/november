@@ -1,0 +1,122 @@
+- name: Resolve worker landing settings
+  ansible.builtin.set_fact:
+    worker_landing_certbot_domains_effective: >-
+      {{
+        certbot_domains_effective
+        if (certbot_domains_effective is defined)
+        else (
+          certbot_domains
+          if (certbot_domains is defined and certbot_domains is sequence and certbot_domains is not string)
+          else ([certbot_domains] if (certbot_domains is defined and certbot_domains | length > 0) else [inventory_hostname])
+        )
+      }}
+    worker_landing_src_dir_effective: >-
+      {{
+        worker_landing_src_dir
+        if (
+          worker_landing_src_dir is defined and
+          worker_landing_src_dir | regex_search('^/')
+        )
+        else (
+          (repo_root ~ '/' ~ worker_landing_src_dir)
+          if (
+            worker_landing_src_dir is defined and
+            worker_landing_src_dir | length > 0
+          )
+          else (repo_root ~ '/deployments/landing-lite/site')
+        )
+      }}
+    worker_landing_dest_dir_effective: "{{ worker_landing_dest_dir | default('/opt/landing-lite') }}"
+    worker_landing_compose_file_effective: "{{ worker_landing_compose_file | default((worker_landing_dest_dir | default('/opt/landing-lite')) ~ '/docker-compose.yml') }}"
+    worker_landing_nginx_conf_effective: "{{ worker_landing_nginx_conf | default((worker_landing_dest_dir | default('/opt/landing-lite')) ~ '/nginx.conf') }}"
+    worker_landing_enable_https_effective: "{{ worker_landing_enable_https | default(true) | bool }}"
+    worker_landing_http_port_effective: "{{ worker_landing_http_port | default(80) }}"
+    worker_landing_https_port_effective: "{{ worker_landing_https_port | default(443) }}"
+    worker_landing_http_bind_effective: "{{ worker_landing_http_bind | default('0.0.0.0') }}"
+    worker_landing_https_bind_effective: "{{ worker_landing_https_bind | default('0.0.0.0') }}"
+    worker_landing_project_name_effective: "{{ worker_landing_project_name | default('landing-lite') }}"
+    worker_landing_xhttp_proxy_locations_effective: "{{ worker_landing_xhttp_proxy_locations | default([]) }}"
+    worker_landing_network_mode_host_effective: "{{ worker_landing_network_mode_host | default(false) | bool }}"
+
+- name: Resolve worker landing domain
+  ansible.builtin.set_fact:
+    worker_landing_domain_effective: "{{ worker_landing_domain | default(worker_landing_certbot_domains_effective | first) }}"
+
+- name: Ensure worker landing source directory exists on control-node
+  ansible.builtin.stat:
+    path: "{{ worker_landing_src_dir_effective }}"
+  delegate_to: localhost
+  become: false
+  register: worker_landing_src_dir_stat
+
+- name: Validate worker landing source directory exists on control-node
+  ansible.builtin.assert:
+    that:
+      - worker_landing_src_dir_stat.stat.exists
+      - worker_landing_src_dir_stat.stat.isdir
+    fail_msg: "Worker landing source dir not found: {{ worker_landing_src_dir_effective }}"
+
+- name: Ensure worker landing destination directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ worker_landing_dest_dir_effective }}"
+    - "{{ worker_landing_dest_dir_effective }}/site"
+
+- name: Copy worker landing static site
+  ansible.builtin.copy:
+    src: "{{ worker_landing_src_dir_effective }}/"
+    dest: "{{ worker_landing_dest_dir_effective }}/site/"
+    mode: "0644"
+
+- name: Ensure worker landing certbot domain is configured for HTTPS
+  ansible.builtin.assert:
+    that:
+      - worker_landing_domain_effective | length > 0
+    fail_msg: "worker_landing_domain is empty for HTTPS landing."
+  when: worker_landing_enable_https_effective
+
+- name: Ensure worker landing TLS certificate exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ worker_landing_domain_effective }}/fullchain.pem"
+  register: worker_landing_fullchain_stat
+  when: worker_landing_enable_https_effective
+
+- name: Ensure worker landing TLS private key exists
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ worker_landing_domain_effective }}/privkey.pem"
+  register: worker_landing_privkey_stat
+  when: worker_landing_enable_https_effective
+
+- name: Validate worker landing TLS files exist
+  ansible.builtin.assert:
+    that:
+      - worker_landing_fullchain_stat.stat.exists
+      - worker_landing_privkey_stat.stat.exists
+    fail_msg: >-
+      TLS certificate files for {{ worker_landing_domain_effective }} are missing.
+      Ensure certbot issued certificate on this worker host.
+  when: worker_landing_enable_https_effective
+
+- name: Render worker landing nginx config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ worker_landing_nginx_conf_effective }}"
+    mode: "0644"
+
+- name: Render worker landing docker compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ worker_landing_compose_file_effective }}"
+    mode: "0644"
+
+- name: Run worker landing stack
+  ansible.builtin.command: >
+    docker compose -f {{ worker_landing_compose_file_effective }}
+    --project-name {{ worker_landing_project_name_effective }}
+    up -d
+  args:
+    chdir: "{{ worker_landing_dest_dir_effective }}"
+  when: not ansible_check_mode

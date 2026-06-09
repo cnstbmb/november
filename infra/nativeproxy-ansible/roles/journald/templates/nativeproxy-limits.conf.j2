@@ -1,0 +1,5 @@
+[Journal]
+SystemMaxUse={{ journald_system_max_use | default('200M') }}
+RuntimeMaxUse={{ journald_runtime_max_use | default('50M') }}
+MaxRetentionSec={{ journald_max_retention_sec | default('7day') }}
+Compress=yes

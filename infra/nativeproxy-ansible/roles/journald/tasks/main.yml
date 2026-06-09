@@ -1,0 +1,12 @@
+- name: Ensure journald config directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    mode: "0755"
+
+- name: Configure journald disk limits
+  ansible.builtin.template:
+    src: nativeproxy-limits.conf.j2
+    dest: /etc/systemd/journald.conf.d/90-nativeproxy-limits.conf
+    mode: "0644"
+  notify: Restart journald

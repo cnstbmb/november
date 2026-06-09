@@ -1,0 +1,69 @@
+- name: Resolve landing paths
+  ansible.builtin.set_fact:
+    landing_src_dir_effective: >-
+      {{
+        landing_src_dir
+        if (landing_src_dir is defined and landing_src_dir | regex_search('^/'))
+        else ((playbook_dir ~ '/../../../' ~ landing_src_dir) if (landing_src_dir is defined and landing_src_dir | length > 0) else (playbook_dir ~ '/../../../deployments/landing-lite/site'))
+      }}
+    landing_dest_dir_effective: "{{ landing_dest_dir | default('/var/www/nativeproxy-landing') }}"
+    landing_nginx_port_effective: "{{ landing_nginx_port | default(8080) }}"
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx-light
+    state: present
+
+- name: Ensure landing source exists on control-node
+  ansible.builtin.stat:
+    path: "{{ landing_src_dir_effective }}"
+  delegate_to: localhost
+  become: false
+  register: landing_src_dir_stat
+
+- name: Validate landing source exists
+  ansible.builtin.assert:
+    that:
+      - landing_src_dir_stat.stat.exists
+      - landing_src_dir_stat.stat.isdir
+    fail_msg: "Landing source dir not found: {{ landing_src_dir_effective }}"
+
+- name: Ensure landing destination exists
+  ansible.builtin.file:
+    path: "{{ landing_dest_dir_effective }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy landing static files
+  ansible.builtin.copy:
+    src: "{{ landing_src_dir_effective }}/"
+    dest: "{{ landing_dest_dir_effective }}/"
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Render nativeProxy landing nginx site
+  ansible.builtin.template:
+    src: nativeproxy-landing.conf.j2
+    dest: /etc/nginx/sites-available/nativeproxy-landing.conf
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Enable nativeProxy landing nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/nativeproxy-landing.conf
+    dest: /etc/nginx/sites-enabled/nativeproxy-landing.conf
+    state: link
+  notify: Reload nginx
+
+- name: Ensure nginx is enabled
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+  when: not ansible_check_mode

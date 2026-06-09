@@ -2,6 +2,9 @@ global:
   scrape_interval: {{ monitoring_prometheus_scrape_interval }}
   evaluation_interval: {{ monitoring_prometheus_evaluation_interval }}
 
+rule_files:
+  - /etc/prometheus/public-status-rules.yml
+
 {% set master_hosts = groups['master'] | default([]) %}
 {% set worker_hosts = groups['workers'] | default([]) %}
 {% set monitored_hosts = (master_hosts + worker_hosts) | unique %}
@@ -44,6 +47,69 @@ scrape_configs:
         labels:
           host: "{{ master_host }}"
           role: "master"
+{% endif %}
+
+{% if monitoring_remnawave_status_exporter_enabled | default(false) | bool %}
+  - job_name: remnawave_nodes
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "remnawave-status-exporter:{{ monitoring_remnawave_status_exporter_port }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+{% endif %}
+
+{% if monitoring_xray_checker_enabled | default(false) | bool %}
+  - job_name: xray_checker
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "xray-checker:{{ monitoring_xray_checker_port }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "vpn"
+{% endif %}
+
+{% if monitoring_blackbox_enabled | default(true) | bool %}
+{% set public_http_probes = [] %}
+{% if remnawave_panel_domain | default('', true) | length > 0 %}
+{% set _ = public_http_probes.append({'name': 'panel', 'url': 'https://' ~ remnawave_panel_domain}) %}
+{% endif %}
+{% if enable_remnawave_subscription_page | default(false) | bool and remnawave_subscription_page_domain | default('', true) | length > 0 %}
+{% set _ = public_http_probes.append({'name': 'subscription', 'url': 'https://' ~ remnawave_subscription_page_domain}) %}
+{% endif %}
+{% if remnawave_panel_landing_server_names | default([]) | length > 0 %}
+{% for landing_domain in remnawave_panel_landing_server_names %}
+{% set _ = public_http_probes.append({'name': 'landing', 'url': 'https://' ~ landing_domain}) %}
+{% endfor %}
+{% endif %}
+{% if enable_remnashop | default(false) | bool and remnashop_domain | default('', true) | length > 0 %}
+{% set _ = public_http_probes.append({'name': 'bot', 'url': 'https://' ~ remnashop_domain}) %}
+{% endif %}
+{% if public_http_probes | length > 0 %}
+  - job_name: public_http_services
+    metrics_path: /probe
+    params:
+      module: [http_public_2xx]
+    static_configs:
+{% for public_probe in public_http_probes %}
+      - targets:
+          - "{{ public_probe.url }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "{{ public_probe.name }}"
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "monitoring-blackbox-exporter:{{ monitoring_blackbox_port }}"
+{% endif %}
 {% endif %}
 
 {% if enable_remnashop | default(false) | bool and monitoring_blackbox_enabled | default(true) | bool and monitoring_prometheus_scrape_remnashop_probes | default(true) | bool and remnashop_domain | default('', true) | length > 0 %}

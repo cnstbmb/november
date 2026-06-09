@@ -16,7 +16,37 @@
     - "{{ monitoring_dir }}/grafana/provisioning/datasources"
     - "{{ monitoring_dir }}/grafana/provisioning/dashboards"
     - "{{ monitoring_dir }}/grafana/dashboards"
+    - "{{ monitoring_dir }}/grafana-public"
+    - "{{ monitoring_dir }}/grafana-public/provisioning"
+    - "{{ monitoring_dir }}/grafana-public/provisioning/datasources"
+    - "{{ monitoring_dir }}/grafana-public/provisioning/dashboards"
+    - "{{ monitoring_dir }}/grafana-public/dashboards"
+    - "{{ monitoring_dir }}/remnawave-status-exporter"
   when: not ansible_check_mode
+
+- name: Copy Remnawave status exporter
+  ansible.builtin.copy:
+    src: remnawave-status-exporter/
+    dest: "{{ monitoring_dir }}/remnawave-status-exporter/"
+    mode: "0644"
+  register: monitoring_remnawave_status_exporter_copy
+  when:
+    - monitoring_remnawave_status_exporter_enabled | default(false) | bool
+    - not ansible_check_mode
+
+- name: Render Remnawave status exporter env file
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/remnawave-status-exporter.env"
+    mode: "0600"
+    content: |
+      REMNAWAVE_API_BASE={{ monitoring_remnawave_api_base }}
+      REMNAWAVE_API_TOKEN={{ monitoring_remnawave_api_token }}
+      EXPORTER_PORT={{ monitoring_remnawave_status_exporter_port }}
+      EXPORTER_CACHE_TTL_MS={{ monitoring_remnawave_status_exporter_cache_ttl_ms }}
+  register: monitoring_remnawave_status_exporter_env
+  when:
+    - monitoring_remnawave_status_exporter_enabled | default(false) | bool
+    - not ansible_check_mode
 
 - name: Allow master-local Prometheus scrapes to node exporter via docker bridge
   ansible.builtin.ufw:
@@ -37,6 +67,8 @@
     mode: "0644"
   loop:
     - prometheus.yml.j2
+    - prometheus-public.yml.j2
+    - public-status-rules.yml.j2
     - loki-config.yml.j2
     - blackbox.yml.j2
   register: monitoring_config_templates
@@ -60,7 +92,20 @@
       dest: "{{ monitoring_dir }}/grafana/dashboards/logs-overview.json"
     - src: dashboard-service-health.json.j2
       dest: "{{ monitoring_dir }}/grafana/dashboards/service-health.json"
+    - src: grafana-public-datasources.yml.j2
+      dest: "{{ monitoring_dir }}/grafana-public/provisioning/datasources/datasources.yml"
+    - src: grafana-dashboardproviders.yml.j2
+      dest: "{{ monitoring_dir }}/grafana-public/provisioning/dashboards/dashboards.yml"
+    - src: dashboard-public-service-status.json.j2
+      dest: "{{ monitoring_dir }}/grafana-public/dashboards/public-service-status.json"
   register: monitoring_grafana_templates
+  when: not ansible_check_mode
+
+- name: Remove legacy public Grafana status dashboard file
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana-public/dashboards/public-vpn-status.json"
+    state: absent
+  register: monitoring_legacy_public_dashboard
   when: not ansible_check_mode
 
 - name: Render monitoring compose file
@@ -75,12 +120,19 @@
   ansible.builtin.command: docker compose up -d --remove-orphans --force-recreate
   args:
     chdir: "{{ monitoring_dir }}"
+  register: monitoring_stack_recreate
   when:
     - not ansible_check_mode
     - >
       (monitoring_config_templates is defined and (monitoring_config_templates.results | selectattr('changed') | list | length > 0))
       or
       (monitoring_grafana_templates is defined and (monitoring_grafana_templates.results | selectattr('changed') | list | length > 0))
+      or
+      (monitoring_legacy_public_dashboard is defined and monitoring_legacy_public_dashboard.changed)
+      or
+      (monitoring_remnawave_status_exporter_copy is defined and monitoring_remnawave_status_exporter_copy.changed)
+      or
+      (monitoring_remnawave_status_exporter_env is defined and monitoring_remnawave_status_exporter_env.changed)
       or
       (monitoring_compose_template is defined and monitoring_compose_template.changed)
 
@@ -89,3 +141,15 @@
   args:
     chdir: "{{ monitoring_dir }}"
   when: not ansible_check_mode
+
+- name: Refresh Remnawave proxy upstream after public Grafana recreate
+  ansible.builtin.command: docker compose restart {{ monitoring_remnawave_proxy_service_name }}
+  args:
+    chdir: "{{ monitoring_remnawave_panel_dir }}"
+  when:
+    - not ansible_check_mode
+    - monitoring_restart_remnawave_proxy_on_public_grafana_recreate | default(true) | bool
+    - monitoring_public_grafana_enabled | default(false) | bool
+    - remnawave_public_status_enabled | default(false) | bool
+    - monitoring_stack_recreate is defined
+    - monitoring_stack_recreate is changed

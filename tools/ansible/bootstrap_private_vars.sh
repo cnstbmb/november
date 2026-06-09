@@ -608,6 +608,29 @@ if [ "${enable_monitoring}" = "true" ]; then
   prompt_secret monitoring_grafana_admin_password "Grafana admin password"
 fi
 
+enable_public_status_page="false"
+monitoring_xray_checker_subscription_url=""
+monitoring_public_grafana_root_url="/status-grafana/"
+remnawave_public_status_path="/status"
+remnawave_public_status_grafana_path="/status-grafana/"
+remnawave_public_status_dashboard_path="/status-grafana/d/public-service-status/status?orgId=1&refresh=30s&kiosk"
+if [ "${enable_monitoring}" = "true" ] && [ "${enable_remnawave_panel}" = "true" ]; then
+  prompt_bool enable_public_status_page "Включить публичную страницу статуса сервисов?" "false"
+  if [ "${enable_public_status_page}" = "true" ]; then
+    default_public_status_root_url="/status-grafana/"
+    if [ -n "${master_certbot_domain}" ]; then
+      default_public_status_root_url="https://${master_certbot_domain}/status-grafana/"
+    fi
+    prompt monitoring_public_grafana_root_url "Public Grafana root URL" "${default_public_status_root_url}"
+    prompt remnawave_public_status_path "Публичный путь страницы статуса" "/status"
+    prompt monitoring_xray_checker_subscription_url "URL подписки для Xray Checker"
+    if [ -z "${monitoring_xray_checker_subscription_url}" ]; then
+      echo "Xray Checker subscription URL is required when public status page is enabled."
+      exit 1
+    fi
+  fi
+fi
+
 if [ "${enable_backups}" = "true" ]; then
   backup_paths_default="/etc"
   if [ "${enable_remnawave_panel}" = "true" ] || [ "${enable_remnawave_node_master}" = "true" ] || [ "${enable_adguard}" = "true" ]; then
@@ -847,6 +870,20 @@ monitoring_grafana_admin_password: "${monitoring_grafana_admin_password}"
 monitoring_prometheus_retention: "7d"
 monitoring_loki_retention: "168h"
 EOF
+  if [ "${enable_public_status_page}" = "true" ]; then
+    cat >> "${GROUP_VARS_DIR}/master.yml" <<EOF
+monitoring_xray_checker_enabled: true
+monitoring_xray_checker_subscription_url: "${monitoring_xray_checker_subscription_url}"
+monitoring_xray_checker_proxy_check_interval: 60
+monitoring_xray_checker_proxy_check_method: "status"
+monitoring_public_grafana_enabled: true
+monitoring_public_grafana_root_url: "${monitoring_public_grafana_root_url}"
+remnawave_public_status_enabled: true
+remnawave_public_status_path: "${remnawave_public_status_path}"
+remnawave_public_status_grafana_path: "${remnawave_public_status_grafana_path}"
+remnawave_public_status_dashboard_path: "${remnawave_public_status_dashboard_path}"
+EOF
+  fi
 fi
 
 if [ "${enable_backups}" = "true" ]; then

@@ -1,0 +1,69 @@
+# Minimal nativeProxy host profile for weak VPS instances.
+ansible_user: "root"
+ansible_port: 22
+ansible_python_interpreter: "/usr/bin/python3"
+
+timezone: "Europe/Moscow"
+swap_size_mb: 1024
+
+journald_system_max_use: "200M"
+journald_runtime_max_use: "50M"
+journald_max_retention_sec: "7day"
+
+sysctl_settings:
+  fs.file-max: 1048576
+  net.core.somaxconn: 4096
+  net.core.netdev_max_backlog: 4096
+  net.ipv4.tcp_max_syn_backlog: 4096
+  net.ipv4.tcp_fin_timeout: 15
+  net.ipv4.tcp_keepalive_time: 600
+  net.ipv4.tcp_keepalive_intvl: 30
+  net.ipv4.tcp_keepalive_probes: 5
+  net.ipv4.ip_local_port_range: "10240 65535"
+
+ssh_public_key_path: ""
+ssh_password_authentication: "no"
+ssh_permit_root_login: "prohibit-password"
+
+enable_certbot: true
+letsencrypt_email: "admin@example.com"
+cloudflare_api_token: ""
+certbot_credentials_path: "/etc/letsencrypt/cloudflare.ini"
+certbot_dns_propagation_seconds: 60
+certbot_domains:
+  - "nativeproxy.example.com"
+
+enable_landing: true
+landing_domain: "nativeproxy.example.com"
+landing_src_dir: "deployments/landing-lite/site"
+landing_dest_dir: "/var/www/nativeproxy-landing"
+landing_nginx_port: 8080
+
+enable_native_proxy: true
+native_proxy_user: "nativeproxy"
+native_proxy_group: "nativeproxy"
+native_proxy_bin_path: "/usr/local/bin/nativeproxy"
+native_proxy_config_path: "/etc/nativeproxy/config.yml"
+native_proxy_work_dir: "/var/lib/nativeproxy"
+native_proxy_log_level: "info"
+native_proxy_tls_dir: "/etc/nativeproxy/tls"
+native_proxy_tls_cert_path: "/etc/nativeproxy/tls/fullchain.pem"
+native_proxy_tls_key_path: "/etc/nativeproxy/tls/privkey.pem"
+
+# Pick one binary source before running the playbook:
+# native_proxy_binary_src: "/Users/you/nativeproxy"
+# native_proxy_binary_url: "https://example.com/nativeproxy-linux-amd64"
+native_proxy_binary_src: ""
+native_proxy_binary_url: ""
+native_proxy_checksum: ""
+
+# If nativeProxy has its own config syntax, point this at a ready local config file.
+# Otherwise the role renders a conservative YAML skeleton with TLS and fallback upstream.
+native_proxy_config_src: ""
+native_proxy_listen_address: "0.0.0.0"
+native_proxy_listen_port: 443
+native_proxy_fallback_upstream: "http://127.0.0.1:8080"
+native_proxy_extra_args: []
+
+firewall_tcp_ports:
+  - 443

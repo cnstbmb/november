@@ -1,0 +1,6 @@
+- name: Monitoring stack setup
+  hosts: master
+  become: true
+  roles:
+    - role: monitoring
+      when: enable_monitoring | bool

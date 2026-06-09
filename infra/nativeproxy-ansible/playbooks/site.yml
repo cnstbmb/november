@@ -1,0 +1,17 @@
+- name: NativeProxy single host setup
+  hosts: nativeproxy
+  become: true
+  gather_facts: true
+  roles:
+    - base
+    - ssh_hardening
+    - sysctl
+    - journald
+    - firewall
+    - fail2ban
+    - role: certbot
+      when: enable_certbot | default(false) | bool
+    - role: landing
+      when: enable_landing | default(true) | bool
+    - role: native_proxy
+      when: enable_native_proxy | default(true) | bool

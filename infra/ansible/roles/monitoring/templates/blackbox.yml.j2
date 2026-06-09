@@ -1,4 +1,14 @@
 modules:
+  http_public_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      valid_status_codes: []
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+
   http_remnashop_internal:
     prober: http
     timeout: 5s

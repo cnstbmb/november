@@ -1,0 +1,10 @@
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Restart nativeProxy
+  ansible.builtin.systemd_service:
+    name: nativeproxy.service
+    state: restarted
+  when: not ansible_check_mode

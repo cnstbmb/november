@@ -1,0 +1,3 @@
+{% for key, value in sysctl_settings | default({}) | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}

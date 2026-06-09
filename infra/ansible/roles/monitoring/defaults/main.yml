@@ -16,7 +16,31 @@ monitoring_master_local_scrape_cidrs:
 monitoring_prometheus_scrape_remnawave_panel_metrics: true
 monitoring_prometheus_scrape_remnashop_probes: true
 monitoring_remnawave_panel_metrics_path: "/metrics"
+monitoring_remnawave_status_exporter_enabled: "{{ enable_remnawave_panel | default(false) | bool }}"
+monitoring_remnawave_status_exporter_image: "node:22-alpine"
+monitoring_remnawave_status_exporter_port: 9808
+monitoring_remnawave_status_exporter_cache_ttl_ms: 15000
+monitoring_remnawave_api_base: "https://{{ remnawave_panel_domain | default('') }}/api"
+monitoring_remnawave_api_token: "{{ remnawave_subscription_page_api_token | default('') }}"
 monitoring_remnashop_internal_probe_url: "http://remnashop:{{ remnashop_app_port | default(5000) }}/"
 monitoring_remnashop_webhook_probe_url: "https://{{ remnashop_domain }}/api/v1/telegram"
+monitoring_xray_checker_enabled: false
+monitoring_xray_checker_image: "kutovoys/xray-checker:v1.2.4"
+monitoring_xray_checker_port: 2112
+monitoring_xray_checker_subscription_url: ""
+monitoring_xray_checker_proxy_check_interval: 60
+monitoring_xray_checker_subscription_update_interval: 300
+monitoring_xray_checker_proxy_check_method: "status"
+monitoring_xray_checker_web_public: false
+monitoring_xray_checker_metrics_protected: false
+monitoring_public_grafana_enabled: false
+monitoring_public_prometheus_container_name: "monitoring-public-prometheus"
+monitoring_public_grafana_image: "grafana/grafana-oss:latest"
+monitoring_public_grafana_container_name: "monitoring-public-grafana"
+monitoring_public_grafana_root_url: "/status-grafana/"
+monitoring_public_grafana_anonymous_role: "Viewer"
+monitoring_restart_remnawave_proxy_on_public_grafana_recreate: true
+monitoring_remnawave_panel_dir: "{{ remnawave_panel_dir | default('/opt/remnawave-panel') }}"
+monitoring_remnawave_proxy_service_name: "remnawave-proxy"
 monitoring_grafana_prometheus_uid: "prometheus"
 monitoring_grafana_loki_uid: "loki"

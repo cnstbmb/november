@@ -64,7 +64,7 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers)
-  --playbook <value>     site | base | master | workers | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | master | workers | monitoring | remnawave-panel | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -79,6 +79,8 @@ resolve_playbook() {
     base) echo "${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
     master) echo "${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
     workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
+    monitoring) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring.yml" ;;
+    remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
     *) echo "${value}" ;;
   esac
 }

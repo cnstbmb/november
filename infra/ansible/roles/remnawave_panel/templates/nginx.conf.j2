@@ -27,6 +27,29 @@
 
 {%- endmacro %}
 
+{% macro render_public_status_locations() -%}
+{% if remnawave_public_status_enabled | default(false) | bool %}
+    location = {{ remnawave_public_status_path | default('/status') }} {
+        return 302 {{ remnawave_public_status_dashboard_path | default('/status-grafana/d/public-service-status/status?orgId=1&refresh=30s&kiosk') }};
+    }
+
+    location {{ remnawave_public_status_grafana_path | default('/status-grafana/') }} {
+        resolver 127.0.0.11 valid=30s ipv6=off;
+        set $public_status_grafana_upstream {{ remnawave_public_status_grafana_upstream | default('monitoring-public-grafana:3000') }};
+        proxy_pass http://$public_status_grafana_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_http_version 1.1;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+{% endif %}
+{%- endmacro %}
+
 server {
     listen 80;
     listen [::]:80;
@@ -95,6 +118,7 @@ server {
     resolver 127.0.0.11 valid=30s ipv6=off;
 
 {{ render_xhttp_locations(remnawave_panel_domain_effective) }}
+{{ render_public_status_locations() }}
 {{ deny_hidden_files() }}
     location / {
         set $remnawave_upstream remnawave:{{ remnawave_panel_app_port_effective }};
@@ -170,6 +194,7 @@ server {
     }
 
 {{ render_xhttp_locations(remnawave_subscription_page_domain_effective) }}
+{{ render_public_status_locations() }}
 {{ deny_hidden_files() }}
     location / {
         set $remnawave_subscription_upstream {{ remnawave_subscription_page_container_name_effective }}:{{ remnawave_subscription_page_app_port_effective }};
@@ -210,6 +235,7 @@ server {
 {% for landing_server_name in remnawave_panel_landing_server_names_effective %}
 {{ render_xhttp_locations(landing_server_name) }}
 {% endfor %}
+{{ render_public_status_locations() }}
 {{ deny_hidden_files() }}
     location / {
         try_files $uri $uri/ /index.html;
@@ -255,6 +281,7 @@ server {
 {% endif %}
 
 {{ render_xhttp_locations(remnashop_domain_effective) }}
+{{ render_public_status_locations() }}
 {{ deny_hidden_files() }}
     location / {
         set $remnashop_upstream remnashop:{{ remnashop_app_port_effective }};

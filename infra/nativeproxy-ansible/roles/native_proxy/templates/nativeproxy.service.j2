@@ -1,0 +1,24 @@
+[Unit]
+Description=nativeProxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ native_proxy_user }}
+Group={{ native_proxy_group }}
+WorkingDirectory={{ native_proxy_work_dir }}
+ExecStart={{ native_proxy_bin_path }} --config {{ native_proxy_config_path }}{% for arg in native_proxy_extra_args | default([]) %} {{ arg }}{% endfor %}
+Restart=on-failure
+RestartSec=3s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ native_proxy_work_dir }}
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+CERT_NAME="{{ certbot_domains_effective | first }}"
+TLS_DIR="{{ native_proxy_tls_dir | default('/etc/nativeproxy/tls') }}"
+TLS_GROUP="{{ native_proxy_group | default('nativeproxy') }}"
+
+install -d -m 0750 -o root -g "$TLS_GROUP" "$TLS_DIR"
+install -m 0640 -o root -g "$TLS_GROUP" "/etc/letsencrypt/live/$CERT_NAME/fullchain.pem" "$TLS_DIR/fullchain.pem"
+install -m 0640 -o root -g "$TLS_GROUP" "/etc/letsencrypt/live/$CERT_NAME/privkey.pem" "$TLS_DIR/privkey.pem"
+
+if systemctl list-unit-files nativeproxy.service >/dev/null 2>&1; then
+  systemctl restart nativeproxy.service
+fi

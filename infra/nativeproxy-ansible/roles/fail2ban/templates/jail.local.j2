@@ -1,0 +1,9 @@
+[DEFAULT]
+bantime = {{ fail2ban_bantime | default('1h') }}
+findtime = {{ fail2ban_findtime | default('10m') }}
+maxretry = {{ fail2ban_maxretry | default(5) }}
+backend = systemd
+
+[sshd]
+enabled = true
+port = {{ ansible_port }}

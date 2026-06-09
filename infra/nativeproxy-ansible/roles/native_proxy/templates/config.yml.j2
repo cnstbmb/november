@@ -1,0 +1,11 @@
+# Replace this template if nativeProxy requires another config syntax.
+server:
+  listen: "{{ native_proxy_listen_address }}:{{ native_proxy_listen_port }}"
+  log_level: "{{ native_proxy_log_level }}"
+
+tls:
+  certificate: "{{ native_proxy_tls_cert_path }}"
+  private_key: "{{ native_proxy_tls_key_path }}"
+
+fallback:
+  upstream: "{{ native_proxy_fallback_upstream }}"

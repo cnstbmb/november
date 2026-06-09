@@ -1,0 +1,65 @@
+groups:
+  - name: public_status
+    interval: {{ monitoring_prometheus_evaluation_interval }}
+    rules:
+      - record: public_connectivity_status
+        expr: min(xray_proxy_status)
+
+      - record: public_infrastructure_status
+        expr: min(remnawave_node_connected * (1 - remnawave_node_disabled))
+
+      - record: public_services_status
+        expr: min(probe_success{job="public_http_services"})
+
+      - record: public_response_time_ms
+        expr: avg(xray_proxy_latency_ms)
+
+      - record: public_channel_status
+        labels:
+          area: primary
+        expr: max(xray_proxy_status{name="MOSCOW"})
+
+      - record: public_channel_status
+        labels:
+          area: reserve
+        expr: max(xray_proxy_status{name="AMSTERDAM"})
+
+      - record: public_channel_status
+        labels:
+          area: local
+        expr: max(xray_proxy_status{name="MOSCOW HOME WIFI"})
+
+      - record: public_site_status
+        labels:
+          area: central
+        expr: max(remnawave_node_connected{node="moscow.himenkov.ru"} * (1 - remnawave_node_disabled{node="moscow.himenkov.ru"}))
+
+      - record: public_site_status
+        labels:
+          area: external
+        expr: max(remnawave_node_connected{node="himenkov.ru"} * (1 - remnawave_node_disabled{node="himenkov.ru"}))
+
+      - record: public_site_status
+        labels:
+          area: home
+        expr: max(remnawave_node_connected{node="home.himenkov.ru"} * (1 - remnawave_node_disabled{node="home.himenkov.ru"}))
+
+      - record: public_service_status
+        labels:
+          area: access
+        expr: max(probe_success{job="public_http_services",service="subscription"})
+
+      - record: public_service_status
+        labels:
+          area: main
+        expr: max(probe_success{job="public_http_services",service="landing"})
+
+      - record: public_service_status
+        labels:
+          area: assistant
+        expr: max(probe_success{job="public_http_services",service="bot"})
+
+      - record: public_service_status
+        labels:
+          area: operations
+        expr: max(probe_success{job="public_http_services",service="panel"})

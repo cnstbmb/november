@@ -1,0 +1,13 @@
+- name: Render nativeProxy sysctl settings
+  ansible.builtin.template:
+    src: 99-nativeproxy.conf.j2
+    dest: /etc/sysctl.d/99-nativeproxy.conf
+    mode: "0644"
+  register: nativeproxy_sysctl_template
+
+- name: Apply nativeProxy sysctl settings
+  ansible.builtin.command: sysctl --system
+  changed_when: nativeproxy_sysctl_template is changed
+  when:
+    - nativeproxy_sysctl_template is changed
+    - not ansible_check_mode

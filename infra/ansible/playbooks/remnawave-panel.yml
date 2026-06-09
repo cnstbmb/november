@@ -1,0 +1,6 @@
+- name: Remnawave panel proxy setup
+  hosts: master
+  become: true
+  roles:
+    - role: remnawave_panel
+      when: enable_remnawave_panel | default(false) | bool

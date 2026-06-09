@@ -1,0 +1,46 @@
+- name: Resolve authorized keys path
+  ansible.builtin.set_fact:
+    ssh_authorized_keys_path_effective: >-
+      {{
+        ssh_authorized_keys_path
+        | default(
+            ('/root/.ssh/authorized_keys' if ansible_user == 'root' else '/home/' ~ ansible_user ~ '/.ssh/authorized_keys'),
+            true
+          )
+      }}
+  when: ssh_public_key_path is defined and ssh_public_key_path | length > 0
+
+- name: Ensure SSH authorized keys directory exists
+  ansible.builtin.file:
+    path: "{{ ssh_authorized_keys_path_effective | dirname }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+  when: ssh_public_key_path is defined and ssh_public_key_path | length > 0
+
+- name: Install SSH public key
+  ansible.builtin.lineinfile:
+    path: "{{ ssh_authorized_keys_path_effective }}"
+    line: "{{ lookup('file', ssh_public_key_path) }}"
+    create: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when: ssh_public_key_path is defined and ssh_public_key_path | length > 0
+
+- name: Disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication {{ ssh_password_authentication | default('no') }}"
+    validate: "sshd -t -f %s"
+  notify: Restart ssh
+
+- name: Configure root login policy
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin {{ ssh_permit_root_login | default('prohibit-password') }}"
+    validate: "sshd -t -f %s"
+  notify: Restart ssh

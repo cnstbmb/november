@@ -14,6 +14,7 @@ services:
       - "{{ monitoring_prometheus_port }}:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./public-status-rules.yml:/etc/prometheus/public-status-rules.yml:ro
       - prometheus-data:/prometheus
 {% if monitoring_attach_remnawave_network %}
     networks:
@@ -33,6 +34,48 @@ services:
     networks:
       - default
       - remnawave-network
+{% endif %}
+
+{% if monitoring_remnawave_status_exporter_enabled | default(false) | bool %}
+  remnawave-status-exporter:
+    image: {{ monitoring_remnawave_status_exporter_image }}
+    container_name: monitoring-remnawave-status-exporter
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "/app/server.mjs"]
+    env_file:
+      - ./remnawave-status-exporter.env
+    volumes:
+      - ./remnawave-status-exporter:/app:ro
+{% if monitoring_attach_remnawave_network %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
+{% endif %}
+
+{% if monitoring_xray_checker_enabled | default(false) | bool %}
+  xray-checker:
+    image: {{ monitoring_xray_checker_image }}
+    container_name: monitoring-xray-checker
+    restart: unless-stopped
+    environment:
+      - SUBSCRIPTION_URL={{ monitoring_xray_checker_subscription_url }}
+      - SUBSCRIPTION_UPDATE=true
+      - SUBSCRIPTION_UPDATE_INTERVAL={{ monitoring_xray_checker_subscription_update_interval }}
+      - PROXY_CHECK_INTERVAL={{ monitoring_xray_checker_proxy_check_interval }}
+      - PROXY_CHECK_METHOD={{ monitoring_xray_checker_proxy_check_method }}
+      - WEB_PUBLIC={{ monitoring_xray_checker_web_public | ternary('true', 'false') }}
+      - WEB_SHOW_DETAILS=false
+      - METRICS_PROTECTED={{ monitoring_xray_checker_metrics_protected | ternary('true', 'false') }}
+      - METRICS_PORT={{ monitoring_xray_checker_port }}
+      - METRICS_HOST=0.0.0.0
+      - METRICS_INSTANCE=remnawave
+{% if monitoring_attach_remnawave_network %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
 {% endif %}
 
   grafana:
@@ -65,6 +108,50 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
 {% endif %}
 
+{% if monitoring_public_grafana_enabled | default(false) | bool %}
+  public-prometheus:
+    image: prom/prometheus:latest
+    container_name: {{ monitoring_public_prometheus_container_name }}
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time={{ monitoring_prometheus_retention }}"
+    volumes:
+      - ./prometheus-public.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-public-data:/prometheus
+{% if monitoring_attach_remnawave_network %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
+
+  public-grafana:
+    image: {{ monitoring_public_grafana_image }}
+    container_name: {{ monitoring_public_grafana_container_name }}
+    restart: unless-stopped
+    environment:
+      - GF_SERVER_ROOT_URL={{ monitoring_public_grafana_root_url }}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE={{ monitoring_public_grafana_anonymous_role }}
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_EXPLORE_ENABLED=false
+    volumes:
+      - grafana-public-data:/var/lib/grafana
+      - ./grafana-public/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana-public/dashboards:/var/lib/grafana/dashboards:ro
+{% if monitoring_attach_remnawave_network %}
+    networks:
+      - default
+      - remnawave-network
+{% endif %}
+{% endif %}
+
   loki:
     image: {{ monitoring_loki_image }}
     container_name: monitoring-loki
@@ -78,7 +165,9 @@ services:
 
 volumes:
   prometheus-data:
+  prometheus-public-data:
   grafana-data:
+  grafana-public-data:
   loki-data:
 
 {% if monitoring_attach_remnawave_network %}

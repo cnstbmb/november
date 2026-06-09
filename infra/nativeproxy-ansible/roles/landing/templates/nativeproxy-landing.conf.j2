@@ -1,0 +1,20 @@
+server {
+    listen 127.0.0.1:{{ landing_nginx_port_effective }};
+    server_name _;
+
+    root {{ landing_dest_dir_effective }};
+    index index.html;
+
+    access_log off;
+    error_log /var/log/nginx/nativeproxy-landing-error.log warn;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location ~* \.(?:css|js|jpg|jpeg|gif|png|svg|webp|ico|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800, immutable";
+        try_files $uri =404;
+    }
+}

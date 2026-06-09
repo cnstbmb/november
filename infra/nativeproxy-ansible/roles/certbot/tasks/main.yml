@@ -1,0 +1,108 @@
+- name: Install certbot packages
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-dns-cloudflare
+    state: present
+
+- name: Resolve certbot domains
+  ansible.builtin.set_fact:
+    certbot_domains_effective: >-
+      {{
+        certbot_domains
+        if (certbot_domains is defined and certbot_domains is sequence and certbot_domains is not string)
+        else ([certbot_domains] if (certbot_domains is defined and certbot_domains | length > 0) else [inventory_hostname])
+      }}
+
+- name: Ensure nativeProxy TLS group exists
+  ansible.builtin.group:
+    name: "{{ native_proxy_group | default('nativeproxy') }}"
+    system: true
+    state: present
+  when: (native_proxy_group | default('nativeproxy')) != 'root'
+
+- name: Ensure nativeProxy TLS user exists
+  ansible.builtin.user:
+    name: "{{ native_proxy_user | default('nativeproxy') }}"
+    group: "{{ native_proxy_group | default('nativeproxy') }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ native_proxy_work_dir | default('/var/lib/nativeproxy') }}"
+    create_home: false
+    state: present
+  when: (native_proxy_user | default('nativeproxy')) != 'root'
+
+- name: Validate certbot settings
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_email | default('') | length > 0
+      - cloudflare_api_token | default('') | length > 0
+      - certbot_domains_effective | length > 0
+    fail_msg: "Certbot requires letsencrypt_email, cloudflare_api_token and certbot_domains."
+
+- name: Create certbot credentials file
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: "{{ certbot_credentials_path }}"
+    mode: "0600"
+
+- name: Ensure certbot deploy hook directory exists
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/deploy
+    state: directory
+    mode: "0755"
+
+- name: Ensure nativeProxy TLS directory exists
+  ansible.builtin.file:
+    path: "{{ native_proxy_tls_dir | default('/etc/nativeproxy/tls') }}"
+    state: directory
+    owner: root
+    group: "{{ native_proxy_group | default('nativeproxy') }}"
+    mode: "0750"
+
+- name: Install certbot deploy hook for nativeProxy TLS
+  ansible.builtin.template:
+    src: restart-nativeproxy.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/restart-nativeproxy.sh
+    mode: "0755"
+
+- name: Ensure certbot timer is enabled
+  ansible.builtin.systemd_service:
+    name: certbot.timer
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+- name: Obtain certificate via Cloudflare DNS-01
+  ansible.builtin.command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials {{ certbot_credentials_path }}
+    --dns-cloudflare-propagation-seconds {{ certbot_dns_propagation_seconds | default(60) }}
+    --cert-name {{ certbot_domains_effective | first }}
+    --expand
+    --non-interactive --agree-tos --keep-until-expiring
+    -m {{ letsencrypt_email }}
+    {% for domain in certbot_domains_effective %}
+    -d {{ domain }}
+    {% endfor %}
+  when: not ansible_check_mode
+
+- name: Copy nativeProxy TLS certificate
+  ansible.builtin.copy:
+    src: "/etc/letsencrypt/live/{{ certbot_domains_effective | first }}/fullchain.pem"
+    dest: "{{ native_proxy_tls_cert_path | default('/etc/nativeproxy/tls/fullchain.pem') }}"
+    remote_src: true
+    owner: root
+    group: "{{ native_proxy_group | default('nativeproxy') }}"
+    mode: "0640"
+  when: not ansible_check_mode
+
+- name: Copy nativeProxy TLS private key
+  ansible.builtin.copy:
+    src: "/etc/letsencrypt/live/{{ certbot_domains_effective | first }}/privkey.pem"
+    dest: "{{ native_proxy_tls_key_path | default('/etc/nativeproxy/tls/privkey.pem') }}"
+    remote_src: true
+    owner: root
+    group: "{{ native_proxy_group | default('nativeproxy') }}"
+    mode: "0640"
+  when: not ansible_check_mode

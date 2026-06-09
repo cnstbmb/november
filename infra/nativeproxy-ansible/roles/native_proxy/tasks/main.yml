@@ -1,0 +1,98 @@
+- name: Validate nativeProxy binary source
+  ansible.builtin.assert:
+    that:
+      - (native_proxy_binary_src | default('') | length > 0) or (native_proxy_binary_url | default('') | length > 0)
+    fail_msg: "Set native_proxy_binary_src or native_proxy_binary_url before running native_proxy."
+
+- name: Ensure nativeProxy group exists
+  ansible.builtin.group:
+    name: "{{ native_proxy_group }}"
+    system: true
+    state: present
+  when: native_proxy_group != 'root'
+
+- name: Ensure nativeProxy user exists
+  ansible.builtin.user:
+    name: "{{ native_proxy_user }}"
+    group: "{{ native_proxy_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ native_proxy_work_dir }}"
+    create_home: false
+    state: present
+  when: native_proxy_user != 'root'
+
+- name: Ensure nativeProxy directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(native_proxy_user) }}"
+    group: "{{ item.group | default(native_proxy_group) }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ native_proxy_config_path | dirname }}"
+      owner: root
+      group: root
+      mode: "0755"
+    - path: "{{ native_proxy_work_dir }}"
+      mode: "0750"
+
+- name: Copy nativeProxy binary from control-node
+  ansible.builtin.copy:
+    src: "{{ native_proxy_binary_src }}"
+    dest: "{{ native_proxy_bin_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: native_proxy_binary_src | default('') | length > 0
+  notify: Restart nativeProxy
+
+- name: Download nativeProxy binary
+  ansible.builtin.get_url:
+    url: "{{ native_proxy_binary_url }}"
+    dest: "{{ native_proxy_bin_path }}"
+    checksum: "{{ native_proxy_checksum | default(omit, true) }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: native_proxy_binary_url | default('') | length > 0
+  notify: Restart nativeProxy
+
+- name: Copy nativeProxy config from control-node
+  ansible.builtin.copy:
+    src: "{{ native_proxy_config_src }}"
+    dest: "{{ native_proxy_config_path }}"
+    owner: root
+    group: "{{ native_proxy_group }}"
+    mode: "0640"
+  when: native_proxy_config_src | default('') | length > 0
+  notify: Restart nativeProxy
+
+- name: Render nativeProxy config skeleton
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ native_proxy_config_path }}"
+    owner: root
+    group: "{{ native_proxy_group }}"
+    mode: "0640"
+  when: native_proxy_config_src | default('') | length == 0
+  notify: Restart nativeProxy
+
+- name: Render nativeProxy systemd unit
+  ansible.builtin.template:
+    src: nativeproxy.service.j2
+    dest: /etc/systemd/system/nativeproxy.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart nativeProxy
+
+- name: Ensure nativeProxy service is enabled
+  ansible.builtin.systemd_service:
+    name: nativeproxy.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

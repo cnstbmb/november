@@ -1,3 +1,8 @@
 remnawave_panel_pull_policy: "missing"
 remnashop_domain: ""
 remnashop_app_port: 5000
+remnawave_public_status_enabled: false
+remnawave_public_status_path: "/status"
+remnawave_public_status_grafana_path: "/status-grafana/"
+remnawave_public_status_grafana_upstream: "monitoring-public-grafana:3000"
+remnawave_public_status_dashboard_path: "/status-grafana/d/public-service-status/status?orgId=1&refresh=30s&kiosk"

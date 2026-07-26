@@ -16,18 +16,27 @@ const XHTTP_MODE = "stream-one";
 const XHTTP_OUTBOUND = process.env.REMNAWAVE_MOSCOW_XHTTP_OUTBOUND || null;
 const XHTTP_EXTRA_PARAMS = {
   xmux: {
-    maxConcurrency: 1,
-    cMaxReuseTimes: 1,
-    hMaxRequestTimes: "50-100",
-    hMaxReusableSecs: "60-180",
-    hKeepAlivePeriod: 15,
+    maxConcurrency: "16-32",
+    maxConnections: 0,
+    cMaxReuseTimes: 0,
+    hMaxRequestTimes: "600-900",
+    hMaxReusableSecs: "1800-3000",
+    hKeepAlivePeriod: 0,
   },
 };
+const LOCAL_PROFILE_PATHS = [
+  path.join(ROOT, ".private/configs/MASTER_NODE.json"),
+  path.join(
+    ROOT,
+    ".private/ansible/prod/remnawave-topology/profiles/02-master-moscow.himenkov.ru.profile.json",
+  ),
+];
 const MOSCOW_SERVICE_INBOUNDS = [
   "VLESS_REALITY_MOSCOW",
   "BRIDGE_MASTER_IN",
   XHTTP_TAG,
   "VLESS_REALITY_HOME_WIFI",
+  "HYSTERIA2_MOSCOW",
 ];
 const MOSCOW_SERVICE_DOMAINS = [
   "domain:sub.moscow.himenkov.ru",
@@ -48,12 +57,22 @@ function readToken() {
 function backupDir() {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
   const dir = path.join(ROOT, ".private/backups/moscow-xhttp-stream-one", stamp);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.chmodSync(dir, 0o700);
   return dir;
 }
 
 function writeJson(dir, name, value) {
-  fs.writeFileSync(path.join(dir, name), JSON.stringify(value, null, 2) + "\n");
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+}
+
+function writeLocalProfile(file, config) {
+  const temp = `${file}.xhttp-update-${process.pid}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+  fs.chmodSync(temp, 0o600);
+  fs.renameSync(temp, file);
 }
 
 async function api(method, endpoint, body) {
@@ -104,7 +123,7 @@ function isMoscowServiceBypassRule(rule) {
   return (
     rule?.type === "field" &&
     rule.outboundTag === "IPv4" &&
-    sameArray(rule.inboundTag || [], MOSCOW_SERVICE_INBOUNDS) &&
+    rule.inboundTag?.includes?.(XHTTP_TAG) &&
     sameArray(rule.domain || [], MOSCOW_SERVICE_DOMAINS)
   );
 }
@@ -114,7 +133,7 @@ function isMoscowSelf443BypassRule(rule) {
     rule?.type === "field" &&
     rule.outboundTag === "IPv4" &&
     rule.port === "443" &&
-    sameArray(rule.inboundTag || [], MOSCOW_SERVICE_INBOUNDS) &&
+    rule.inboundTag?.includes?.(XHTTP_TAG) &&
     sameArray(rule.ip || [], [MOSCOW_SELF_IP])
   );
 }
@@ -263,6 +282,11 @@ writeJson(dir, "node.restart.response.json", restartAfter);
 
 const hostsAfter = await api("GET", "/hosts");
 writeJson(dir, "hosts.after.json", hostsAfter);
+const profileFinal = await api("GET", `/config-profiles/${PROFILE_UUID}`);
+writeJson(dir, "profile.after.json", profileFinal);
+for (const file of LOCAL_PROFILE_PATHS) {
+  writeLocalProfile(file, profileFinal.response.config);
+}
 
 console.log(JSON.stringify({
   backupDir: dir,
@@ -273,5 +297,6 @@ console.log(JSON.stringify({
     outbound: xhttpOutbound,
   },
   hosts: hostUpdates,
+  localProfilesSynchronized: LOCAL_PROFILE_PATHS.map((file) => path.relative(ROOT, file)),
   restart: restartAfter.response || restartAfter,
 }, null, 2));

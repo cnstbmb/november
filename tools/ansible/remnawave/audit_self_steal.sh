@@ -75,13 +75,22 @@ check_http_status() {
   local label="$1"
   local resolve="$2"
   local url="$3"
-  local code
+  local code=""
+  local attempt
 
-  if [ -n "${resolve}" ]; then
-    code="$(curl -kfsS --max-time "${TIMEOUT}" --resolve "${resolve}" -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null)"
-  else
-    code="$(curl -kfsS --max-time "${TIMEOUT}" -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null)"
-  fi
+  for attempt in 1 2 3; do
+    if [ -n "${resolve}" ]; then
+      code="$(curl -kfsS --max-time "${TIMEOUT}" --resolve "${resolve}" -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null)"
+    else
+      code="$(curl -kfsS --max-time "${TIMEOUT}" -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null)"
+    fi
+    if [ "${code}" = "200" ]; then
+      break
+    fi
+    if [ "${attempt}" -lt 3 ]; then
+      sleep 1
+    fi
+  done
 
   if [ "${code}" = "200" ]; then
     pass "${label}: HTTP 200"
@@ -186,6 +195,12 @@ query_param() {
   printf '%s\n' "${line}" | sed -n "s/.*[?&]${key}=\\([^&#]*\\).*/\\1/p"
 }
 
+query_json_param() {
+  local line="$1"
+  local key="$2"
+  python3 -c 'import sys, urllib.parse; print(urllib.parse.parse_qs(urllib.parse.urlsplit(sys.argv[1]).query).get(sys.argv[2], [""])[0])' "${line}" "${key}"
+}
+
 check_subscription_line() {
   local label="$1"
   local remark="$2"
@@ -220,6 +235,7 @@ check_subscription_line() {
 
 check_subscription_moscow_line() {
   local line
+  local xhttp_extra
 
   line="$(line_for_remark "MOSCOW")"
   if [ -z "${line}" ]; then
@@ -262,10 +278,19 @@ check_subscription_moscow_line() {
     *) fail "subscription MOSCOW: expected mode=${MOSCOW_SUBSCRIPTION_MODE}" ;;
   esac
 
-  case "${line}" in
-    *"extra="*"maxConcurrency"*) pass "subscription MOSCOW: xhttp extra xmux maxConcurrency" ;;
-    *) fail "subscription MOSCOW: expected extra xmux maxConcurrency" ;;
-  esac
+  xhttp_extra="$(query_json_param "${line}" "extra")"
+  if printf '%s\n' "${xhttp_extra}" | jq -e '
+    .xmux.maxConcurrency == "16-32" and
+    .xmux.maxConnections == 0 and
+    .xmux.cMaxReuseTimes == 0 and
+    .xmux.hMaxRequestTimes == "600-900" and
+    .xmux.hMaxReusableSecs == "1800-3000" and
+    .xmux.hKeepAlivePeriod == 0
+  ' >/dev/null 2>&1; then
+    pass "subscription MOSCOW: documented stable xmux values"
+  else
+    fail "subscription MOSCOW: unexpected xmux values"
+  fi
 }
 
 check_subscription_no_xhttp_canary() {
@@ -453,6 +478,7 @@ section "Tooling"
 require_cmd curl
 require_cmd jq
 require_cmd base64
+require_cmd python3
 
 section "Public fallback"
 check_http_status "sub.moscow.himenkov.ru root" "sub.moscow.himenkov.ru:443:5.42.111.142" "https://sub.moscow.himenkov.ru/"
@@ -490,6 +516,26 @@ fi
 check_json_value "MASTER MOSCOW target" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_MOSCOW") | .streamSettings.realitySettings.target' "127.0.0.1:443"
 check_json_value "MASTER MOSCOW serverName" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_MOSCOW") | .streamSettings.realitySettings.serverNames[0]' "sub.moscow.himenkov.ru"
 check_json_array_contains "MASTER MOSCOW 443 SNI" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_MOSCOW") | .streamSettings.realitySettings.serverNames[]' "moscow.himenkov.ru"
+if jq -e '
+  [.inbounds[]
+    | select(.tag=="VLESS_REALITY_MOSCOW" or .tag=="VLESS_REALITY_HOME_WIFI")
+    | .streamSettings.realitySettings.privateKey]
+  | length == 2 and (unique | length == 2)
+' "${ROOT_DIR}/.private/configs/MASTER_NODE.json" >/dev/null; then
+  pass "MASTER Reality private keys: present and distinct"
+else
+  fail "MASTER Reality private keys: expected two distinct keys"
+fi
+if jq -e '
+  [.outbounds[]
+    | select(.tag=="GRPC_TO_HOME_RU" or .tag=="GRPC_TO_EXIT")
+    | .settings.vnext[0].users[0].id]
+  | length == 2 and (unique | length == 2)
+' "${ROOT_DIR}/.private/configs/MASTER_NODE.json" >/dev/null; then
+  pass "MASTER bridge VLESS UUIDs: present and distinct"
+else
+  fail "MASTER bridge VLESS UUIDs: expected two distinct values"
+fi
 check_json_path_absent "MASTER DIRECT inbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_DIRECT_MSK")'
 check_json_value "MASTER MOSCOW xhttp network" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.network' "xhttp"
 check_json_value "MASTER MOSCOW xhttp security" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.security' "none"
@@ -515,9 +561,9 @@ check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTE
 check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru")) and (.inboundTag? | not)) | .balancerTag' "HOME_OR_MOSCOW"
 check_json_value "MASTER Home fallback to Moscow" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .fallbackTag' "IPv4"
 if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*port: 10085' "${ROOT_DIR}/.private/ansible/prod/group_vars/master.yml" >/dev/null; then
-  pass "MASTER 10085 firewall: allows Docker bridge CIDR"
+  pass "MASTER 10085 firewall config: allows Docker bridge CIDR"
 else
-  fail "MASTER 10085 firewall: missing Docker bridge CIDR allow"
+  fail "MASTER 10085 firewall config: missing Docker bridge CIDR allow"
 fi
 if rg -U 'firewall_extra_udp_ports:[\s\S]*- 443' "${ROOT_DIR}/.private/ansible/prod/host_vars/moscow.himenkov.ru/remnawave_topology.yml" >/dev/null; then
   pass "MASTER HYSTERIA2 firewall: opens 443/udp"

@@ -79,11 +79,12 @@ npm run ansible:topology
   `entry -> master -> exit + WireGuard`
 - также умеет legacy-схему `edge -> transit -> multiple exits` на `XHTTP`
 - позволяет выбирать inventory hosts по номеру или по hostname
-- использует жёсткие opinionated defaults для camouflage-полей:
-  - `entry -> client`: `sun6-22.userapi.com`
+- использует только собственные домены и self-steal defaults:
+  - `entry -> client`: `himenkov.ru`
   - `entry -> master`: `/fluegergeheimer`
-  - `master public`: `borsaistanbul.com:443`
-  - `master direct`: `borsaistanbul.com:443`
+  - `master public/direct`: `127.0.0.1:443`, SNI `moscow.himenkov.ru`
+  - `exit public`: `127.0.0.1:443`, SNI `himenkov.ru`
+  - `home public`: `127.0.0.1:443`, SNI `home.himenkov.ru`
   - `master -> exit`: `gRPC/TLS` на `8443`
 - пишет JSON профили в `.private/ansible/prod/remnawave-topology/profiles`
 - пишет `firewall_extra_tcp_ports` и `firewall_extra_udp_ports` в
@@ -206,22 +207,17 @@ tools/ansible/remnawave/entry-master-exit/
 tools/ansible/bootstrap_remnawave_subscription_page.sh
 ```
 
-Готовые sanitized templates для схемы `ENTRY -> MASTER -> EXIT`
+Renderer и документация для схемы `ENTRY -> MASTER -> EXIT`
 с `Reality/TCP`, `XHTTP/TLS`, `gRPC/TLS`, optional `DIRECT_EXIT`
-и mandatory `WireGuard`
-лежат в:
+и mandatory `WireGuard` лежат в:
 
 ```bash
 tools/ansible/remnawave/entry-master-exit/
 ```
 
-См.:
-
-- `ENTRY_NODE.profile.template.json`
-- `MASTER_NODE.profile.template.json`
-- `EXIT_NODE.profile.template.json`
-- `DIRECT_EXIT.profile.template.json`
-- `README.md` с mapping по `Hosts`, `Internal Squads`, `system users`
+JSON-профили не хранятся как статические шаблоны: их генерирует
+`render_entry_master_exit.py` в private-каталог. Это исключает расхождение
+между неиспользуемыми примерами и фактической topology.
 
 Важно: при `enable_remnawave_node=true` роль `remnawave_node` требует, чтобы
 `node_env_src` для каждого хоста, где включена нода, был задан и файл существовал

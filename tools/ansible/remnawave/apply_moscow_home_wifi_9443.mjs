@@ -29,7 +29,8 @@ function readToken() {
 function backupDir() {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
   const dir = path.join(ROOT, ".private/backups/moscow-home-wifi-9443", stamp);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.chmodSync(dir, 0o700);
   return dir;
 }
 
@@ -59,10 +60,14 @@ async function api(method, endpoint, body) {
 }
 
 function writeJson(dir, name, value) {
-  fs.writeFileSync(path.join(dir, name), JSON.stringify(value, null, 2) + "\n");
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
 }
 
 function ensureInbound(config) {
+  const existingHomeWifi = config.inbounds.find((inbound) => inbound.tag === NEW_TAG);
+  const existingHomeWifiReality = existingHomeWifi?.streamSettings?.realitySettings;
   config.inbounds = config.inbounds.filter((inbound) => inbound.tag !== HYSTERIA_TAG && inbound.tag !== NEW_TAG);
   const base = config.inbounds.find((inbound) => inbound.tag === OLD_TAG);
   if (!base) throw new Error(`${OLD_TAG} not found in MASTER_NODE profile`);
@@ -70,7 +75,12 @@ function ensureInbound(config) {
   const next = JSON.parse(JSON.stringify(base));
   next.tag = NEW_TAG;
   next.port = 9443;
-  next.streamSettings.realitySettings.shortIds = ["9443b5ef"];
+  if (existingHomeWifiReality?.privateKey) {
+    next.streamSettings.realitySettings.privateKey = existingHomeWifiReality.privateKey;
+  }
+  if (Array.isArray(existingHomeWifiReality?.shortIds) && existingHomeWifiReality.shortIds.length > 0) {
+    next.streamSettings.realitySettings.shortIds = existingHomeWifiReality.shortIds;
+  }
   next.streamSettings.realitySettings.serverNames = ["moscow.himenkov.ru"];
 
   const baseIndex = config.inbounds.findIndex((inbound) => inbound.tag === OLD_TAG);

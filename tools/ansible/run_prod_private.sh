@@ -64,7 +64,7 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
-  --playbook <value>     site | base | master | workers | stremio | monitoring | remnawave-panel | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | remnawave-panel | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -77,6 +77,7 @@ resolve_playbook() {
   case "${value}" in
     site) echo "${ROOT_DIR}/infra/ansible/playbooks/site.yml" ;;
     base) echo "${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
+    firewall) echo "${ROOT_DIR}/infra/ansible/playbooks/firewall.yml" ;;
     master) echo "${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
     workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
     stremio) echo "${ROOT_DIR}/infra/ansible/playbooks/stremio.yml" ;;

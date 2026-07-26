@@ -26,12 +26,15 @@ function readToken() {
 function backupDir() {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
   const dir = path.join(ROOT, ".private/backups/torrent-blocker", stamp);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.chmodSync(dir, 0o700);
   return dir;
 }
 
 function writeJson(dir, name, value) {
-  fs.writeFileSync(path.join(dir, name), JSON.stringify(value, null, 2) + "\n");
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
 }
 
 async function api(method, endpoint, body) {

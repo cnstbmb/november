@@ -1,0 +1,23 @@
+- name: Stremio torrent stream base setup
+  hosts: stremio
+  become: "{{ stremio_torrent_stream_manage_host | default(true) | bool }}"
+  gather_facts: "{{ stremio_torrent_stream_manage_host | default(true) | bool }}"
+  roles:
+    - role: base
+      when: stremio_torrent_stream_manage_host | default(true) | bool
+    - role: ssh_hardening
+      when: stremio_torrent_stream_manage_host | default(true) | bool
+    - role: firewall
+      when: stremio_torrent_stream_manage_host | default(true) | bool
+    - role: fail2ban
+      when: stremio_torrent_stream_manage_host | default(true) | bool
+    - role: docker
+      when: stremio_torrent_stream_manage_host | default(true) | bool
+
+- name: Stremio torrent stream stack
+  hosts: stremio
+  become: "{{ stremio_torrent_stream_become | default(true) | bool }}"
+  gather_facts: true
+  roles:
+    - role: stremio_torrent_stream
+      when: enable_stremio_torrent_stream | default(true) | bool

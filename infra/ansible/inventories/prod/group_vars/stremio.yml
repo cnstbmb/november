@@ -1,0 +1,37 @@
+# NanoPi R76S / ARM64 LAN-only Stremio addon stack.
+allow_http_https: false
+enable_certbot: false
+enable_monitoring: false
+enable_backups: false
+
+enable_stremio_torrent_stream: true
+stremio_torrent_stream_manage_host: true
+stremio_torrent_stream_become: true
+stremio_torrent_stream_dir: "/opt/stremio-torrent-stream"
+stremio_torrent_stream_platform: "linux/arm64"
+stremio_torrent_stream_http_port: 58827
+stremio_torrent_stream_https_port: 58828
+jackett_port: 9117
+
+# Optional short HTTPS frontend. Requires either an existing certificate under
+# /etc/letsencrypt/live/<tls-domain>/ or proxy certbot enabled below.
+# stremio_torrent_stream_proxy_enabled: true
+# stremio_torrent_stream_proxy_domain: "stremio.example.com"
+# stremio_torrent_stream_proxy_tls_domain: "stremio.example.com"
+# stremio_torrent_stream_proxy_bind_host: "0.0.0.0"
+# stremio_torrent_stream_proxy_http_port: 80
+# stremio_torrent_stream_proxy_https_port: 443
+
+# Optional certificate issuance without host sudo. The role runs the official
+# certbot Cloudflare DNS container and writes /etc/letsencrypt through Docker.
+# stremio_torrent_stream_proxy_certbot_enabled: true
+# stremio_torrent_stream_proxy_certbot_renew_enabled: true
+
+# Optional: pin when the default route IP is not the LAN address Stremio clients use.
+# stremio_torrent_stream_lan_ip: "192.168.1.50"
+
+# Optional: restrict UFW ingress to your LAN CIDR instead of allowing any source.
+# stremio_torrent_stream_firewall_from_ip: "192.168.1.0/24"
+
+# Use localtunnel only if local-ip.medicmobile.org DNS/certificate flow is blocked.
+# stremio_torrent_stream_https_method: "localtunnel"

@@ -108,6 +108,72 @@ ansible-playbook -i infra/ansible/inventories/prod/hosts.yml infra/ansible/playb
 ansible-playbook -i infra/ansible/inventories/prod/hosts.yml infra/ansible/playbooks/workers.yml
 ```
 
+### Targeting NanoPi Stremio
+
+Add the NanoPi R76S host to the `stremio` inventory group, either through
+`tools/ansible/bootstrap_private_vars.sh` or manually in `.private/ansible/prod/hosts.yml`:
+
+```yaml
+all:
+  children:
+    stremio:
+      hosts:
+        nanopi-r76s:
+          ansible_host: "192.168.1.50"
+```
+
+Run only this LAN stack:
+
+```bash
+npm run ansible:stremio
+```
+
+The playbook installs the shared base roles on the `stremio` group, then deploys
+`stremio-torrent-stream` and Jackett under `/opt/stremio-torrent-stream`.
+The role renders its own compose file with `platform: linux/arm64` because the
+upstream repository currently ships a compact `compose.yaml` without ARM platform
+or persistent Jackett volume settings.
+By default it also configures public Jackett indexers:
+`1337x`, `yts`, `torrentgalaxyclone`, `therarbg`, `rutracker-ru`, `rutor`,
+and `byrutor`.
+
+Ports:
+
+- `58827/tcp` - addon HTTP config UI
+- `58828/tcp` - addon HTTPS install URL for Stremio
+- `9117/tcp` - Jackett UI
+- optional `80/tcp` and `443/tcp` - short HTTPS frontend when
+  `stremio_torrent_stream_proxy_enabled: true`
+
+After deployment, use:
+
+- Jackett UI from a browser: `http://<LAN_IP>:9117`
+- Addon HTTPS install URL: `https://<LAN-IP-with-dashes>.local-ip.medicmobile.org:58828`
+- Optional short HTTPS install URL: `https://<stremio-domain>` when
+  `stremio_torrent_stream_proxy_enabled: true`
+- Jackett URL inside the addon config: `http://jackett:9117`
+
+For a short LAN-only hostname, create a local DNS record such as
+`stremio.home.example.com -> <LAN_IP>` and set:
+
+```yaml
+stremio_torrent_stream_proxy_enabled: true
+stremio_torrent_stream_proxy_domain: "stremio.home.example.com"
+stremio_torrent_stream_proxy_tls_domain: "stremio.home.example.com"
+stremio_torrent_stream_proxy_bind_host: "<LAN_IP>"
+stremio_torrent_stream_proxy_certbot_enabled: true
+```
+
+The proxy uses nginx in the same compose project and forwards HTTPS traffic to
+the addon's HTTP port. With `stremio_torrent_stream_proxy_certbot_enabled`, the
+role runs a Certbot Cloudflare DNS container, so certificate issuance does not
+require passwordless sudo on the NanoPi.
+
+If Docker Hub does not provide an ARM64 image for the addon, the role can clone
+`https://github.com/nyakaspeter/stremio-torrent-stream.git` and build
+`stremio-torrent-stream:local` on the NanoPi. This fallback is enabled by default
+after a failed ARM64 image pull.
+
 ## 5) Remnawave Nodes
 
 If `enable_remnawave_node: true`, remnawave node is deployed on the selected host

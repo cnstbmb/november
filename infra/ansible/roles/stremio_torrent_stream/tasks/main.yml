@@ -1,0 +1,357 @@
+- name: Validate stremio-torrent-stream ports
+  ansible.builtin.assert:
+    that:
+      - stremio_torrent_stream_http_port | int != stremio_torrent_stream_https_port | int
+      - stremio_torrent_stream_http_port | int != jackett_port | int
+      - stremio_torrent_stream_https_port | int != jackett_port | int
+      - not (stremio_torrent_stream_proxy_enabled | bool) or stremio_torrent_stream_proxy_http_port | int not in [stremio_torrent_stream_http_port | int, stremio_torrent_stream_https_port | int, jackett_port | int]
+      - not (stremio_torrent_stream_proxy_enabled | bool) or stremio_torrent_stream_proxy_https_port | int not in [stremio_torrent_stream_http_port | int, stremio_torrent_stream_https_port | int, jackett_port | int, stremio_torrent_stream_proxy_http_port | int]
+      - not (stremio_torrent_stream_proxy_enabled | bool) or stremio_torrent_stream_proxy_domain | length > 0
+      - not (stremio_torrent_stream_proxy_enabled | bool) or stremio_torrent_stream_proxy_tls_domain | length > 0
+      - not (stremio_torrent_stream_proxy_certbot_enabled | bool) or stremio_torrent_stream_proxy_certbot_email | length > 0
+      - not (stremio_torrent_stream_proxy_certbot_enabled | bool) or cloudflare_api_token | default('') | length > 0
+    fail_msg: "stremio-torrent-stream and Jackett host ports must be distinct."
+
+- name: Resolve stremio-torrent-stream LAN address
+  ansible.builtin.set_fact:
+    stremio_torrent_stream_lan_ip_effective: >-
+      {{
+        stremio_torrent_stream_lan_ip
+        if (stremio_torrent_stream_lan_ip | length > 0)
+        else (
+          (ansible_facts.default_ipv4 | default({})).address
+          | default(ansible_host | default(inventory_hostname), true)
+        )
+      }}
+    stremio_torrent_stream_effective_image: "{{ stremio_torrent_stream_image }}"
+
+- name: Pull stremio-torrent-stream ARM64 image
+  ansible.builtin.command: >
+    docker pull --platform {{ stremio_torrent_stream_platform }}
+    {{ stremio_torrent_stream_image }}
+  register: stremio_torrent_stream_pull_image
+  changed_when: >-
+    'Downloaded newer image' in stremio_torrent_stream_pull_image.stdout or
+    'Pull complete' in stremio_torrent_stream_pull_image.stdout or
+    'Status: Downloaded' in stremio_torrent_stream_pull_image.stdout
+  failed_when: false
+  when:
+    - stremio_torrent_stream_probe_image | bool
+    - not (stremio_torrent_stream_force_build | bool)
+    - not ansible_check_mode
+
+- name: Decide whether local stremio-torrent-stream image build is needed
+  ansible.builtin.set_fact:
+    stremio_torrent_stream_build_needed: >-
+      {{
+        (stremio_torrent_stream_force_build | bool)
+        or (
+          stremio_torrent_stream_probe_image | bool
+          and (stremio_torrent_stream_pull_image.rc | default(0) | int != 0)
+          and (stremio_torrent_stream_build_on_pull_failure | bool)
+        )
+      }}
+
+- name: Fail when ARM64 image pull failed and build fallback is disabled
+  ansible.builtin.fail:
+    msg: >-
+      Could not pull {{ stremio_torrent_stream_image }} for
+      {{ stremio_torrent_stream_platform }}. Enable
+      stremio_torrent_stream_build_on_pull_failure or set
+      stremio_torrent_stream_force_build to build from source.
+  when:
+    - stremio_torrent_stream_probe_image | bool
+    - stremio_torrent_stream_pull_image.rc | default(0) | int != 0
+    - not (stremio_torrent_stream_build_on_pull_failure | bool)
+    - not (stremio_torrent_stream_force_build | bool)
+    - not ansible_check_mode
+
+- name: Ensure stremio-torrent-stream directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ stremio_torrent_stream_dir }}"
+    - "{{ jackett_config_dir }}"
+    - "{{ jackett_downloads_dir }}"
+  when: not ansible_check_mode
+
+- name: Install git for source build fallback
+  ansible.builtin.apt:
+    name: git
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - stremio_torrent_stream_build_needed | bool
+    - not ansible_check_mode
+
+- name: Clone stremio-torrent-stream source for local image build
+  ansible.builtin.git:
+    repo: "{{ stremio_torrent_stream_repo_url }}"
+    dest: "{{ stremio_torrent_stream_source_dir }}"
+    version: "{{ stremio_torrent_stream_repo_version }}"
+    update: true
+  when:
+    - stremio_torrent_stream_build_needed | bool
+    - not ansible_check_mode
+
+- name: Build local stremio-torrent-stream image
+  ansible.builtin.command: "{{ stremio_torrent_stream_build_command }}"
+  args:
+    chdir: "{{ stremio_torrent_stream_source_dir }}"
+  register: stremio_torrent_stream_build_image
+  changed_when: true
+  when:
+    - stremio_torrent_stream_build_needed | bool
+    - not ansible_check_mode
+
+- name: Use locally built stremio-torrent-stream image
+  ansible.builtin.set_fact:
+    stremio_torrent_stream_effective_image: "{{ stremio_torrent_stream_local_image }}"
+  when:
+    - stremio_torrent_stream_build_needed | bool
+    - not ansible_check_mode
+
+- name: Write stremio-torrent-stream compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ stremio_torrent_stream_dir }}/docker-compose.yml"
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Write stremio-torrent-stream HTTPS proxy config
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ stremio_torrent_stream_proxy_nginx_conf }}"
+    mode: "0644"
+  when:
+    - stremio_torrent_stream_proxy_enabled | bool
+    - not ansible_check_mode
+
+- name: Write stremio-torrent-stream certbot Cloudflare credentials
+  ansible.builtin.copy:
+    dest: "{{ stremio_torrent_stream_proxy_certbot_credentials_file }}"
+    mode: "0600"
+    content: |
+      dns_cloudflare_api_token = {{ cloudflare_api_token }}
+  no_log: true
+  when:
+    - stremio_torrent_stream_proxy_enabled | bool
+    - stremio_torrent_stream_proxy_certbot_enabled | bool
+    - not ansible_check_mode
+
+- name: Obtain stremio-torrent-stream HTTPS proxy certificate via DNS-01
+  ansible.builtin.command: >
+    docker run --rm
+    -v {{ stremio_torrent_stream_proxy_certbot_credentials_file }}:/cloudflare.ini:ro
+    -v /etc/letsencrypt:/etc/letsencrypt
+    -v /var/lib/letsencrypt:/var/lib/letsencrypt
+    {{ stremio_torrent_stream_proxy_certbot_image }}
+    certonly --dns-cloudflare
+    --dns-cloudflare-credentials /cloudflare.ini
+    --dns-cloudflare-propagation-seconds {{ stremio_torrent_stream_proxy_certbot_propagation_seconds }}
+    --cert-name {{ stremio_torrent_stream_proxy_tls_domain }}
+    --expand
+    --non-interactive --agree-tos --keep-until-expiring
+    -m {{ stremio_torrent_stream_proxy_certbot_email }}
+    -d {{ stremio_torrent_stream_proxy_domain }}
+  register: stremio_torrent_stream_proxy_certbot_result
+  changed_when: >-
+    'Successfully received certificate' in stremio_torrent_stream_proxy_certbot_result.stdout or
+    'Certificate not yet due for renewal; no action taken.' not in stremio_torrent_stream_proxy_certbot_result.stdout
+  when:
+    - stremio_torrent_stream_proxy_enabled | bool
+    - stremio_torrent_stream_proxy_certbot_enabled | bool
+    - not ansible_check_mode
+
+- name: Install stremio-torrent-stream HTTPS proxy certificate renewal cron
+  ansible.builtin.cron:
+    name: "renew stremio-torrent-stream HTTPS proxy certificate"
+    minute: "{{ stremio_torrent_stream_proxy_certbot_renew_minute }}"
+    hour: "{{ stremio_torrent_stream_proxy_certbot_renew_hour }}"
+    weekday: "{{ stremio_torrent_stream_proxy_certbot_renew_weekday }}"
+    job: >-
+      docker run --rm
+      -v {{ stremio_torrent_stream_proxy_certbot_credentials_file }}:/cloudflare.ini:ro
+      -v /etc/letsencrypt:/etc/letsencrypt
+      -v /var/lib/letsencrypt:/var/lib/letsencrypt
+      {{ stremio_torrent_stream_proxy_certbot_image }}
+      renew
+      --dns-cloudflare-credentials /cloudflare.ini
+      --dns-cloudflare-propagation-seconds {{ stremio_torrent_stream_proxy_certbot_propagation_seconds }}
+      --quiet
+      && docker kill -s HUP {{ stremio_torrent_stream_proxy_container_name }} >/dev/null 2>&1 || true
+  when:
+    - stremio_torrent_stream_proxy_enabled | bool
+    - stremio_torrent_stream_proxy_certbot_enabled | bool
+    - stremio_torrent_stream_proxy_certbot_renew_enabled | bool
+    - not ansible_check_mode
+
+- name: Allow stremio-torrent-stream LAN TCP ports in UFW
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ stremio_torrent_stream_http_port }}"
+    - "{{ stremio_torrent_stream_https_port }}"
+    - "{{ jackett_port }}"
+  when:
+    - stremio_torrent_stream_open_firewall | bool
+    - stremio_torrent_stream_firewall_from_ip | length == 0
+    - not ansible_check_mode
+
+- name: Allow stremio-torrent-stream LAN TCP ports from configured CIDR in UFW
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    from_ip: "{{ stremio_torrent_stream_firewall_from_ip }}"
+  loop:
+    - "{{ stremio_torrent_stream_http_port }}"
+    - "{{ stremio_torrent_stream_https_port }}"
+    - "{{ jackett_port }}"
+  when:
+    - stremio_torrent_stream_open_firewall | bool
+    - stremio_torrent_stream_firewall_from_ip | length > 0
+    - not ansible_check_mode
+
+- name: Start stremio-torrent-stream stack
+  ansible.builtin.command: >
+    docker compose
+    --project-name {{ stremio_torrent_stream_project_name }}
+    -f {{ stremio_torrent_stream_dir }}/docker-compose.yml
+    up -d --remove-orphans
+    {% if stremio_torrent_stream_pull_policy | length > 0 %}
+    --pull {{ stremio_torrent_stream_pull_policy }}
+    {% endif %}
+  args:
+    chdir: "{{ stremio_torrent_stream_dir }}"
+  when: not ansible_check_mode
+
+- name: Wait for stremio-torrent-stream services to be running
+  ansible.builtin.command: >
+    docker compose
+    --project-name {{ stremio_torrent_stream_project_name }}
+    -f {{ stremio_torrent_stream_dir }}/docker-compose.yml
+    ps --status running --services
+  args:
+    chdir: "{{ stremio_torrent_stream_dir }}"
+  register: stremio_torrent_stream_running_services
+  changed_when: false
+  retries: "{{ (stremio_torrent_stream_wait_timeout / stremio_torrent_stream_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ stremio_torrent_stream_wait_delay }}"
+  until:
+    - "'stremio-addon-server' in stremio_torrent_stream_running_services.stdout_lines"
+    - "'jackett' in stremio_torrent_stream_running_services.stdout_lines"
+    - "(not (stremio_torrent_stream_proxy_enabled | bool)) or 'stremio-addon-proxy' in stremio_torrent_stream_running_services.stdout_lines"
+  when:
+    - stremio_torrent_stream_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Wait for stremio-torrent-stream and Jackett ports
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: "{{ item }}"
+    timeout: "{{ stremio_torrent_stream_wait_timeout }}"
+  loop:
+    - "{{ stremio_torrent_stream_http_port }}"
+    - "{{ stremio_torrent_stream_https_port }}"
+    - "{{ jackett_port }}"
+  when:
+    - stremio_torrent_stream_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Wait for stremio-torrent-stream HTTPS proxy ports
+  ansible.builtin.wait_for:
+    host: "{{ '127.0.0.1' if stremio_torrent_stream_proxy_bind_host in ['', '0.0.0.0'] else stremio_torrent_stream_proxy_bind_host }}"
+    port: "{{ item }}"
+    timeout: "{{ stremio_torrent_stream_wait_timeout }}"
+  loop:
+    - "{{ stremio_torrent_stream_proxy_http_port }}"
+    - "{{ stremio_torrent_stream_proxy_https_port }}"
+  when:
+    - stremio_torrent_stream_proxy_enabled | bool
+    - stremio_torrent_stream_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Configure Jackett indexers
+  ansible.builtin.shell: |
+    set -eu
+
+    cookie_file="$(mktemp)"
+    indexers_file="$(mktemp)"
+    config_file="$(mktemp)"
+    trap 'rm -f "${cookie_file}" "${indexers_file}" "${config_file}"' EXIT
+
+    curl -fsS -c "${cookie_file}" "http://127.0.0.1:{{ jackett_port }}/UI/Login" >/dev/null || true
+    curl -fsS -b "${cookie_file}" -c "${cookie_file}" \
+      -X POST \
+      --data-urlencode "password={{ jackett_admin_password }}" \
+      "http://127.0.0.1:{{ jackett_port }}/UI/Dashboard" >/dev/null || true
+
+    curl -fsS -b "${cookie_file}" \
+      "http://127.0.0.1:{{ jackett_port }}/api/v2.0/indexers" \
+      -o "${indexers_file}"
+
+    missing_indexers="$(
+      python3 - "${indexers_file}" {{ jackett_indexers | map('quote') | join(' ') }} <<'PY'
+    import json
+    import sys
+
+    with open(sys.argv[1], "r", encoding="utf-8") as f:
+        indexers = json.load(f)
+
+    configured = {item.get("id") for item in indexers if item.get("configured")}
+    for indexer_id in sys.argv[2:]:
+        if indexer_id not in configured:
+            print(indexer_id)
+    PY
+    )"
+
+    if [ -z "${missing_indexers}" ]; then
+      echo "changed=false"
+      exit 0
+    fi
+
+    for indexer_id in ${missing_indexers}; do
+      curl -fsS -b "${cookie_file}" \
+        "http://127.0.0.1:{{ jackett_port }}/api/v2.0/indexers/${indexer_id}/config" \
+        -o "${config_file}"
+
+      status_code="$(
+        curl -sS -o /tmp/jackett-configure-response.json -w "%{http_code}" \
+          -b "${cookie_file}" \
+          -H "Content-Type: application/json" \
+          -X POST \
+          --data-binary "@${config_file}" \
+          "http://127.0.0.1:{{ jackett_port }}/api/v2.0/indexers/${indexer_id}/config"
+      )"
+
+      if [ "${status_code}" != "204" ]; then
+        cat /tmp/jackett-configure-response.json >&2 || true
+        echo "Failed to configure Jackett indexer ${indexer_id}: HTTP ${status_code}" >&2
+        exit 1
+      fi
+
+      echo "configured ${indexer_id}"
+    done
+  args:
+    executable: /bin/bash
+  register: jackett_configure_indexers_result
+  changed_when: "'configured ' in jackett_configure_indexers_result.stdout"
+  when:
+    - jackett_configure_indexers | bool
+    - jackett_indexers | length > 0
+    - not ansible_check_mode
+
+- name: Show stremio-torrent-stream LAN URLs
+  ansible.builtin.debug:
+    msg:
+      - "Jackett UI: http://{{ stremio_torrent_stream_lan_ip_effective }}:{{ jackett_port }}"
+      - "Addon HTTP config: http://{{ stremio_torrent_stream_lan_ip_effective }}:{{ stremio_torrent_stream_http_port }}"
+      - "Addon HTTPS install: https://{{ stremio_torrent_stream_lan_ip_effective | replace('.', '-') }}.local-ip.medicmobile.org:{{ stremio_torrent_stream_https_port }}"
+      - "{% if stremio_torrent_stream_proxy_enabled | bool %}Addon HTTPS proxy install: https://{{ stremio_torrent_stream_proxy_domain }}{% else %}Addon HTTPS proxy install: disabled{% endif %}"
+      - "Jackett URL for addon config: http://jackett:9117"

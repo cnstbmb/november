@@ -1,0 +1,48 @@
+services:
+  stremio-addon-server:
+    platform: "{{ stremio_torrent_stream_platform }}"
+    image: "{{ stremio_torrent_stream_effective_image }}"
+    container_name: "{{ stremio_torrent_stream_container_name }}"
+    restart: unless-stopped
+    ports:
+      - "{{ stremio_torrent_stream_bind_host }}:{{ stremio_torrent_stream_http_port }}:{{ stremio_torrent_stream_http_port }}/tcp"
+      - "{{ stremio_torrent_stream_bind_host }}:{{ stremio_torrent_stream_https_port }}:{{ stremio_torrent_stream_https_port }}/tcp"
+    environment:
+      PORT: "{{ stremio_torrent_stream_http_port }}"
+      HTTPS_PORT: "{{ stremio_torrent_stream_https_port }}"
+{% if stremio_torrent_stream_https_method | length > 0 %}
+      HTTPS_METHOD: "{{ stremio_torrent_stream_https_method }}"
+{% endif %}
+
+{% if stremio_torrent_stream_proxy_enabled | bool %}
+  stremio-addon-proxy:
+    image: "{{ stremio_torrent_stream_proxy_image }}"
+    container_name: "{{ stremio_torrent_stream_proxy_container_name }}"
+    restart: unless-stopped
+    depends_on:
+      - stremio-addon-server
+    ports:
+      - "{% if stremio_torrent_stream_proxy_bind_host not in ['', '0.0.0.0'] %}{{ stremio_torrent_stream_proxy_bind_host }}:{% endif %}{{ stremio_torrent_stream_proxy_http_port }}:80/tcp"
+      - "{% if stremio_torrent_stream_proxy_bind_host not in ['', '0.0.0.0'] %}{{ stremio_torrent_stream_proxy_bind_host }}:{% endif %}{{ stremio_torrent_stream_proxy_https_port }}:443/tcp"
+    volumes:
+      - "{{ stremio_torrent_stream_proxy_nginx_conf }}:/etc/nginx/conf.d/default.conf:ro"
+      - "/etc/letsencrypt:/etc/letsencrypt:ro"
+{% for static_site in stremio_torrent_stream_proxy_static_sites %}
+      - "{{ static_site.root }}:/srv/static-sites/{{ static_site.domain }}:ro"
+{% endfor %}
+
+{% endif %}
+  jackett:
+    platform: "{{ jackett_platform }}"
+    image: "{{ jackett_image }}"
+    container_name: "{{ jackett_container_name }}"
+    restart: unless-stopped
+    ports:
+      - "{{ stremio_torrent_stream_bind_host }}:{{ jackett_port }}:9117/tcp"
+    volumes:
+      - "{{ jackett_config_dir }}:/config"
+      - "{{ jackett_downloads_dir }}:/downloads"
+    environment:
+      PUID: "{{ jackett_puid }}"
+      PGID: "{{ jackett_pgid }}"
+      TZ: "{{ jackett_timezone }}"

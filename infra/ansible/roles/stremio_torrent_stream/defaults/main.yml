@@ -1,0 +1,75 @@
+enable_stremio_torrent_stream: true
+stremio_torrent_stream_manage_host: true
+stremio_torrent_stream_become: true
+
+stremio_torrent_stream_dir: "/opt/stremio-torrent-stream"
+stremio_torrent_stream_project_name: "stremio-torrent-stream"
+stremio_torrent_stream_platform: "linux/arm64"
+stremio_torrent_stream_bind_host: "0.0.0.0"
+stremio_torrent_stream_http_port: 58827
+stremio_torrent_stream_https_port: 58828
+stremio_torrent_stream_image: "nyakaspeter/stremio-torrent-stream:latest"
+stremio_torrent_stream_local_image: "stremio-torrent-stream:local"
+stremio_torrent_stream_container_name: "stremio-addon-server"
+stremio_torrent_stream_https_method: ""
+
+stremio_torrent_stream_proxy_enabled: false
+stremio_torrent_stream_proxy_image: "nginx:mainline-alpine"
+stremio_torrent_stream_proxy_container_name: "stremio-addon-proxy"
+stremio_torrent_stream_proxy_bind_host: "0.0.0.0"
+stremio_torrent_stream_proxy_http_port: 80
+stremio_torrent_stream_proxy_https_port: 443
+stremio_torrent_stream_proxy_domain: ""
+stremio_torrent_stream_proxy_tls_domain: "{{ stremio_torrent_stream_proxy_domain }}"
+stremio_torrent_stream_proxy_static_sites: []
+stremio_torrent_stream_proxy_nginx_conf: "{{ stremio_torrent_stream_dir }}/nginx.conf"
+
+stremio_torrent_stream_proxy_certbot_enabled: false
+stremio_torrent_stream_proxy_certbot_image: "certbot/dns-cloudflare:latest"
+stremio_torrent_stream_proxy_certbot_credentials_file: "{{ stremio_torrent_stream_dir }}/cloudflare.ini"
+stremio_torrent_stream_proxy_certbot_email: "{{ letsencrypt_email | default('') }}"
+stremio_torrent_stream_proxy_certbot_propagation_seconds: "{{ certbot_dns_propagation_seconds | default(60) }}"
+stremio_torrent_stream_proxy_certbot_renew_enabled: "{{ stremio_torrent_stream_proxy_certbot_enabled }}"
+stremio_torrent_stream_proxy_certbot_renew_minute: "23"
+stremio_torrent_stream_proxy_certbot_renew_hour: "3"
+stremio_torrent_stream_proxy_certbot_renew_weekday: "1"
+
+stremio_torrent_stream_probe_image: true
+stremio_torrent_stream_build_on_pull_failure: true
+stremio_torrent_stream_force_build: false
+stremio_torrent_stream_repo_url: "https://github.com/nyakaspeter/stremio-torrent-stream.git"
+stremio_torrent_stream_repo_version: "main"
+stremio_torrent_stream_source_dir: "{{ stremio_torrent_stream_dir }}/src"
+stremio_torrent_stream_build_command: >-
+  docker build --platform {{ stremio_torrent_stream_platform }}
+  -t {{ stremio_torrent_stream_local_image }} .
+
+stremio_torrent_stream_pull_policy: "missing"
+stremio_torrent_stream_wait_for_stack: true
+stremio_torrent_stream_wait_delay: 3
+stremio_torrent_stream_wait_timeout: 120
+
+stremio_torrent_stream_open_firewall: true
+stremio_torrent_stream_firewall_from_ip: ""
+
+stremio_torrent_stream_lan_ip: ""
+
+jackett_image: "lscr.io/linuxserver/jackett:latest"
+jackett_platform: "{{ stremio_torrent_stream_platform }}"
+jackett_container_name: "jackett"
+jackett_port: 9117
+jackett_config_dir: "{{ stremio_torrent_stream_dir }}/jackett/config"
+jackett_downloads_dir: "{{ stremio_torrent_stream_dir }}/jackett/downloads"
+jackett_puid: 1000
+jackett_pgid: 1000
+jackett_timezone: "{{ timezone | default('Europe/Moscow') }}"
+jackett_configure_indexers: true
+jackett_admin_password: ""
+jackett_indexers:
+  - "1337x"
+  - "yts"
+  - "torrentgalaxyclone"
+  - "therarbg"
+  - "rutracker-ru"
+  - "rutor"
+  - "byrutor"

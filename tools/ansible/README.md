@@ -9,6 +9,7 @@
   - `.private/ansible/prod/group_vars/all.yml`
   - `.private/ansible/prod/group_vars/master.yml`
   - `.private/ansible/prod/group_vars/workers.yml`
+  - `.private/ansible/prod/group_vars/stremio.yml`
 - `run_prod_private.sh` запускает playbook с private inventory.
 
 ## Как использовать
@@ -33,6 +34,7 @@ npm run ansible:bootstrap
 - создаёт `.private/ansible/prod/group_vars/all.yml`
 - создаёт `.private/ansible/prod/group_vars/master.yml`
 - создаёт `.private/ansible/prod/group_vars/workers.yml`
+- создаёт `.private/ansible/prod/group_vars/stremio.yml`
 - создаёт `host_vars/<host>/certbot.yml` для certbot доменов
 
 2. Поднять базовую инфраструктуру и master control-plane:
@@ -89,6 +91,48 @@ npm run ansible:topology
 
 Если service-user UUID ещё не готовы, helper допускает placeholder `REPLACE_*`.
 Это не мешает сначала сделать `node-env`, а потом вернуться к профилям.
+
+### Stremio/NanoPi
+
+При bootstrap можно добавить NanoPi R76S в отдельную группу `stremio`
+форматом `name` или `name=ip`, например:
+
+```text
+nanopi-r76s=192.168.1.50
+```
+
+Для деплоя только Stremio addon stack:
+
+```bash
+npm run ansible:stremio
+```
+
+Плейбук поднимет на NanoPi `stremio-torrent-stream` и Jackett через Docker Compose
+и выведет готовый HTTPS URL для Stremio. Базовые порты: `58827`, `58828`, `9117`.
+Если включён короткий HTTPS frontend, дополнительно поднимаются `80/443`.
+
+```text
+https://192-168-1-50.local-ip.medicmobile.org:58828
+```
+
+Для красивого LAN-адреса включите в private vars:
+
+```yaml
+stremio_torrent_stream_proxy_enabled: true
+stremio_torrent_stream_proxy_domain: "stremio.home.example.com"
+stremio_torrent_stream_proxy_tls_domain: "stremio.home.example.com"
+stremio_torrent_stream_proxy_bind_host: "192.168.1.50"
+stremio_torrent_stream_proxy_certbot_enabled: true
+```
+
+Тогда основной URL будет:
+
+```text
+https://stremio.home.example.com/configure
+```
+
+Jackett UI открывается с клиента как `http://<LAN_IP>:9117`; в настройках addon
+лучше указывать внутренний Docker Compose URL `http://jackett:9117`.
 
 Опционально, если нужна отдельная Subscription Page для Remnawave вместо raw
 `/api/sub` endpoint, после panel bootstrap можно подготовить её private vars и DNS:

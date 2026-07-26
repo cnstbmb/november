@@ -111,6 +111,7 @@ npm run test:algorithms
 - `npm run ansible:run:menu` — интерактивный выбор playbook.
 - `npm run ansible:master` / `npm run ansible:master:check`
 - `npm run ansible:workers` / `npm run ansible:workers:check`
+- `npm run ansible:stremio` / `npm run ansible:stremio:check` — NanoPi R76S LAN-stack: stremio-torrent-stream + Jackett.
 - `npm run ansible:site` / `npm run ansible:site:check`
 
 Для реального deploy `remnawave_node` на workers сначала выполните
@@ -126,6 +127,19 @@ Bootstrap по умолчанию создаёт `.private/ansible/prod/remnasho
 - `name=ip` (например `test.beer.ru=8.80.55.35`)
 
 Во втором случае в inventory автоматически добавляется `ansible_host`, что удобно до настройки DNS.
+
+Для Stremio/NanoPi укажите хост в группе `stremio` при bootstrap или вручную в
+`.private/ansible/prod/hosts.yml`, затем запускайте:
+
+```bash
+npm run ansible:stremio
+```
+
+После деплоя Ansible выведет Jackett UI, HTTP config URL и HTTPS install URL.
+По умолчанию это fallback вида
+`https://192-168-1-50.local-ip.medicmobile.org:58828`; для красивого LAN-адреса
+включите `stremio_torrent_stream_proxy_enabled` и укажите свой домен, например
+`https://stremio.home.example.com`.
 
 ### Landing Lite
 

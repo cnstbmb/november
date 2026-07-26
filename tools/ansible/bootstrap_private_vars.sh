@@ -351,6 +351,7 @@ done
 
 prompt master_entry "Master host (name или name=ip)"
 prompt worker_hosts_csv "Workers (name или name=ip, через запятую, можно пусто)" ""
+prompt stremio_hosts_csv "Stremio/NanoPi hosts (name или name=ip, через запятую, можно пусто)" ""
 prompt ansible_user "SSH user" "root"
 prompt ansible_port "SSH port" "22"
 prompt ssh_public_key_path "Путь к публичному SSH ключу на control-node" "${default_ssh_public_key_path}"
@@ -391,6 +392,25 @@ if [ -n "${worker_hosts_csv}" ]; then
   done
 fi
 
+stremio_count=0
+declare -a stremio_hosts=()
+declare -a stremio_targets=()
+declare -a stremio_user_overrides=()
+declare -a stremio_port_overrides=()
+if [ -n "${stremio_hosts_csv}" ]; then
+  IFS=',' read -r -a stremio_entries <<< "${stremio_hosts_csv}"
+  for entry in "${stremio_entries[@]}"; do
+    if ! parse_host_entry "${entry}"; then
+      echo "Некорректный Stremio/NanoPi host: ${entry}"
+      echo "Используй формат: name или name=ip"
+      exit 1
+    fi
+    stremio_hosts+=("${PARSED_HOST_NAME}")
+    stremio_targets+=("${PARSED_HOST_TARGET}")
+    stremio_count=$((stremio_count + 1))
+  done
+fi
+
 prompt master_ansible_user_override "SSH user для master ${master_host_name} (пусто = ${ansible_user})" ""
 prompt master_ansible_port_override "SSH port для master ${master_host_name} (пусто = ${ansible_port})" ""
 
@@ -416,6 +436,24 @@ if [ "${worker_count}" -gt 0 ]; then
 
     worker_user_overrides+=("${worker_ansible_user_override}")
     worker_port_overrides+=("${worker_ansible_port_override}")
+  done
+fi
+
+if [ "${stremio_count}" -gt 0 ]; then
+  for i in "${!stremio_hosts[@]}"; do
+    stremio_name="${stremio_hosts[$i]}"
+    prompt stremio_ansible_user_override "SSH user для Stremio/NanoPi ${stremio_name} (пусто = ${ansible_user})" ""
+    prompt stremio_ansible_port_override "SSH port для Stremio/NanoPi ${stremio_name} (пусто = ${ansible_port})" ""
+
+    if [ "${stremio_ansible_user_override}" = "${ansible_user}" ]; then
+      stremio_ansible_user_override=""
+    fi
+    if [ "${stremio_ansible_port_override}" = "${ansible_port}" ]; then
+      stremio_ansible_port_override=""
+    fi
+
+    stremio_user_overrides+=("${stremio_ansible_user_override}")
+    stremio_port_overrides+=("${stremio_ansible_port_override}")
   done
 fi
 
@@ -701,6 +739,26 @@ if [ "${worker_count}" -gt 0 ]; then
   done
 fi
 
+cat >> "${PRIVATE_DIR}/hosts.yml" <<EOF
+    stremio:
+      hosts:
+EOF
+
+if [ "${stremio_count}" -gt 0 ]; then
+  for i in "${!stremio_hosts[@]}"; do
+    host_name="${stremio_hosts[$i]}"
+    host_target="${stremio_targets[$i]}"
+    host_user="${stremio_user_overrides[$i]}"
+    host_port="${stremio_port_overrides[$i]}"
+    append_host_inventory_entry \
+      "${PRIVATE_DIR}/hosts.yml" \
+      "${host_name}" \
+      "${host_target}" \
+      "${host_user}" \
+      "${host_port}"
+  done
+fi
+
 monitoring_targets_yaml=$'\n  - "localhost:9100"'
 if [ "${worker_count}" -gt 0 ]; then
   for host_target in "${worker_targets[@]}"; do
@@ -946,6 +1004,23 @@ node_env_dest: "${node_env_dest}"
 EOF
 fi
 
+cat > "${GROUP_VARS_DIR}/stremio.yml" <<EOF
+allow_http_https: false
+enable_certbot: false
+enable_monitoring: false
+enable_backups: false
+
+enable_stremio_torrent_stream: true
+stremio_torrent_stream_dir: "/opt/stremio-torrent-stream"
+stremio_torrent_stream_platform: "linux/arm64"
+stremio_torrent_stream_http_port: 58827
+stremio_torrent_stream_https_port: 58828
+jackett_port: 9117
+# stremio_torrent_stream_lan_ip: "192.168.1.50"
+# stremio_torrent_stream_firewall_from_ip: "192.168.1.0/24"
+# stremio_torrent_stream_https_method: "localtunnel"
+EOF
+
 if [ "${enable_certbot}" = "true" ]; then
   mkdir -p "${PRIVATE_DIR}/host_vars/${master_host_name}"
   cat > "${PRIVATE_DIR}/host_vars/${master_host_name}/certbot.yml" <<EOF
@@ -977,6 +1052,7 @@ echo "  ${PRIVATE_DIR}/hosts.yml"
 echo "  ${GROUP_VARS_DIR}/all.yml"
 echo "  ${GROUP_VARS_DIR}/master.yml"
 echo "  ${GROUP_VARS_DIR}/workers.yml"
+echo "  ${GROUP_VARS_DIR}/stremio.yml"
 if [ "${enable_certbot}" = "true" ]; then
   echo "  ${PRIVATE_DIR}/host_vars/<host>/certbot.yml"
 fi

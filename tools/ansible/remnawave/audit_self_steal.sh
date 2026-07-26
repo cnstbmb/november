@@ -14,7 +14,13 @@ TIMEOUT="${REMNAWAVE_AUDIT_TIMEOUT:-10}"
 MOSCOW_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_MOSCOW_ADDRESS:-@moscow.himenkov.ru:443}"
 MOSCOW_SUBSCRIPTION_SNI="${REMNAWAVE_AUDIT_MOSCOW_SNI:-moscow.himenkov.ru}"
 MOSCOW_SUBSCRIPTION_HOST="${REMNAWAVE_AUDIT_MOSCOW_HOST:-moscow.himenkov.ru}"
-MOSCOW_SUBSCRIPTION_PATH="${REMNAWAVE_AUDIT_MOSCOW_PATH:-%2Ffluegergeheimer-xhttp}"
+MOSCOW_SUBSCRIPTION_PATH="${REMNAWAVE_AUDIT_MOSCOW_PATH:-%2Ffluegergeheimer-xhttp%2F}"
+MOSCOW_SUBSCRIPTION_MODE="${REMNAWAVE_AUDIT_MOSCOW_MODE:-stream-one}"
+MOSCOW_XHTTP_OUTBOUND="${REMNAWAVE_AUDIT_MOSCOW_OUTBOUND:-GRPC_TO_EXIT}"
+MOSCOW_HYSTERIA2_REMARK="${REMNAWAVE_AUDIT_MOSCOW_HYSTERIA2_REMARK:-MOSCOW%20HYSTERIA2}"
+MOSCOW_HYSTERIA2_ADDRESS="${REMNAWAVE_AUDIT_MOSCOW_HYSTERIA2_ADDRESS:-@moscow.himenkov.ru:443}"
+MOSCOW_HYSTERIA2_SNI="${REMNAWAVE_AUDIT_MOSCOW_HYSTERIA2_SNI:-moscow.himenkov.ru}"
+MOSCOW_HYSTERIA2_OUTBOUND="${REMNAWAVE_AUDIT_MOSCOW_HYSTERIA2_OUTBOUND:-GRPC_TO_EXIT}"
 ENTRY_AUDIT_ENABLED="${REMNAWAVE_AUDIT_ENTRY_ENABLED:-false}"
 ENTRY_SUBSCRIPTION_REMARK="${REMNAWAVE_AUDIT_ENTRY_REMARK:-ENTRY}"
 ENTRY_SUBSCRIPTION_ADDRESS="${REMNAWAVE_AUDIT_ENTRY_ADDRESS:-}"
@@ -250,6 +256,16 @@ check_subscription_moscow_line() {
     *"alpn=h2"*) pass "subscription MOSCOW: alpn h2" ;;
     *) fail "subscription MOSCOW: expected alpn=h2" ;;
   esac
+
+  case "${line}" in
+    *"mode=${MOSCOW_SUBSCRIPTION_MODE}"*) pass "subscription MOSCOW: mode ${MOSCOW_SUBSCRIPTION_MODE}" ;;
+    *) fail "subscription MOSCOW: expected mode=${MOSCOW_SUBSCRIPTION_MODE}" ;;
+  esac
+
+  case "${line}" in
+    *"extra="*"maxConcurrency"*) pass "subscription MOSCOW: xhttp extra xmux maxConcurrency" ;;
+    *) fail "subscription MOSCOW: expected extra xmux maxConcurrency" ;;
+  esac
 }
 
 check_subscription_no_xhttp_canary() {
@@ -258,6 +274,36 @@ check_subscription_no_xhttp_canary() {
   else
     pass "subscription XHTTP CANARY: absent"
   fi
+}
+
+check_subscription_hysteria2_line() {
+  local line
+
+  line="$(line_for_remark "${MOSCOW_HYSTERIA2_REMARK}")"
+  if [ -z "${line}" ]; then
+    fail "subscription HYSTERIA2 MOSCOW: link not found"
+    return
+  fi
+
+  case "${line}" in
+    hysteria2://*|hy2://*) pass "subscription HYSTERIA2 MOSCOW: protocol" ;;
+    *) fail "subscription HYSTERIA2 MOSCOW: expected hysteria2/hy2 link" ;;
+  esac
+
+  case "${line}" in
+    *"${MOSCOW_HYSTERIA2_ADDRESS}"*) pass "subscription HYSTERIA2 MOSCOW: address ${MOSCOW_HYSTERIA2_ADDRESS}" ;;
+    *) fail "subscription HYSTERIA2 MOSCOW: expected address ${MOSCOW_HYSTERIA2_ADDRESS}" ;;
+  esac
+
+  case "${line}" in
+    *"sni=${MOSCOW_HYSTERIA2_SNI}"*) pass "subscription HYSTERIA2 MOSCOW: sni ${MOSCOW_HYSTERIA2_SNI}" ;;
+    *) fail "subscription HYSTERIA2 MOSCOW: expected sni ${MOSCOW_HYSTERIA2_SNI}" ;;
+  esac
+
+  case "${line}" in
+    *"alpn=h3"*) pass "subscription HYSTERIA2 MOSCOW: alpn h3" ;;
+    *) fail "subscription HYSTERIA2 MOSCOW: expected alpn=h3" ;;
+  esac
 }
 
 check_subscription_absent() {
@@ -449,15 +495,34 @@ check_json_value "MASTER MOSCOW xhttp network" "${ROOT_DIR}/.private/configs/MAS
 check_json_value "MASTER MOSCOW xhttp security" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.security' "none"
 check_json_value "MASTER MOSCOW xhttp listen" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .listen' "0.0.0.0"
 check_json_value "MASTER MOSCOW xhttp host" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.host' "moscow.himenkov.ru"
-check_json_value "MASTER MOSCOW xhttp path" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.path' "/fluegergeheimer-xhttp"
-check_json_value "MASTER MOSCOW xhttp outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("VLESS_XHTTP_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "GRPC_TO_EXIT"
+check_json_value "MASTER MOSCOW xhttp path" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.path' "/fluegergeheimer-xhttp/"
+check_json_value "MASTER MOSCOW xhttp mode" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.mode' "stream-one"
+check_json_value "MASTER Moscow service domains direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:sub.moscow.himenkov.ru")) and .outboundTag=="IPv4") | .outboundTag' "IPv4"
+check_json_value "MASTER Moscow self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="443" and .outboundTag=="IPv4") | .outboundTag' "IPv4"
+check_json_value "MASTER MOSCOW xhttp outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("VLESS_XHTTP_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "${MOSCOW_XHTTP_OUTBOUND}"
+check_json_value "MASTER HYSTERIA2 protocol" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .protocol' "hysteria"
+check_json_value "MASTER HYSTERIA2 port" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .port' "443"
+check_json_value "MASTER HYSTERIA2 network" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .streamSettings.network' "hysteria"
+check_json_value "MASTER HYSTERIA2 security" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .streamSettings.security' "tls"
+check_json_value "MASTER HYSTERIA2 alpn" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .streamSettings.tlsSettings.alpn[0]' "h3"
+check_json_value "MASTER HYSTERIA2 default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "${MOSCOW_HYSTERIA2_OUTBOUND}"
+check_json_value "MASTER HYSTERIA2 service domains direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:sub.moscow.himenkov.ru")) and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4") | .outboundTag' "IPv4"
+check_json_value "MASTER HYSTERIA2 self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="443" and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag' "IPv4"
+check_json_value "MASTER HYSTERIA2 YouTube direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '[.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube")) and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag] | unique[]' "IPv4"
+check_json_path_absent "MASTER HYSTERIA2 RU direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.ip? | index("geoip:ru")))'
+check_json_path_absent "MASTER HYSTERIA2 category-ru direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.domain? | index("geosite:category-ru")))'
 check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
-check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru"))) | .balancerTag' "HOME_OR_MOSCOW"
+check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru")) and (.inboundTag? | not)) | .balancerTag' "HOME_OR_MOSCOW"
 check_json_value "MASTER Home fallback to Moscow" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .fallbackTag' "IPv4"
 if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*port: 10085' "${ROOT_DIR}/.private/ansible/prod/group_vars/master.yml" >/dev/null; then
   pass "MASTER 10085 firewall: allows Docker bridge CIDR"
 else
   fail "MASTER 10085 firewall: missing Docker bridge CIDR allow"
+fi
+if rg -U 'firewall_extra_udp_ports:[\s\S]*- 443' "${ROOT_DIR}/.private/ansible/prod/host_vars/moscow.himenkov.ru/remnawave_topology.yml" >/dev/null; then
+  pass "MASTER HYSTERIA2 firewall: opens 443/udp"
+else
+  fail "MASTER HYSTERIA2 firewall: missing 443/udp"
 fi
 TOPOLOGY_FILE="${ROOT_DIR}/.private/ansible/prod/remnawave-topology/topology.yml"
 if [ ! -f "${TOPOLOGY_FILE}" ]; then
@@ -495,6 +560,7 @@ else
   if curl -fsSL --max-time "${TIMEOUT}" "${SUBSCRIPTION_URL}" >"${SUB_RAW}" 2>/dev/null; then
     decode_subscription
     check_subscription_moscow_line
+    check_subscription_hysteria2_line
     check_subscription_absent "DIRECT MOSCOW" "DIRECT%20MOSCOW"
     check_subscription_exit_line
     check_subscription_absent "HOME" "HOME"

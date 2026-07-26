@@ -63,8 +63,8 @@ Usage:
   tools/ansible/run_prod_private.sh [options]
 
 Options:
-  --menu                 Интерактивный выбор playbook (site/base/master/workers)
-  --playbook <value>     site | base | master | workers | monitoring | remnawave-panel | /abs/path/to/playbook.yml
+  --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
+  --playbook <value>     site | base | master | workers | stremio | monitoring | remnawave-panel | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -79,6 +79,7 @@ resolve_playbook() {
     base) echo "${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
     master) echo "${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
     workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
+    stremio) echo "${ROOT_DIR}/infra/ansible/playbooks/stremio.yml" ;;
     monitoring) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring.yml" ;;
     remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
     *) echo "${value}" ;;
@@ -92,13 +93,15 @@ choose_playbook_menu() {
   echo "  2) base"
   echo "  3) master"
   echo "  4) workers"
-  read -r -p "Введите номер [1-4, default: 1]: " choice
+  echo "  5) stremio"
+  read -r -p "Введите номер [1-5, default: 1]: " choice
   choice="${choice:-1}"
   case "${choice}" in
     1) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/site.yml" ;;
     2) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/base.yml" ;;
     3) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
     4) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
+    5) PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/stremio.yml" ;;
     *) echo "Некорректный выбор: ${choice}"; exit 1 ;;
   esac
 }

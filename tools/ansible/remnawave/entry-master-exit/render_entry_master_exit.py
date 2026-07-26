@@ -9,6 +9,10 @@ def clean_list(values):
     return [value for value in values if value]
 
 
+def clean_dict(value):
+    return {key: item for key, item in value.items() if item is not None}
+
+
 def emit_yaml(value, indent=0):
     pad = "  " * indent
     if isinstance(value, dict):
@@ -348,6 +352,7 @@ def build_entry_profile(entry, master):
 
 def build_master_profile(master, exit_node, home_exit=None):
     xhttp_moscow = master.get("xhttp_moscow") if enabled_block(master.get("xhttp_moscow")) else None
+    hysteria2_moscow = master.get("hysteria2_moscow") if enabled_block(master.get("hysteria2_moscow")) else None
     direct_msk = master.get("reality_direct_msk") if enabled_block(master.get("reality_direct_msk")) else None
     wg_peers = [
         {
@@ -362,6 +367,8 @@ def build_master_profile(master, exit_node, home_exit=None):
         moscow_client_inbounds.append("VLESS_REALITY_DIRECT_MSK")
     if xhttp_moscow:
         moscow_client_inbounds.append(xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW"))
+    if hysteria2_moscow:
+        moscow_client_inbounds.append(hysteria2_moscow.get("tag", "HYSTERIA2_MOSCOW"))
 
     route_rules = [
         dns_rule(),
@@ -403,6 +410,29 @@ def build_master_profile(master, exit_node, home_exit=None):
                 "port": str(port),
                 "inboundTag": moscow_client_inbounds,
                 "outboundTag": "BLOCK",
+            }
+        )
+
+    route_moscow_ipv4_domains = clean_list(master.get("route_moscow_ipv4_domains", []))
+    if route_moscow_ipv4_domains:
+        route_rules.append(
+            {
+                "type": "field",
+                "domain": [f"domain:{value}" for value in route_moscow_ipv4_domains],
+                "inboundTag": moscow_client_inbounds,
+                "outboundTag": "IPv4",
+            }
+        )
+
+    route_moscow_ipv4_ip_cidrs = clean_list(master.get("route_moscow_ipv4_ip_cidrs", []))
+    if route_moscow_ipv4_ip_cidrs:
+        route_rules.append(
+            {
+                "type": "field",
+                "ip": route_moscow_ipv4_ip_cidrs,
+                "port": "443",
+                "inboundTag": moscow_client_inbounds,
+                "outboundTag": "IPv4",
             }
         )
 
@@ -485,6 +515,14 @@ def build_master_profile(master, exit_node, home_exit=None):
                 "type": "field",
                 "inboundTag": [xhttp_moscow.get("tag", "VLESS_XHTTP_MOSCOW")],
                 "outboundTag": xhttp_moscow.get("outbound", "GRPC_TO_EXIT"),
+            }
+        )
+    if hysteria2_moscow:
+        route_rules.append(
+            {
+                "type": "field",
+                "inboundTag": [hysteria2_moscow.get("tag", "HYSTERIA2_MOSCOW")],
+                "outboundTag": hysteria2_moscow.get("outbound", "GRPC_TO_EXIT"),
             }
         )
 
@@ -633,14 +671,20 @@ def build_master_profile(master, exit_node, home_exit=None):
                 "streamSettings": {
                     "network": "xhttp",
                     "security": xhttp_moscow.get("security", "none"),
-                    "xhttpSettings": {
-                        "host": xhttp_moscow["host"],
-                        "mode": xhttp_moscow.get("mode", "stream-one"),
-                        "path": xhttp_moscow["path"],
-                        "scMaxBufferedPosts": 30,
-                        "scMaxEachPostBytes": "1000000",
-                        "scStreamUpServerSecs": "20-80",
-                    },
+                    "xhttpSettings": clean_dict(
+                        {
+                            "host": xhttp_moscow["host"],
+                            # Remnawave derives subscription mode from this.
+                            "mode": xhttp_moscow.get(
+                                "server_mode",
+                                xhttp_moscow.get("client_mode", "stream-one"),
+                            ),
+                            "path": xhttp_moscow["path"],
+                            "scMaxBufferedPosts": 30,
+                            "scMaxEachPostBytes": "1000000",
+                            "scStreamUpServerSecs": "20-80",
+                        }
+                    ),
                 },
             }
         )
@@ -663,6 +707,53 @@ def build_master_profile(master, exit_node, home_exit=None):
                 "master.xhttp_moscow.security must be either 'none' for nginx-terminated canary "
                 "or 'tls' for direct-to-Xray canary"
             )
+    if hysteria2_moscow:
+        cert_domain = hysteria2_moscow.get("cert_domain", master["cert_domain"])
+        inbounds.append(
+            {
+                "tag": hysteria2_moscow.get("tag", "HYSTERIA2_MOSCOW"),
+                "port": int(hysteria2_moscow.get("port", 443)),
+                "listen": hysteria2_moscow.get("listen", "0.0.0.0"),
+                "protocol": "hysteria",
+                "settings": {
+                    "clients": [],
+                    "version": 2,
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "routeOnly": True,
+                    "destOverride": ["http", "tls", "quic"],
+                    "metadataOnly": False,
+                },
+                "streamSettings": {
+                    "network": "hysteria",
+                    "security": "tls",
+                    "tlsSettings": {
+                        "alpn": hysteria2_moscow.get("alpn", ["h3"]),
+                        "maxVersion": "1.3",
+                        "minVersion": "1.3",
+                        "serverName": hysteria2_moscow.get("server_name", cert_domain),
+                        "certificates": [
+                            {
+                                "usage": "encipherment",
+                                "keyFile": f"/etc/letsencrypt/live/{cert_domain}/privkey.pem",
+                                "certificateFile": f"/etc/letsencrypt/live/{cert_domain}/fullchain.pem",
+                            }
+                        ],
+                    },
+                    "hysteriaSettings": {
+                        "version": 2,
+                        "masquerade": {
+                            "url": hysteria2_moscow.get("masquerade_url", f"https://{master['host']}/"),
+                            "type": "proxy",
+                            "insecure": False,
+                            "rewriteHost": True,
+                        },
+                        "udpIdleTimeout": int(hysteria2_moscow.get("udp_idle_timeout", 60)),
+                    },
+                },
+            }
+        )
 
     outbounds = [
         {
@@ -736,46 +827,47 @@ def build_master_profile(master, exit_node, home_exit=None):
             }
         )
 
-    outbounds.extend(
-        [
-            {
-                "tag": "GRPC_TO_EXIT",
-                "protocol": "vless",
-                "settings": {
-                    "vnext": [
-                        {
-                            "port": int(master["to_exit_port"]),
-                            "users": [
-                                {
-                                    "id": master["to_exit_uuid"],
-                                    "encryption": "none",
-                                }
-                            ],
-                            "address": master["to_exit_address"],
-                        }
-                    ]
+    outbounds.append(
+        {
+            "tag": "GRPC_TO_EXIT",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "port": int(master["to_exit_port"]),
+                        "users": [
+                            {
+                                "id": master["to_exit_uuid"],
+                                "encryption": "none",
+                            }
+                        ],
+                        "address": master["to_exit_address"],
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "security": "tls",
+                "tlsSettings": {
+                    "alpn": ["h2"],
+                    "serverName": master["to_exit_server_name"],
+                    "fingerprint": "chrome",
+                    "allowInsecure": False,
                 },
-                "streamSettings": {
-                    "network": "grpc",
-                    "security": "tls",
-                    "tlsSettings": {
-                        "alpn": ["h2"],
-                        "serverName": master["to_exit_server_name"],
-                        "fingerprint": "chrome",
-                        "allowInsecure": False,
-                    },
-                    "grpcSettings": {
-                        "multiMode": False,
-                        "serviceName": "",
-                    },
+                "grpcSettings": {
+                    "multiMode": False,
+                    "serviceName": "",
                 },
             },
-            {
-                "tag": "DNS_OUT",
-                "protocol": "freedom",
-                "settings": {"redirect": "127.0.0.1:53"},
-            },
-        ]
+        }
+    )
+
+    outbounds.append(
+        {
+            "tag": "DNS_OUT",
+            "protocol": "freedom",
+            "settings": {"redirect": "127.0.0.1:53"},
+        }
     )
 
     routing = {
@@ -1128,6 +1220,7 @@ def main():
     home_exit = spec.get("home_exit")
     direct_exit = spec.get("direct_exit")
     xhttp_moscow = master.get("xhttp_moscow") if enabled_block(master.get("xhttp_moscow")) else None
+    hysteria2_moscow = master.get("hysteria2_moscow") if enabled_block(master.get("hysteria2_moscow")) else None
     direct_msk = master.get("reality_direct_msk") if enabled_block(master.get("reality_direct_msk")) else None
     home_exit_public = public_client_enabled(home_exit)
     entry_host_remark = entry.get("host_remark") or "WHITE LIST"
@@ -1154,7 +1247,14 @@ def main():
                     int(direct_msk["port"]) if direct_msk else None,
                 ]
             ),
-            "udp_ports": [int(master["wg_port"])] if master.get("wg_port") else [],
+            "udp_ports": clean_list(
+                [
+                    int(master["wg_port"]) if master.get("wg_port") else None,
+                    int(hysteria2_moscow.get("public_port", hysteria2_moscow.get("port", 443)))
+                    if hysteria2_moscow
+                    else None,
+                ]
+            ),
         },
         exit_node["host"]: {
             "roles": ["exit", "direct"],
@@ -1385,6 +1485,7 @@ def main():
             "security": xhttp_moscow.get("security", "tls"),
             "server_names": [xhttp_moscow["host"]],
             "path": xhttp_moscow["path"],
+            "mode": xhttp_moscow.get("client_mode", "stream-one"),
         }
         if xhttp_moscow_replaces_reality
         else {
@@ -1395,6 +1496,30 @@ def main():
             "path": "",
         }
     )
+    hysteria2_host_data = (
+        {
+            "remark": hysteria2_moscow.get("remark", "MOSCOW HYSTERIA2"),
+            "profile": "MASTER_NODE",
+            "inbound": hysteria2_moscow.get("tag", "HYSTERIA2_MOSCOW"),
+            "address": hysteria2_moscow.get("public_address", master["host"]),
+            "port": int(hysteria2_moscow.get("public_port", hysteria2_moscow.get("port", 443))),
+            "node": master["host"],
+        }
+        if hysteria2_moscow
+        else None
+    )
+    hysteria2_client_values = (
+        {
+            "host": hysteria2_moscow.get("remark", "MOSCOW HYSTERIA2"),
+            "network": "hysteria2",
+            "security": "tls",
+            "server_names": [hysteria2_moscow.get("server_name", master["host"])],
+            "alpn": hysteria2_moscow.get("alpn", ["h3"]),
+            "path": "",
+        }
+        if hysteria2_moscow
+        else None
+    )
     public_squad_inbounds = [
         "VLESS_TCP_REALITY",
         (
@@ -1403,6 +1528,8 @@ def main():
             else "VLESS_REALITY_MOSCOW"
         ),
     ]
+    if hysteria2_moscow:
+        public_squad_inbounds.append(hysteria2_moscow.get("tag", "HYSTERIA2_MOSCOW"))
 
     topology_data = {
         "mode": "entry_master_exit",
@@ -1430,6 +1557,7 @@ def main():
             [
                 entry_host_data,
                 moscow_host_data,
+                hysteria2_host_data,
                 (
                     {
                         "remark": "DIRECT MOSCOW",
@@ -1473,7 +1601,7 @@ def main():
             {
                 "username": "bridge_master_to_exit",
                 "internal_squads": ["Bridge Exit Squad"],
-                "used_by": "MASTER_NODE -> GRPC_TO_EXIT",
+                "used_by": f"MASTER_NODE -> {xhttp_moscow.get('outbound', 'GRPC_TO_EXIT')}",
                 "service_uuid": master["to_exit_uuid"],
             },
         ],
@@ -1493,6 +1621,7 @@ def main():
             [
                 entry_client_values,
                 moscow_client_values,
+                hysteria2_client_values,
                 (
                     {
                         "host": "DIRECT MOSCOW",
@@ -1538,6 +1667,7 @@ def main():
                 "security": xhttp_moscow.get("security", "tls"),
                 "server_names": [xhttp_moscow["host"]],
                 "path": xhttp_moscow["path"],
+                "mode": xhttp_moscow.get("client_mode", "stream-one"),
             },
         )
     if home_exit:
@@ -1610,6 +1740,10 @@ def main():
         f"- {entry_host_remark} -> {entry['public_address']}:{entry['public_port']} ({entry['host']})",
         moscow_summary_host_line,
     ]
+    if hysteria2_moscow:
+        summary_host_lines.append(
+            f"- {hysteria2_moscow.get('remark', 'MOSCOW HYSTERIA2')} -> {hysteria2_moscow.get('public_address', master['host'])}:{hysteria2_moscow.get('public_port', hysteria2_moscow.get('port', 443))}/udp ({master['host']})"
+        )
     if direct_msk:
         summary_host_lines.append(
             f"- DIRECT MOSCOW -> {master['public_address']}:{direct_msk['port']} ({master['host']})"
@@ -1638,7 +1772,7 @@ def main():
         else f"- {exit_host_remark}: public_key={exit_node['reality_public_key']}, shortId={exit_node['reality_short_id']}"
     )
     moscow_summary_client_line = (
-        f"- {xhttp_moscow.get('remark', 'MOSCOW')}: network=xhttp, sni={xhttp_moscow['host']}, path={xhttp_moscow['path']}"
+        f"- {xhttp_moscow.get('remark', 'MOSCOW')}: network=xhttp, sni={xhttp_moscow['host']}, path={xhttp_moscow['path']}, mode={xhttp_moscow.get('client_mode', 'stream-one')}"
         if xhttp_moscow_replaces_reality
         else f"- MOSCOW: public_key={master['reality_moscow']['public_key']}, shortId={master['reality_moscow']['short_id']}"
     )
@@ -1646,6 +1780,10 @@ def main():
         entry_summary_client_line,
         moscow_summary_client_line,
     ]
+    if hysteria2_moscow:
+        summary_client_lines.append(
+            f"- {hysteria2_moscow.get('remark', 'MOSCOW HYSTERIA2')}: network=hysteria2, sni={hysteria2_moscow.get('server_name', master['host'])}, alpn=h3"
+        )
     if direct_msk:
         summary_client_lines.append(
             f"- DIRECT MOSCOW: public_key={direct_msk['public_key']}, shortId={direct_msk['short_id']}"
@@ -1663,7 +1801,7 @@ def main():
     if xhttp_moscow and not xhttp_moscow_replaces_reality:
         summary_client_lines.insert(
             2,
-            f"- {xhttp_moscow.get('remark', 'MOSCOW XHTTP')}: network=xhttp, sni={xhttp_moscow['host']}, path={xhttp_moscow['path']}",
+            f"- {xhttp_moscow.get('remark', 'MOSCOW XHTTP')}: network=xhttp, sni={xhttp_moscow['host']}, path={xhttp_moscow['path']}, mode={xhttp_moscow.get('client_mode', 'stream-one')}",
         )
     if direct_exit:
         summary_client_lines.append(
@@ -1680,6 +1818,9 @@ def main():
                     f"{master['reality_moscow']['port']}/tcp",
                     f"{direct_msk['port']}/tcp" if direct_msk else None,
                     f"{master['wg_port']}/udp" if master.get("wg_port") else None,
+                    f"{hysteria2_moscow.get('public_port', hysteria2_moscow.get('port', 443))}/udp"
+                    if hysteria2_moscow
+                    else None,
                 ]
             )
         ),
@@ -1707,6 +1848,8 @@ def main():
         + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else [])
     )
     manual_hosts = [entry_host_remark, "MOSCOW", exit_host_remark]
+    if hysteria2_moscow:
+        manual_hosts.insert(2, hysteria2_moscow.get("remark", "MOSCOW HYSTERIA2"))
     if direct_msk:
         manual_hosts.insert(2, "DIRECT MOSCOW")
     if home_exit_public:

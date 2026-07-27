@@ -109,6 +109,7 @@
       - remnawave_panel_postgres_password | default('') | length > 0
       - remnawave_panel_postgres_db | default('') | length > 0
       - remnawave_panel_jwt_auth_secret | default('') | length > 0
+      - remnawave_panel_app_secret | default(remnawave_panel_jwt_auth_secret) | length > 0
       - remnawave_panel_jwt_api_tokens_secret | default('') | length > 0
       - remnawave_panel_metrics_user | default('') | length > 0
       - remnawave_panel_metrics_pass | default('') | length > 0
@@ -116,7 +117,7 @@
     fail_msg: >-
       Remnawave panel is enabled, but required vars are missing or invalid.
       Required: enable_certbot=true, remnawave_panel_domain, database creds,
-      JWT secrets, metrics credentials, 64-char remnawave_panel_webhook_secret.
+      APP/JWT secrets, metrics credentials, 64-char remnawave_panel_webhook_secret.
 
 - name: Validate Remnawave subscription page settings
   ansible.builtin.assert:

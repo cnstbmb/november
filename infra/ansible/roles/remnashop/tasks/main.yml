@@ -134,6 +134,29 @@
     - remnashop_env_src | length == 0
     - not ansible_check_mode
 
+- name: Build effective remnashop env overrides
+  ansible.builtin.set_fact:
+    remnashop_env_overrides_effective: >-
+      {{
+        remnashop_env_overrides
+        | combine(
+            {
+              'BOT_POLLING': (
+                remnashop_telegram_polling_enabled
+                | bool
+                | ternary('true', 'false')
+              ),
+              'BOT_POLLING_DROP_PENDING_UPDATES': (
+                remnashop_telegram_polling_drop_pending_updates
+                | bool
+                | ternary('true', 'false')
+              )
+            }
+          )
+        if (remnashop_hotfix_telegram_polling | bool)
+        else remnashop_env_overrides
+      }}
+
 - name: Apply remnashop env overrides
   ansible.builtin.lineinfile:
     path: "{{ remnashop_env_dest }}"
@@ -141,9 +164,9 @@
     line: "{{ item.key }}={{ item.value }}"
     insertafter: EOF
     mode: "0600"
-  loop: "{{ remnashop_env_overrides | dict2items }}"
+  loop: "{{ remnashop_env_overrides_effective | dict2items }}"
   when:
-    - remnashop_env_overrides | length > 0
+    - remnashop_env_overrides_effective | length > 0
     - not ansible_check_mode
 
 - name: Ensure remnawave network exists for internal mode
@@ -235,126 +258,6 @@
   delay: "{{ remnashop_wait_delay }}"
   until: remnashop_http_probe.status in remnashop_wait_status_codes
   when:
-    - remnashop_wait_for_stack | bool
-    - not ansible_check_mode
-
-- name: Apply remnashop stale Telegram callback hotfix
-  ansible.builtin.shell: |
-    docker compose exec -T remnashop /opt/remnashop/.venv/bin/python - <<'PY'
-    from pathlib import Path
-
-    changed = False
-
-    notification_path = Path("/opt/remnashop/src/telegram/routers/extra/notification.py")
-    notification_text = notification_path.read_text()
-    notification_updated = notification_text
-    if "from aiogram.exceptions import TelegramBadRequest\n" not in notification_updated:
-        notification_updated = notification_updated.replace(
-            "from aiogram import F, Router\n",
-            "from aiogram import F, Router\nfrom aiogram.exceptions import TelegramBadRequest\n",
-            1,
-        )
-
-    notification_default = """    await notifier.delete_notification(
-            chat_id=user.telegram_id,
-            message_id=callback.message.message_id,
-        )
-        await callback.answer()
-    """
-    notification_answer_first = """    await callback.answer()
-        await notifier.delete_notification(
-            chat_id=user.telegram_id,
-            message_id=callback.message.message_id,
-        )
-    """
-    notification_new = """    try:
-            await callback.answer()
-        except TelegramBadRequest as exc:
-            if "query is too old" not in str(exc):
-                raise
-
-        await notifier.delete_notification(
-            chat_id=user.telegram_id,
-            message_id=callback.message.message_id,
-        )
-    """
-    if notification_new not in notification_updated:
-        for old in (notification_default, notification_answer_first):
-            if old in notification_updated:
-                notification_updated = notification_updated.replace(old, notification_new, 1)
-                break
-        else:
-            print("notification callback block not found; assuming upstream layout changed")
-
-    if notification_updated != notification_text:
-        notification_path.write_text(notification_updated)
-        changed = True
-
-    error_path = Path("/opt/remnashop/src/telegram/middlewares/error.py")
-    error_text = error_path.read_text()
-    error_old = """        if isinstance(
-            event.exception,
-            (
-                InvalidStackIdError,
-                OutdatedIntent,
-                UnknownIntent,
-                UnknownState,
-            ),
-        ):
-            return await handler(event, data)
-    """
-    error_new = """        if isinstance(
-            event.exception,
-            (
-                InvalidStackIdError,
-                OutdatedIntent,
-                UnknownIntent,
-                UnknownState,
-            ),
-        ):
-            return
-    """
-    if error_new not in error_text:
-        if error_old not in error_text:
-            print("dialog stale-intent error block not found; assuming upstream layout changed")
-        else:
-            error_text = error_text.replace(error_old, error_new, 1)
-            error_path.write_text(error_text)
-            changed = True
-
-    print(f"changed={changed}")
-    PY
-  args:
-    chdir: "{{ remnashop_dir }}"
-  register: remnashop_stale_telegram_callbacks_hotfix
-  changed_when: "'changed=True' in remnashop_stale_telegram_callbacks_hotfix.stdout"
-  when:
-    - remnashop_hotfix_stale_telegram_callbacks | bool
-    - not ansible_check_mode
-
-- name: Restart remnashop after stale Telegram callback hotfix
-  ansible.builtin.command: docker compose restart remnashop
-  args:
-    chdir: "{{ remnashop_dir }}"
-  when:
-    - remnashop_stale_telegram_callbacks_hotfix is defined
-    - remnashop_stale_telegram_callbacks_hotfix.changed
-    - not ansible_check_mode
-
-- name: Wait for remnashop HTTP endpoint after stale Telegram callback hotfix
-  ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
-    method: GET
-    return_content: false
-    status_code: "{{ remnashop_wait_status_codes }}"
-  register: remnashop_http_probe_after_stale_telegram_callbacks_hotfix
-  changed_when: false
-  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
-  delay: "{{ remnashop_wait_delay }}"
-  until: remnashop_http_probe_after_stale_telegram_callbacks_hotfix.status in remnashop_wait_status_codes
-  when:
-    - remnashop_stale_telegram_callbacks_hotfix is defined
-    - remnashop_stale_telegram_callbacks_hotfix.changed
     - remnashop_wait_for_stack | bool
     - not ansible_check_mode
 
@@ -491,6 +394,7 @@
 
     ensure_replace(
         """    await event_bus.shutdown()
+        await notification_worker.shutdown()
         await telegram_webhook_endpoint.shutdown()
     """,
         """    if polling_task is not None:
@@ -499,6 +403,7 @@
                 await polling_task
 
         await event_bus.shutdown()
+        await notification_worker.shutdown()
         await telegram_webhook_endpoint.shutdown()
     """,
         "polling shutdown",
@@ -541,6 +446,126 @@
   when:
     - remnashop_telegram_polling_hotfix is defined
     - remnashop_telegram_polling_hotfix.changed
+    - remnashop_wait_for_stack | bool
+    - not ansible_check_mode
+
+- name: Apply remnashop stale Telegram callback hotfix
+  ansible.builtin.shell: |
+    docker compose exec -T remnashop /opt/remnashop/.venv/bin/python - <<'PY'
+    from pathlib import Path
+
+    changed = False
+
+    notification_path = Path("/opt/remnashop/src/telegram/routers/extra/notification.py")
+    notification_text = notification_path.read_text()
+    notification_updated = notification_text
+    if "from aiogram.exceptions import TelegramBadRequest\n" not in notification_updated:
+        notification_updated = notification_updated.replace(
+            "from aiogram import F, Router\n",
+            "from aiogram import F, Router\nfrom aiogram.exceptions import TelegramBadRequest\n",
+            1,
+        )
+
+    notification_default = """    await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+        await callback.answer()
+    """
+    notification_answer_first = """    await callback.answer()
+        await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+    """
+    notification_new = """    try:
+            await callback.answer()
+        except TelegramBadRequest as exc:
+            if "query is too old" not in str(exc):
+                raise
+
+        await notifier.delete_notification(
+            chat_id=user.telegram_id,
+            message_id=callback.message.message_id,
+        )
+    """
+    if notification_new not in notification_updated:
+        for old in (notification_default, notification_answer_first):
+            if old in notification_updated:
+                notification_updated = notification_updated.replace(old, notification_new, 1)
+                break
+        else:
+            print("notification callback block not found; assuming upstream layout changed")
+
+    if notification_updated != notification_text:
+        notification_path.write_text(notification_updated)
+        changed = True
+
+    error_path = Path("/opt/remnashop/src/telegram/middlewares/error.py")
+    error_text = error_path.read_text()
+    error_old = """        if isinstance(
+            event.exception,
+            (
+                InvalidStackIdError,
+                OutdatedIntent,
+                UnknownIntent,
+                UnknownState,
+            ),
+        ):
+            return await handler(event, data)
+    """
+    error_new = """        if isinstance(
+            event.exception,
+            (
+                InvalidStackIdError,
+                OutdatedIntent,
+                UnknownIntent,
+                UnknownState,
+            ),
+        ):
+            return
+    """
+    if error_new not in error_text:
+        if error_old not in error_text:
+            print("dialog stale-intent error block not found; assuming upstream layout changed")
+        else:
+            error_text = error_text.replace(error_old, error_new, 1)
+            error_path.write_text(error_text)
+            changed = True
+
+    print(f"changed={changed}")
+    PY
+  args:
+    chdir: "{{ remnashop_dir }}"
+  register: remnashop_stale_telegram_callbacks_hotfix
+  changed_when: "'changed=True' in remnashop_stale_telegram_callbacks_hotfix.stdout"
+  when:
+    - remnashop_hotfix_stale_telegram_callbacks | bool
+    - not ansible_check_mode
+
+- name: Restart remnashop after stale Telegram callback hotfix
+  ansible.builtin.command: docker compose restart remnashop
+  args:
+    chdir: "{{ remnashop_dir }}"
+  when:
+    - remnashop_stale_telegram_callbacks_hotfix is defined
+    - remnashop_stale_telegram_callbacks_hotfix.changed
+    - not ansible_check_mode
+
+- name: Wait for remnashop HTTP endpoint after stale Telegram callback hotfix
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ remnashop_app_port }}/"
+    method: GET
+    return_content: false
+    status_code: "{{ remnashop_wait_status_codes }}"
+  register: remnashop_http_probe_after_stale_telegram_callbacks_hotfix
+  changed_when: false
+  retries: "{{ (remnashop_wait_timeout / remnashop_wait_delay) | round(0, 'ceil') | int }}"
+  delay: "{{ remnashop_wait_delay }}"
+  until: remnashop_http_probe_after_stale_telegram_callbacks_hotfix.status in remnashop_wait_status_codes
+  when:
+    - remnashop_stale_telegram_callbacks_hotfix is defined
+    - remnashop_stale_telegram_callbacks_hotfix.changed
     - remnashop_wait_for_stack | bool
     - not ansible_check_mode
 

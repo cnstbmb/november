@@ -11,6 +11,43 @@
     - enable_adguard | bool
     - not ansible_check_mode
 
+- name: Resolve canonical AdGuard Home config source
+  ansible.builtin.set_fact:
+    adguard_config_src_effective: >-
+      {{
+        adguard_config_src
+        if (
+          adguard_config_src | default('', true) | length > 0 and
+          adguard_config_src | regex_search('^/')
+        )
+        else (
+          (repo_root ~ '/' ~ adguard_config_src)
+          if (adguard_config_src | default('', true) | length > 0)
+          else ''
+        )
+      }}
+  when: enable_adguard | bool
+
+- name: Check canonical AdGuard Home config on control-node
+  ansible.builtin.stat:
+    path: "{{ adguard_config_src_effective }}"
+  delegate_to: localhost
+  become: false
+  register: adguard_config_src_stat
+  when:
+    - enable_adguard | bool
+    - adguard_config_src_effective | length > 0
+
+- name: Validate canonical AdGuard Home config source exists
+  ansible.builtin.assert:
+    that:
+      - adguard_config_src_stat.stat.exists
+      - adguard_config_src_stat.stat.isreg
+    fail_msg: "Canonical AdGuard Home config not found: {{ adguard_config_src_effective }}"
+  when:
+    - enable_adguard | bool
+    - adguard_config_src_effective | length > 0
+
 - name: Build effective AdGuard users list
   ansible.builtin.set_fact:
     adguard_effective_users: >-
@@ -38,6 +75,7 @@
   when:
     - enable_adguard | bool
     - adguard_manage_config | bool
+    - adguard_config_src_effective | length == 0
 
 - name: Write AdGuard Home compose file
   ansible.builtin.template:
@@ -46,6 +84,27 @@
     mode: "0644"
   when:
     - enable_adguard | bool
+    - not ansible_check_mode
+
+- name: Copy canonical AdGuard Home config
+  ansible.builtin.copy:
+    src: "{{ adguard_config_src_effective }}"
+    dest: "{{ adguard_config_file }}"
+    mode: "0600"
+    backup: true
+    validate: >-
+      docker run --rm
+      --entrypoint /opt/adguardhome/AdGuardHome
+      -v %s:/tmp/AdGuardHome.yaml:ro
+      -v /etc/letsencrypt:/etc/letsencrypt:ro
+      {{ adguard_image }}
+      --check-config
+      -c /tmp/AdGuardHome.yaml
+      -w /tmp
+  register: adguard_home_config_copy
+  when:
+    - enable_adguard | bool
+    - adguard_config_src_effective | length > 0
     - not ansible_check_mode
 
 - name: Render AdGuard Home config from template
@@ -57,6 +116,7 @@
   when:
     - enable_adguard | bool
     - adguard_manage_config | bool
+    - adguard_config_src_effective | length == 0
     - not ansible_check_mode
 
 - name: Check existing AdGuard Home config
@@ -66,6 +126,7 @@
   when:
     - enable_adguard | bool
     - not (adguard_manage_config | bool)
+    - adguard_config_src_effective | length == 0
     - not ansible_check_mode
 
 - name: Force AdGuard Home internal web port to configured value
@@ -78,6 +139,7 @@
   when:
     - enable_adguard | bool
     - not (adguard_manage_config | bool)
+    - adguard_config_src_effective | length == 0
     - adguard_home_config_stat.stat.exists | default(false)
     - not ansible_check_mode
 
@@ -130,7 +192,7 @@
     proto: tcp
   when:
     - enable_adguard | bool
-    - adguard_manage_config | bool
+    - (adguard_manage_config | bool) or (adguard_config_src_effective | length > 0)
     - adguard_tls_enabled | bool
     - adguard_tls_port_dns_over_tls | int > 0
     - not ansible_check_mode
@@ -151,7 +213,7 @@
     proto: tcp
   when:
     - enable_adguard | bool
-    - adguard_manage_config | bool
+    - (adguard_manage_config | bool) or (adguard_config_src_effective | length > 0)
     - adguard_tls_enabled | bool
     - adguard_tls_port_https | int > 0
     - not ansible_check_mode
@@ -175,7 +237,10 @@
     that:
       - not (
           enable_monitoring | default(false) | bool and
-          adguard_manage_config | bool and
+          (
+            adguard_manage_config | bool or
+            adguard_config_src_effective | length > 0
+          ) and
           adguard_tls_enabled | bool and
           adguard_tls_port_https | int > 0 and
           (monitoring_grafana_port | default(-1) | int == adguard_tls_port_https | int)
@@ -250,10 +315,14 @@
   when:
     - enable_adguard | bool
     - (
+        (adguard_home_config_copy is defined) and
+        (adguard_home_config_copy is changed)
+      ) or (
         (adguard_manage_config | bool) and
         (adguard_home_config_template is defined) and
         (adguard_home_config_template is changed)
       ) or (
+        (adguard_config_src_effective | length == 0) and
         not (adguard_manage_config | bool) and
         (adguard_home_http_address is defined) and
         (adguard_home_http_address is changed)

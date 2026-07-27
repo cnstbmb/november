@@ -1,0 +1,6 @@
+- name: AdGuard Home setup
+  hosts: master
+  become: true
+  roles:
+    - role: adguard_home
+      when: enable_adguard | default(false) | bool

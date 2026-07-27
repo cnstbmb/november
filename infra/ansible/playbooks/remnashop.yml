@@ -1,0 +1,6 @@
+- name: Remnashop setup
+  hosts: master
+  become: true
+  roles:
+    - role: remnashop
+      when: enable_remnashop | default(false) | bool

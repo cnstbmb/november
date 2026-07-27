@@ -232,9 +232,16 @@ JSON-профили не хранятся как статические шабл
 `.private/ansible/prod/remnashop/.env`.
 Если одновременно включены `monitoring` и `AdGuard`, bootstrap по умолчанию
 предложит `adguard_web_port=3001`, чтобы избежать конфликта с Grafana (`3000`).
-Если нужно управлять самим `AdGuardHome.yaml` через Ansible, включайте это отдельно
-через `adguard_manage_config: true` в `.private/ansible/prod/group_vars/master.yml`
-и храните чувствительные поля (`adguard_users`, IP-ограничения и т.п.) только в `.private`.
+Чтобы Ansible применял полный канонический `AdGuardHome.yaml`, храните его в
+`.private/ansible/prod/adguardhome/AdGuardHome.yaml` и задайте абсолютный путь через
+`adguard_config_src` в `.private/ansible/prod/group_vars/master.yml`. Перед заменой
+роль проверяет конфиг командой AdGuard Home `--check-config`, сохраняет backup
+предыдущего серверного файла и перезапускает контейнер только при изменении.
+Текущую конфигурацию с сервера можно забрать командой
+`npm run adguard:sync-config`; существующий локальный снимок сначала копируется
+в timestamped `.bak` рядом с ним. Все эти файлы остаются внутри `.private`.
+Альтернативный режим генерации конфига из переменных включается через
+`adguard_manage_config: true`, если `adguard_config_src` не задан.
 Для workers bootstrap по умолчанию готовит `stubby` на DNS-over-TLS к master:
 - upstream address берётся из `master` -> `ansible_host`
 - TLS auth name берётся из первого `certbot_domains` master

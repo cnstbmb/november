@@ -331,7 +331,20 @@ Defaults:
 - DNS on port 53 TCP/UDP
 - Data in `/opt/adguardhome`
 
-If you want Ansible to manage `AdGuardHome.yaml` too, set:
+To deploy an exact, complete `AdGuardHome.yaml`, keep it under `.private` and set
+an absolute controller-side path:
+
+```yml
+adguard_config_src: "/absolute/path/to/repo/.private/ansible/prod/adguardhome/AdGuardHome.yaml"
+```
+
+This mode validates the file with the selected AdGuard Home image, creates a
+remote backup before replacement, and restarts the container only when the
+configuration changes.  Run `npm run adguard:sync-config` to refresh the private
+canonical copy from the master server; the command preserves the previous local
+copy as a timestamped `.bak`.
+
+Alternatively, to generate `AdGuardHome.yaml` from role variables, set:
 
 ```yml
 adguard_manage_config: true

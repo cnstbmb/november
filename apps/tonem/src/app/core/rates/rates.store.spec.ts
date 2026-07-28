@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { RatesStore } from './rates.store';
 import { RawQuote } from './quote.model';
+import { INSTRUMENTS } from '../instruments/instrument.registry';
 
 const raw = (over: Partial<RawQuote>): RawQuote => ({
   instrumentId: 'usdrub',
@@ -25,7 +26,7 @@ describe('RatesStore', () => {
   });
 
   it('ticker содержит все инструменты реестра', () => {
-    expect(store.ticker().length).toBe(6);
+    expect(store.ticker().length).toBe(INSTRUMENTS.length);
     expect(store.ticker()[0].instrument.id).toBe('usdrub');
   });
 

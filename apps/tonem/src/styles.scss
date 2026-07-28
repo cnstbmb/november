@@ -1,7 +1,26 @@
 :root {
-  --bg: #0a0a0f;
-  --ink: #f2f0e9;
-  --ink-dim: rgba(242, 240, 233, 0.45);
+  // Настроение рынка (перезаписывается MoodEngine каждые ~1.2с):
+  --mood-hue: 230; // нейтральный синевато-серый до первого расчёта
+  --mood-energy: 0;
+  --mood-turbulence: 0;
+
+  // Фон и акцент дышат настроением: тёплый янтарь при росте, холодная сталь при падении.
+  // Насыщенность/светлость привязаны к энергии, чтобы в штиль почти не отличалось от базовых.
+  --bg: hsl(var(--mood-hue) calc(12% + var(--mood-energy) * 20%) 6%);
+  --ink: hsl(var(--mood-hue) 18% 92%);
+  --ink-dim: hsl(var(--mood-hue) 12% 92% / 0.45);
+  // акцент для цифры-героя и вспышек — чуть насыщеннее чернила
+  --ink-accent: hsl(var(--mood-hue) calc(30% + var(--mood-energy) * 35%) 88%);
+
+  // Плавный переход палитры — само настроение уже сглажено EMA,
+  // но небольшой transition страхует от любых остаточных шагов.
+  transition: background-color 1.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition: none;
+  }
 }
 
 html,

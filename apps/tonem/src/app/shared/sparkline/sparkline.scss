@@ -1,0 +1,169 @@
+// Спарклайн-оверлей: тёмный полноэкранный бэкдроп, по центру — карточка
+// с кривой. Эстетика как у приложения: --bg/--ink/--ink-dim, tabular-nums.
+// Цвет линии: вверх — мягкий зелёный, вниз — мягкий красный, ровно — --ink
+// (те же оттенки, что и вспышки одометра — единый язык).
+
+:host {
+  --spark-up: #6ee7a8;
+  --spark-down: #f28b8b;
+
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: block;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(10, 10, 15, 0.72);
+  backdrop-filter: blur(6px);
+  animation: spark-fade 0.18s ease-out;
+  touch-action: pan-y; // вертикальный свайп обрабатываем сами
+}
+
+.backdrop.reduced {
+  animation: none;
+}
+
+@keyframes spark-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sheet {
+  width: min(560px, 100%);
+  padding: 1.25rem 1.5rem 1.5rem;
+  background: var(--bg);
+  border: 1px solid rgba(242, 240, 233, 0.1);
+  border-radius: 12px;
+  color: var(--ink);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-right: auto;
+}
+
+.label {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.hero-label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  letter-spacing: 0.05em;
+}
+
+.session {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+  padding: 0.15em 0.5em;
+  border: 1px solid rgba(242, 240, 233, 0.18);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0.1em 0.3em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.close:hover {
+  color: var(--ink);
+}
+
+.status {
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--ink-dim);
+  letter-spacing: 0.06em;
+  font-size: 0.9rem;
+}
+
+.chart {
+  position: relative;
+  margin-top: 1rem;
+}
+
+.line {
+  display: block;
+  width: 100%;
+  height: clamp(120px, 30vmin, 220px);
+}
+
+.line polyline {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.line.line-up polyline {
+  stroke: var(--spark-up);
+}
+
+.line.line-down polyline {
+  stroke: var(--spark-down);
+}
+
+.extremes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+}
+
+.extremes .max {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--spark-up);
+}
+
+.extremes .min {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  color: var(--spark-down);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop {
+    animation: none;
+  }
+  .close {
+    transition: none;
+  }
+}

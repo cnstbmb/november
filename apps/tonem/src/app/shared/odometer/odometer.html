@@ -1,0 +1,22 @@
+<span
+  class="odometer"
+  [class.flash-up]="flash() === 'up'"
+  [class.flash-down]="flash() === 'down'"
+  [class.animated]="ready() && !reduced.enabled()"
+  [class.reduced]="reduced.enabled()"
+>
+  @for (d of digits(); track d.index) {
+    @if (d.isDigit) {
+      <span class="digit" aria-hidden="true">
+        <span class="reel" [style.transform]="reelTransform(d.slot)">
+          @for (n of strip; track $index) {
+            <span class="cell">{{ n }}</span>
+          }
+        </span>
+      </span>
+    } @else {
+      <span class="sep" aria-hidden="true">{{ d.char }}</span>
+    }
+  }
+  <span class="sr-only">{{ srText() }}</span>
+</span>

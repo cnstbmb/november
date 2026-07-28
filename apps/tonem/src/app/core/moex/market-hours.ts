@@ -3,11 +3,12 @@ import { MarketKind } from '../instruments/instrument.model';
 
 export type { MarketKind };
 
-/** Торговые окна в минутах от полуночи МСК (будни) */
-const WINDOWS: Record<MarketKind, { open: number; close: number }> = {
+/** Торговые окна в минутах от полуночи МСК (будни). crypto — без окна (24/7). */
+const WINDOWS: Record<MarketKind, { open: number; close: number } | null> = {
   fx: { open: 6 * 60 + 50, close: 23 * 60 + 50 }, // 06:50–23:50
   futures: { open: 9 * 60, close: 23 * 60 + 50 }, // 09:00–23:50
   index: { open: 9 * 60 + 50, close: 23 * 60 + 50 }, // 09:50–23:50
+  crypto: null, // торгуется круглосуточно, без выходных
 };
 
 /** Фид старше этого возраста внутри торгового окна = stale */
@@ -33,9 +34,10 @@ function mskParts(now: Date): { minutes: number; weekend: boolean } {
 }
 
 export function isTradingNow(kind: MarketKind, now: Date): boolean {
+  const w = WINDOWS[kind];
+  if (w === null) return true; // crypto: всегда открыто
   const { minutes, weekend } = mskParts(now);
   if (weekend) return false;
-  const w = WINDOWS[kind];
   return minutes >= w.open && minutes < w.close;
 }
 

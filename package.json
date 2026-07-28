@@ -8,6 +8,7 @@
     "apps/backend",
     "apps/frontend",
     "apps/tonem",
+    "apps/tonem-server",
     "packages/algorithms"
   ],
   "scripts": {
@@ -20,6 +21,9 @@
     "build:frontend": "npm --workspace frontend run build",
     "build:tonem": "npm --workspace tonem run build",
     "start:tonem": "npm --workspace tonem run start",
+    "build:tonem-server": "npm --workspace tonem-server run build",
+    "start:tonem-server": "npm --workspace tonem-server run start",
+    "test:tonem-server": "npm --workspace tonem-server run test",
     "start:frontend": "npm --workspace frontend run start",
     "build:frontend:docker": "npm --workspace frontend run build:docker:prod",
     "watch:frontend": "npm --workspace frontend run watch",

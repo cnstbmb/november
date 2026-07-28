@@ -1,0 +1,130 @@
+// Одометр: вертикальные барабаны цифр + затухающая вспышка.
+// Эстетика — как у приложения: тёмный фон, --ink/--ink-dim, tabular-nums.
+// Все размеры в em, чтобы компонент масштабировался шрифтом родителя
+// (герой clamp(6rem…26vmin) и тикер 0.95rem получают одинаково ровную механику).
+
+:host {
+  --odo-up: #6ee7a8; // мягкий зелёный, читается на --bg
+  --odo-down: #f28b8b; // мягкий красный
+
+  display: inline-block;
+}
+
+.odometer {
+  display: inline-flex;
+  align-items: baseline;
+  // наследуем цвет родителя (герой — --ink, тикер — --ink); флеш его временно перекрывает
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+// ── Барабаны ────────────────────────────────────────────────────────────────
+
+.digit {
+  position: relative;
+  display: inline-block;
+  height: 1em;
+  // ширина цифры при tabular-nums одинакова — колонки не «прыгают» по ширине
+  overflow: hidden;
+  vertical-align: baseline;
+  line-height: 1;
+}
+
+.reel {
+  display: block;
+  will-change: transform;
+  // по умолчанию без перехода: первый рендер и reduced-motion — мгновенно
+  transition: none;
+}
+
+// прокрутка включается только после первого рендера и если движение разрешено
+.odometer.animated .reel {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cell {
+  display: block;
+  height: 1em;
+  line-height: 1;
+}
+
+.sep {
+  display: inline-block;
+  line-height: 1;
+}
+
+// ── Вспышка ────────────────────────────────────────────────────────────────
+// Цвет меняем обычным transition (flash-класс задаёт цвет, его снятие —
+// плавный возврат), а свечение — keyframe-анимацией до прозрачного. Так
+// keyframe не зависит от `inherit` и всегда интерполируется.
+
+.odometer {
+  transition: color 1s ease-out;
+}
+
+.odometer.flash-up {
+  color: var(--odo-up);
+  animation: odo-glow-up 1s ease-out;
+}
+
+.odometer.flash-down {
+  color: var(--odo-down);
+  animation: odo-glow-down 1s ease-out;
+}
+
+@keyframes odo-glow-up {
+  0% {
+    text-shadow: 0 0 0.35em rgba(110, 231, 168, 0.55);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(110, 231, 168, 0);
+  }
+}
+
+@keyframes odo-glow-down {
+  0% {
+    text-shadow: 0 0 0.35em rgba(242, 139, 139, 0.55);
+  }
+  100% {
+    text-shadow: 0 0 0 rgba(242, 139, 139, 0);
+  }
+}
+
+// ── Reduced motion ─────────────────────────────────────────────────────────
+// Пояснение: модель уже не даёт прокрутку/флеш, но на всякий случай гасим
+// любые переходы и анимации и на уровне CSS.
+
+.odometer.reduced {
+  transition: none; // и цвет, и прокрутка — мгновенно
+}
+
+.odometer.reduced .reel {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odometer {
+    transition: none;
+  }
+  .odometer .reel {
+    transition: none;
+  }
+  .odometer.flash-up,
+  .odometer.flash-down {
+    animation: none;
+  }
+}
+
+// ── Доступность ────────────────────────────────────────────────────────────
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -12,8 +12,16 @@
 }
 
 .hero {
+  position: relative;
+  z-index: 1; // над фоном-авророй
   text-align: center;
   user-select: none;
+  cursor: pointer;
+  outline: none;
+
+  &:focus-visible .hero-value {
+    text-shadow: 0 0 1.5em rgba(242, 240, 233, 0.25);
+  }
 }
 
 .hero-value {
@@ -22,6 +30,7 @@
   font-weight: 200;
   line-height: 1;
   letter-spacing: -0.04em;
+  color: var(--ink-accent); // дышит настроением рынка (--mood-hue)
 }
 
 .hero-label {
@@ -42,6 +51,7 @@
 
 .ticker {
   position: absolute;
+  z-index: 1; // над фоном-авророй
   inset-inline: 0;
   bottom: 0;
   display: flex;

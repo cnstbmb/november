@@ -17,22 +17,22 @@ import { RatesStore } from './rates.store';
 const FX_SECIDS = currencySecids();
 
 function currencyMapping(): { id: string; secid: string }[] {
-  return INSTRUMENTS.filter((i) => i.moex.kind === 'currency').flatMap((i) => {
-    const secid = moexSecid(i.moex);
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').flatMap((i) => {
+    const secid = moexSecid(i.moex!);
     return secid ? [{ id: i.id, secid }] : [];
   });
 }
 
 function futuresAssets(): { id: string; assetCode: string }[] {
-  return INSTRUMENTS.filter((i) => i.moex.kind === 'futures').flatMap((i) => {
-    const assetCode = moexAssetCode(i.moex);
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'futures').flatMap((i) => {
+    const assetCode = moexAssetCode(i.moex!);
     return assetCode ? [{ id: i.id, assetCode }] : [];
   });
 }
 
 function indexInstrument(): { id: string; secid: string } | null {
-  const inst = INSTRUMENTS.find((i) => i.moex.kind === 'index');
-  const secid = inst ? moexSecid(inst.moex) : null;
+  const inst = INSTRUMENTS.find((i) => i.moex?.kind === 'index');
+  const secid = inst?.moex ? moexSecid(inst.moex) : null;
   return inst && secid ? { id: inst.id, secid } : null;
 }
 

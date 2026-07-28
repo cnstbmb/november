@@ -1,0 +1,44 @@
+// Аврора: полноэкранный фон за контентом. Canvas рисует плазму, а этот слой
+// отвечает за читаемость героя — радиальная виньетка гасит центр и края.
+// Компонент сам по себе прозрачен к кликам (pointer-events: none).
+
+:host {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none; // фон не перехватывает события
+  z-index: 0; // контент сцены лежит выше (position:relative + z-index)
+}
+
+.aurora-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  // апскейлим заниженное внутреннее разрешение до полного вьюпорта
+  image-rendering: auto;
+}
+
+// Виньетка для читаемости: центр темнее, чтобы текст героя читался на любом
+// настроении. Чисто CSS — дёшево, не нагружает canvas. Центральная зона (где
+// живёт hero-value) затемнена, к краям лёгкое свечение авроры проступает.
+:host::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 62% 55% at 50% 46%,
+      rgba(10, 10, 15, 0.72) 0%,
+      rgba(10, 10, 15, 0.42) 42%,
+      rgba(10, 10, 15, 0) 72%
+    ),
+    radial-gradient(
+      ellipse 120% 100% at 50% 120%,
+      rgba(10, 10, 15, 0.35) 0%,
+      rgba(10, 10, 15, 0) 55%
+    );
+}

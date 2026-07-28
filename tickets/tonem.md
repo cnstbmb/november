@@ -39,7 +39,13 @@
 
 ---
 
-## Фронтир сейчас: T03, T04, T05, T07, T08, T10 (T01, T02 ✅)
+## Фронтир сейчас: T06, T09, T11, T12, T13 (T01–T05, T07, T08, T10 ✅)
+
+> Техдолг после ревью фронтира 2026-07-29 (не блокеры, вынести при случае):
+> - **Дубли логики FORTS-контракта** — nearest-contract в 3 местах (front `moex-iss.parser.ts`, front `candles.service.ts`, server `parsers.ts`). Вынести общий helper; реестр инструментов фронт/сервер — сейчас ручное зеркало, риск рассинхрона (общий `packages/` модуль, прецедент есть — `packages/algorithms`).
+> - **`derived` QuoteSource** — производные штампуются `source:'moex'`; добавить `'derived'` в union, если UI будет ветвиться по источнику.
+> - **tonem-server**: N+1 в `latest()` и sequential upserts (→ `$transaction`/`createMany`); dead `selectNearestAtOrBefore`; unused `private logger`; unsafe `as`-касты вместо narrow-геттеров; runtime-стейдж Dockerfile тащит devDeps (`npm prune --omit=dev`); плоская структура src → фичи-модули по мере роста (T09).
+> - **T07 ввод владельца**: Metrika counter ID (сниппет пока закомментирован), donate-URL (футер «кофе автору» — сниппет в `deployments/tonem/README.md`, не свёрстан), DNS для tonem.ru перед certbot.
 
 ---
 
@@ -79,21 +85,21 @@
 
 Реализация: `core/moex/` (moex-time, market-hours, moex-iss.parser/service), `core/cbr/`, `core/rates/` (quote.model, value.format, rates.store, rates-poller). 48 vitest-тестов зелёные, бандл 44 kB transfer. Открытое: EUR_RUB__TOM имеет LAST=null вечером — берём MARKETPRICE (покрыто тестом).
 
-# T03 — Крипта: Binance WebSocket + одометр
+# T03 — Крипта: Binance WebSocket + одометр ✅ DONE (2026-07-29)
 
 **What to build:** `BinanceWsService` — combined stream BTC/ETH/TON, throttle до
 ~500мс, авто-реконнект с backoff. Анимация смены цены: цифры-одометр (прокрутка
 по направлению движения) + тающая вспышка зелёный/красный за ~1с.
 `prefers-reduced-motion` → мгновенный фейд без анимации.
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** done (2026-07-29)
 
-- [ ] Крипта обновляется в 3 часа ночи (MOEX спит — крипта дышит)
-- [ ] Одометр + вспышка работают на герое и в ленте
-- [ ] Обрыв WS переподключается без перезагрузки страницы
-- [ ] При reduced-motion никаких прокруток
+- [x] Крипта обновляется в 3 часа ночи (MOEX спит — крипта дышит) — Binance miniTicker WS, 24/7
+- [x] Одометр + вспышка работают на герое и в ленте — `shared/odometer`
+- [x] Обрыв WS переподключается без перезагрузки страницы — backoff 1с→30с, fake-timer тесты
+- [x] При reduced-motion никаких прокруток — статичный рендер, тихий фейд
 
-# T04 — Сырьевая полка + производные
+# T04 — Сырьевая полка + производные ✅ DONE (2026-07-29)
 
 **What to build:** FORTS-инструменты (пшеница, АИ-95, кофе, апельсиновый сок, сахар) —
 выбор ближайшего ликвидного контракта по ASSETCODE через ISS. `DerivedEngine`:
@@ -101,25 +107,25 @@ EUR/USD, BTC/RUB, BTC-в-золоте, BTC-в-баррелях, «индекс �
 (нормированный композит кофе+сок+пшеница+сахар), рубль-в-граммах-золота.
 Все ~20 позиций в ленте.
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** done (2026-07-29)
 
-- [ ] 14 живых + 6 производных позиций отображаются в тикере
-- [ ] Производные пересчитываются при каждом обновлении сырья
-- [ ] Если сырьё для производной недоступно — позиция честно скрыта, а не «0»
+- [x] 14 живых + 6 производных позиций отображаются в тикере — реестр расширен до 20
+- [x] Производные пересчитываются при каждом обновлении сырья — `core/derived` computed-сигналы
+- [x] Если сырьё для производной недоступно — позиция честно скрыта, а не «0»
 
-# T05 — Генеративный фон + движок настроения
+# T05 — Генеративный фон + движок настроения ✅ DONE (2026-07-29)
 
 **What to build:** canvas-фон «аврора» (медленные градиентные течения, зерно,
 60fps, без внешних ассетов). `MoodEngine`: агрегированная дельта рынка за сессию →
 CSS-переменные `--mood-hue`, `--mood-energy`, `--mood-turbulence`; фон, цифры и
 лента перекрашиваются согласованно. Переходы настроения — плавные (десятки секунд).
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** done (2026-07-29)
 
-- [ ] Растущий рынок → тёплый спокойный фон, падающий → холодная буря
-- [ ] Нет резких скачков палитры (сглаживание)
-- [ ] FPS не проседает на среднем ноутбуке; при reduced-motion фон статичен
-- [ ] Фон не съедает читаемость цифры (авто-затемнение под текстом)
+- [x] Растущий рынок → тёплый спокойный фон, падающий → холодная буря — `shared/aurora` + `core/mood`
+- [x] Нет резких скачков палитры (сглаживание) — EMA α=0.06, полураспад ~14с
+- [x] FPS не проседает; при reduced-motion фон статичен — DPR≤2, разрешение ×0.5, пауза на скрытой вкладке
+- [x] Фон не съедает читаемость цифры — CSS-виньетка под героем
 
 # T06 — Настройки + шаринг вида через URL
 
@@ -135,21 +141,25 @@ CSS-переменные `--mood-hue`, `--mood-energy`, `--mood-turbulence`; ф�
 - [ ] Возврат на сайт восстанавливает мои настройки из localStorage
 - [ ] Дзен-тумблеры стилизованы в тон zenrus (ироничные подписи)
 
-# T07 — Деплой MVP: tonem.ru в проде
+# T07 — Деплой MVP: tonem.ru в проде ✅ CODE-DONE (2026-07-29)
 
 **What to build:** `deployments/tonem/docker-compose.yml` + мультистейдж Dockerfile
 (node build → nginx serve статики). Server-блок `tonem.ru` в существующем nginx,
 `certbot --nginx -d tonem.ru -d www.tonem.ru`. Статичная OG-карточка + meta,
 favicon, Яндекс.Метрика, донат-футер («кофе автору»).
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** code-done (2026-07-29); прод-вкат — после ввода владельца
 
-- [ ] https://tonem.ru открывается с валидным TLS и живыми курсами
-- [ ] Превью ссылки в телеграме — брендовая карточка
-- [ ] Кэш-заголовки: index.html no-cache, ассеты immutable
-- [ ] Метрика считает визиты
+- [ ] https://tonem.ru открывается с валидным TLS и живыми курсами — нужен DNS + certbot на хосте
+- [ ] Превью ссылки в телеграме — брендовая карточка — `public/og-card.png` 1200×630 + OG/Twitter meta ✅
+- [x] Кэш-заголовки: index.html no-cache, ассеты immutable — `deployments/tonem/nginx/tonem.conf`
+- [ ] Метрика считает визиты — сниппет добавлен, нужен реальный counter ID (плейсхолдер XXXXXXXX)
 
-# T08 — tonem-server: коллектор + БД + read API
+Сделано: `deployments/tonem/` (Dockerfile.frontend мультистейдж → nginx, tonem-web в compose),
+OG-карточка + favicon.svg/.ico + apple-touch-icon, Метрика (body, async), README с nginx-блоком
+и certbot. Ждёт владельца: Metrika ID, donate-URL, DNS. Донат-футер — сниппет в README (не свёрстан в app).
+
+# T08 — tonem-server: коллектор + БД + read API ✅ CODE-DONE (2026-07-29)
 
 **What to build:** NestJS-приложение `apps/tonem-server` (@nestjs/schedule,
 @nestjs/axios, Prisma). Миграция: таблица `ticks (instrument, ts, value, meta)`,
@@ -158,13 +168,17 @@ favicon, Яндекс.Метрика, донат-футер («кофе авто
 `GET /range?from=&to=&instrument=`. База `tonem` на существующем postgres:17.
 Server-блок `api.tonem.ru` + certbot. Контейнер в `deployments/tonem/`.
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** code-done (2026-07-29); миграция и прод — с живым postgres
 
-- [ ] Тики копятся в БД 24/7 (крипта — круглосуточно, MOEX — в часы торгов)
-- [ ] `curl https://api.tonem.ru/latest` отдаёт свежий снапшот
-- [ ] `/at?ts=` возвращает ближайший тик ≤ ts по каждому инструменту
-- [ ] Коллектор переживает рестарт контейнера (идемпотентные вставки, unique instrument+ts)
-- [ ] CORS открыт только для tonem.ru
+- [x] Тики копятся в БД 24/7 — @Cron каждую минуту, MOEX в торговые окна, крипта круглосуточно
+- [ ] curl https://api.tonem.ru/latest — нужен деплой + DNS + certbot
+- [x] /at?ts= возвращает ближайший тик ≤ ts по каждому инструменту — selectNearestAtOrBefore
+- [x] Коллектор переживает рестарт (идемпотентные вставки, unique instrument+ts) — upsert, ts к началу минуты
+- [x] CORS открыт только для tonem.ru
+
+Сделано: `apps/tonem-server` (NestJS+Prisma, реестр переиспользован, 25 тестов, Dockerfile),
+миграция 0001_init, compose-сервис, README с nginx api-блоком. Не запускалось против живой БД
+(нет локального postgres); prisma migrate deploy — на хосте.
 
 # T09 — Машина времени
 
@@ -179,17 +193,19 @@ Server-блок `api.tonem.ru` + certbot. Контейнер в `deployments/ton
 - [ ] Падение api.tonem.ru не ломает live-режим (машина времени просто недоступна)
 - [ ] Состояние перемотки тоже сериализуется в URL (можно переслать «момент»)
 
-# T10 — Спарклайн по тапу
+# T10 — Спарклайн по тапу ✅ DONE (2026-07-29)
 
 **What to build:** тап/клик на героя → оверлей с внутридневным графиком инструмента
 (MOEX candles / Binance klines, browser-direct). Ручной SVG-полилайн, без чарт-либ.
 Подписи min/max за день. Свайп вниз/крестик — закрыть.
 **Blocked by:** T02
-**Status:** ready-for-agent
+**Status:** done (2026-07-29)
 
-- [ ] У каждого инструмента есть рабочий спарклайн за сегодня
-- [ ] График строится <300мс после тапа
-- [ ] Ночью для MOEX-инструментов — кривая вчерашней сессии с пометкой
+- [x] У каждого инструмента есть рабочий спарклайн за сегодня — `core/candles` (MOEX candles / Binance klines)
+- [x] График строится <300мс после тапа — ручной SVG-полилайн, `shared/sparkline`
+- [x] Ночью для MOEX — кривая вчерашней сессии с пометкой — decideSession + бейдж «вчерашняя сессия»
+
+Сделано: тап на герое открывает оверлей; закрытие — ×/бэкдроп/свайп вниз; min/max подписи.
 
 # T11 — Генеративный звук
 

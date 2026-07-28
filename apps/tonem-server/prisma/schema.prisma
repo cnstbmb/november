@@ -1,0 +1,22 @@
+// tonem-server Prisma schema.
+// Database: `tonem` on the existing shared postgres-db (postgres:17) container.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tick {
+  id         BigInt   @id @default(autoincrement())
+  instrument String
+  ts         DateTime
+  value      Float
+  meta       Json?
+
+  @@unique([instrument, ts])
+  @@index([instrument, ts])
+}

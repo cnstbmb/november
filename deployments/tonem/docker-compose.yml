@@ -1,0 +1,58 @@
+# tonem.ru stack.
+#
+# This file is shared between two tickets:
+#   - T08 (this section): tonem-server — NestJS quote collector + history API.
+#   - T07 (deploy agent): tonem frontend — nginx static site for tonem.ru.
+#
+# Convention: each agent only ADDS its own clearly-marked service block and does
+# not rewrite existing blocks. Shared networks live at the bottom.
+
+services:
+  # ── tonem-server (T08) ─────────────────────────────────────────────────────
+  # Collects MOEX ISS + Binance quotes 24/7 into the `tonem` database on the
+  # existing prod postgres, and serves the public read API on :3100.
+  tonem-server:
+    build:
+      context: ../../          # repo root (npm workspaces hoist deps there)
+      dockerfile: apps/tonem-server/Dockerfile
+    image: cnstbmb/tonem-server:latest
+    container_name: tonem-server
+    restart: always
+    env_file:
+      - .env                   # provides DATABASE_URL (+ optional PORT)
+    ports:
+      - "3100:3100"            # host:container — nginx api.tonem.ru proxies here
+    networks:
+      - tonem-network
+      - app-network            # shared with deployments/prod; postgres-db reachable there
+    # No depends_on: postgres-db runs in a different compose project (deployments/prod).
+    # DATABASE_URL points at the `postgres-db` hostname on `app-network`.
+
+  # ── tonem frontend (T07) ───────────────────────────────────────────────────
+  # nginx serving the built Angular SPA for tonem.ru / www.tonem.ru.
+  # Reached by the prod nginx (`webserver`) over the shared `app-network`:
+  #   proxy_pass http://tonem-web;   (container listens on :80)
+  tonem-web:
+    build:
+      context: ../../          # repo root (npm workspaces hoist deps there)
+      dockerfile: deployments/tonem/Dockerfile.frontend
+    image: cnstbmb/tonem-web:latest
+    container_name: tonem-web
+    restart: always
+    # No host port published: only the prod nginx proxies to it by container
+    # name over `app-network`. (To smoke-test directly, add  "8081:80".)
+    networks:
+      - tonem-network
+      - app-network            # shared with deployments/prod; webserver reaches it here
+
+networks:
+  # Private to the tonem stack (server <-> future frontend).
+  tonem-network:
+    driver: bridge
+  # The existing prod network where the postgres-db container is reachable by
+  # its service/container name. Created by deployments/prod/docker-compose.yml.
+  # NOTE: compose prefixes project names, so the real network is likely
+  # `prod_app-network`; set `name:` accordingly if it differs on the host.
+  app-network:
+    external: true
+    name: app-network

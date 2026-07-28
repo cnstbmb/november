@@ -1,0 +1,38 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- subtle vertical vignette to keep the flat dark from looking dead -->
+    <radialGradient id="glow" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#15151d"/>
+      <stop offset="55%" stop-color="#0d0d13"/>
+      <stop offset="100%" stop-color="#0a0a0f"/>
+    </radialGradient>
+    <style>
+      .word  { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; font-weight: 800; fill: #f2f0e9; letter-spacing: -6px; }
+      .num   { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; font-weight: 800; fill: #f2f0e9; font-variant-numeric: tabular-nums; letter-spacing: -4px; }
+      .lbl   { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; font-weight: 400; fill: rgba(242,240,233,0.45); }
+      .tick  { font-family: 'Inter', 'Segoe UI', Roboto, sans-serif; font-weight: 500; fill: rgba(242,240,233,0.55); font-variant-numeric: tabular-nums; }
+      .tick-dim { fill: rgba(242,240,233,0.28); }
+      .rule  { stroke: rgba(242,240,233,0.14); stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- word mark, top-left -->
+  <text class="word" x="80" y="150" font-size="92">тонем?</text>
+
+  <!-- hero: the monumental number, right-aligned block -->
+  <text class="num" x="1120" y="400" font-size="300" text-anchor="end">92,47</text>
+  <text class="lbl" x="1120" y="470" font-size="42" text-anchor="end">рублей за доллар</text>
+
+  <!-- divider above the ticker -->
+  <line class="rule" x1="80" y1="520" x2="1120" y2="520"/>
+
+  <!-- ticker strip -->
+  <g class="tick" font-size="30">
+    <text x="80"   y="572">EUR/RUB <tspan class="tick-dim">101,3</tspan></text>
+    <text x="360"  y="572">Нефть <tspan class="tick-dim">$68,4</tspan></text>
+    <text x="560"  y="572">Золото <tspan class="tick-dim">8 940</tspan></text>
+    <text x="820"  y="572">BTC <tspan class="tick-dim">97 210</tspan></text>
+  </g>
+</svg>

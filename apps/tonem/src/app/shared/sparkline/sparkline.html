@@ -1,0 +1,47 @@
+<div
+  class="backdrop"
+  [class.reduced]="reduced.enabled()"
+  (click)="onBackdropClick($event)"
+  (touchstart)="onTouchStart($event)"
+  (touchend)="onTouchEnd($event)"
+  (keydown.escape)="close()"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="instrument().heroLabel"
+>
+  <section class="sheet">
+    <header class="head">
+      <div class="titles">
+        <p class="label">{{ instrument().label }}</p>
+        <p class="hero-label">{{ instrument().heroLabel }}</p>
+      </div>
+      @if (sessionNote()) {
+        <p class="session">{{ sessionNote() }}</p>
+      }
+      <button #closeBtn type="button" class="close" aria-label="Закрыть" (click)="close()">×</button>
+    </header>
+
+    @if (state() === 'loading') {
+      <p class="status">загружаем…</p>
+    } @else if (state() === 'empty') {
+      <p class="status">нет данных за сессию</p>
+    } @else {
+      <div class="chart">
+        <svg
+          [attr.viewBox]="'0 0 ' + 100 + ' ' + 40"
+          preserveAspectRatio="none"
+          class="line"
+          [class.line-up]="trend() === 'up'"
+          [class.line-down]="trend() === 'down'"
+          aria-hidden="true"
+        >
+          <polyline fill="none" [attr.points]="points()" vector-effect="non-scaling-stroke" />
+        </svg>
+        <div class="extremes">
+          <span class="max">{{ dayMax() }}</span>
+          <span class="min">{{ dayMin() }}</span>
+        </div>
+      </div>
+    }
+  </section>
+</div>

@@ -1,6 +1,13 @@
 <main class="stage">
-  <section class="hero" aria-live="polite">
-    <p class="hero-value">{{ valueOf(store.hero()) }}</p>
+  <app-aurora />
+
+  <section class="hero" aria-live="polite" (click)="openSpark()" (keydown.enter)="openSpark()" (keydown.space)="openSpark(); $event.preventDefault()" tabindex="0" role="button" aria-label="Показать график за сегодня">
+    <p class="hero-value">
+      <app-odometer
+        [value]="store.hero().quote.value"
+        [decimals]="store.hero().instrument.decimals"
+      />
+    </p>
     <p class="hero-label">{{ store.hero().instrument.heroLabel }}</p>
     @if (heroStatus()) {
       <p class="hero-status">{{ heroStatus() }}</p>
@@ -8,14 +15,22 @@
   </section>
 
   <footer class="ticker" aria-label="Все котировки">
-    @for (entry of store.ticker(); track entry.instrument.id) {
+    @for (entry of fullTicker(); track entry.instrument.id) {
       <span class="ticker-item" [class.ticker-dim]="isDim(entry)">
         <span class="ticker-label">{{ entry.instrument.label }}</span>
-        <span class="ticker-value">{{ valueOf(entry) }}</span>
+        <app-odometer
+          class="ticker-value"
+          [value]="entry.quote.value"
+          [decimals]="entry.instrument.decimals"
+        />
         @if (entry.quote.source === 'cbr') {
           <span class="ticker-badge">ЦБ</span>
         }
       </span>
     }
   </footer>
+
+  @if (sparkInstrument(); as inst) {
+    <app-sparkline [instrument]="inst" (closed)="closeSpark()" />
+  }
 </main>

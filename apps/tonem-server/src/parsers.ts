@@ -1,0 +1,188 @@
+/**
+ * Pure parsing / mapping logic: raw MOEX ISS + Binance responses -> ticks.
+ * No IO, no Nest, no Prisma — trivially unit-testable. Ported from
+ * apps/tonem/src/app/core/moex/moex-iss.parser.ts.
+ */
+import { moexTimeOnDate, parseMoexDateTime } from './moex-time';
+
+/** A normalized tick ready to persist. ts is always defined (collector stamps it). */
+export interface TickInput {
+  instrument: string;
+  ts: Date;
+  value: number;
+  meta?: Record<string, unknown>;
+}
+
+/** Minimal slice of an ISS response we work with. */
+interface IssBlock {
+  columns: string[];
+  data: unknown[][];
+}
+
+interface IssResponse {
+  securities?: IssBlock;
+  marketdata?: IssBlock;
+}
+
+function rowBySecid(block: IssBlock | undefined): Map<string, Map<string, unknown>> {
+  const out = new Map<string, Map<string, unknown>>();
+  if (!block || !Array.isArray(block.columns) || !Array.isArray(block.data)) return out;
+  const secidIdx = block.columns.indexOf('SECID');
+  if (secidIdx < 0) return out;
+  for (const row of block.data) {
+    if (!Array.isArray(row)) continue;
+    const map = new Map<string, unknown>();
+    block.columns.forEach((col, i) => map.set(col, row[i]));
+    out.set(String(row[secidIdx]), map);
+  }
+  return out;
+}
+
+const num = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+
+function timesFrom(md: Map<string, unknown> | undefined): {
+  time: Date | null;
+  systime: Date | null;
+} {
+  const systime = parseMoexDateTime(str(md?.get('SYSTIME')));
+  const time = moexTimeOnDate(str(md?.get('TIME')), systime);
+  return { time, systime };
+}
+
+function makeTick(
+  instrument: string,
+  value: number | null,
+  fallbackTs: Date,
+  source: string,
+  extra?: Record<string, unknown>,
+): TickInput | null {
+  if (value === null) return null;
+  return {
+    instrument,
+    ts: fallbackTs,
+    value,
+    meta: { source, ...extra },
+  };
+}
+
+/**
+ * Currency spot: LAST with fallback to MARKETPRICE (EUR_RUB__TOM's LAST is often null).
+ * Produces one tick per mapped instrument, timestamped at the collection minute.
+ */
+export function parseCurrencyBatch(
+  json: unknown,
+  mapping: readonly { id: string; secid: string }[],
+  ts: Date,
+): TickInput[] {
+  const md = rowBySecid((json as IssResponse | null)?.marketdata);
+  const out: TickInput[] = [];
+  for (const { id, secid } of mapping) {
+    const row = md.get(secid);
+    const value = num(row?.get('LAST')) ?? num(row?.get('MARKETPRICE'));
+    const { systime } = timesFrom(row);
+    const tick = makeTick(id, value, ts, 'moex-currency', {
+      secid,
+      ...(systime ? { systime: systime.toISOString() } : {}),
+    });
+    if (tick) out.push(tick);
+  }
+  return out;
+}
+
+/** Index: value lives in CURRENTVALUE (fallback LAST). */
+export function parseIndexQuote(
+  json: unknown,
+  instrumentId: string,
+  ts: Date,
+): TickInput | null {
+  const md = rowBySecid((json as IssResponse | null)?.marketdata);
+  const row = md.values().next().value as Map<string, unknown> | undefined;
+  const value = num(row?.get('CURRENTVALUE')) ?? num(row?.get('LAST'));
+  const { systime } = timesFrom(row);
+  return makeTick(instrumentId, value, ts, 'moex-index', {
+    ...(systime ? { systime: systime.toISOString() } : {}),
+  });
+}
+
+/**
+ * FORTS futures: from the board listing pick the nearest contract by ASSETCODE
+ * (expiry >= today MSK), price from the same sample's marketdata.
+ */
+export function parseFuturesBatch(
+  json: unknown,
+  assets: readonly { id: string; assetCode: string }[],
+  today: Date,
+  ts: Date,
+): TickInput[] {
+  const resp = json as IssResponse | null;
+  const sec = resp?.securities;
+  const md = rowBySecid(resp?.marketdata);
+  if (!sec) return [];
+
+  const colSecid = sec.columns.indexOf('SECID');
+  const colAsset = sec.columns.indexOf('ASSETCODE');
+  const colExpiry = sec.columns.indexOf('LASTTRADEDATE');
+  const todayYmd = today.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
+
+  const out: TickInput[] = [];
+  for (const { id, assetCode } of assets) {
+    const candidates = sec.data
+      .filter((row) => row[colAsset] === assetCode)
+      .map((row) => ({
+        secid: String(row[colSecid]),
+        expiry: String(row[colExpiry] ?? ''),
+        last: num(md.get(String(row[colSecid]))?.get('LAST')),
+      }));
+
+    // Nearest expiry not before today; otherwise nearest overall.
+    // Among equals prefer the contract with a live price.
+    const tradable = candidates.filter((c) => c.expiry >= todayYmd);
+    const pool = tradable.length > 0 ? tradable : candidates;
+    const chosen = [...pool].sort(
+      (a, b) =>
+        a.expiry.localeCompare(b.expiry) || Number(b.last !== null) - Number(a.last !== null),
+    )[0];
+
+    if (!chosen) continue;
+    const { systime } = timesFrom(md.get(chosen.secid));
+    const tick = makeTick(id, chosen.last, ts, 'moex-futures', {
+      assetCode,
+      secid: chosen.secid,
+      expiry: chosen.expiry,
+      ...(systime ? { systime: systime.toISOString() } : {}),
+    });
+    if (tick) out.push(tick);
+  }
+  return out;
+}
+
+/** Binance REST ticker/price response -> ticks. Accepts the array form. */
+export function parseBinancePrices(
+  json: unknown,
+  mapping: readonly { id: string; symbol: string }[],
+  ts: Date,
+): TickInput[] {
+  const bySymbol = new Map<string, number>();
+  if (Array.isArray(json)) {
+    for (const entry of json) {
+      if (entry && typeof entry === 'object') {
+        const sym = (entry as { symbol?: unknown }).symbol;
+        const price = (entry as { price?: unknown }).price;
+        const p = typeof price === 'string' ? Number(price) : num(price);
+        if (typeof sym === 'string' && p !== null && Number.isFinite(p)) {
+          bySymbol.set(sym, p);
+        }
+      }
+    }
+  }
+  const out: TickInput[] = [];
+  for (const { id, symbol } of mapping) {
+    const value = bySymbol.get(symbol) ?? null;
+    const tick = makeTick(id, value, ts, 'binance', { symbol });
+    if (tick) out.push(tick);
+  }
+  return out;
+}

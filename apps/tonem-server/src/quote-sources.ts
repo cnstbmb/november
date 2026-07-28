@@ -1,0 +1,78 @@
+/**
+ * Thin HTTP clients for MOEX ISS and Binance, using global fetch (Node 20+).
+ * Mirrors apps/tonem/src/app/core/moex/moex-iss.service.ts endpoints.
+ */
+import { Injectable, Logger } from '@nestjs/common';
+
+const ISS_BASE = 'https://iss.moex.com/iss';
+const BINANCE_TICKER = 'https://api.binance.com/api/v3/ticker/price';
+
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function getJson(url: string): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { accept: 'application/json' },
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} for ${url}`);
+    }
+    return (await res.json()) as unknown;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function qs(params: Record<string, string>): string {
+  return Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+}
+
+@Injectable()
+export class QuoteSourcesService {
+  private readonly logger = new Logger(QuoteSourcesService.name);
+
+  /** One batched request for all currency secids. */
+  async fetchCurrencyBatch(secids: readonly string[]): Promise<unknown> {
+    const url = `${ISS_BASE}/engines/currency/markets/selt/boards/CETS/securities.json?${qs({
+      'iss.meta': 'off',
+      'iss.only': 'marketdata',
+      securities: secids.join(','),
+      'marketdata.columns': 'SECID,LAST,MARKETPRICE,TIME,SYSTIME',
+    })}`;
+    return getJson(url);
+  }
+
+  async fetchIndex(secid: string): Promise<unknown> {
+    const url = `${ISS_BASE}/engines/stock/markets/index/securities/${secid}.json?${qs({
+      'iss.meta': 'off',
+      'iss.only': 'marketdata',
+      'marketdata.columns': 'SECID,CURRENTVALUE,LAST,TIME,SYSTIME',
+    })}`;
+    return getJson(url);
+  }
+
+  async fetchFuturesBoard(): Promise<unknown> {
+    const url = `${ISS_BASE}/engines/futures/markets/forts/boards/RFUD/securities.json?${qs({
+      'iss.meta': 'off',
+      'iss.only': 'securities,marketdata',
+      'securities.columns': 'SECID,ASSETCODE,LASTTRADEDATE',
+      'marketdata.columns': 'SECID,LAST,TIME,SYSTIME',
+    })}`;
+    return getJson(url);
+  }
+
+  /**
+   * Binance REST price for a set of symbols. Uses the ?symbols=["A","B"] form.
+   * The symbols param must be a JSON array literal (already compact-encoded).
+   */
+  async fetchBinancePrices(symbols: readonly string[]): Promise<unknown> {
+    const symbolsJson = JSON.stringify(symbols);
+    const url = `${BINANCE_TICKER}?symbols=${encodeURIComponent(symbolsJson)}`;
+    return getJson(url);
+  }
+}

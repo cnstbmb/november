@@ -7,6 +7,7 @@
   "workspaces": [
     "apps/backend",
     "apps/frontend",
+    "apps/tonem",
     "packages/algorithms"
   ],
   "scripts": {
@@ -17,6 +18,8 @@
     "start:backend": "npm --workspace november-server run start",
     "lint:fix:backend": "npm --workspace november-server run lint:fix",
     "build:frontend": "npm --workspace frontend run build",
+    "build:tonem": "npm --workspace tonem run build",
+    "start:tonem": "npm --workspace tonem run start",
     "start:frontend": "npm --workspace frontend run start",
     "build:frontend:docker": "npm --workspace frontend run build:docker:prod",
     "watch:frontend": "npm --workspace frontend run watch",

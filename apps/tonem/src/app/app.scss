@@ -1,0 +1,80 @@
+:host {
+  display: block;
+  height: 100dvh;
+}
+
+.stage {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero {
+  text-align: center;
+  user-select: none;
+}
+
+.hero-value {
+  margin: 0;
+  font-size: clamp(6rem, 26vmin, 22rem);
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hero-label {
+  margin: 0.5em 0 0;
+  font-size: clamp(1rem, 2.2vmin, 1.6rem);
+  font-weight: 400;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em;
+}
+
+.hero-status {
+  margin: 1.2em 0 0;
+  font-size: clamp(0.8rem, 1.6vmin, 1.05rem);
+  color: var(--ink-dim);
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.ticker {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  display: flex;
+  gap: 2.5rem;
+  padding: 1rem 1.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  color: var(--ink-dim);
+
+  // тонкая линия сверху, отделяющая ленту от сцены
+  border-top: 1px solid rgba(242, 240, 233, 0.08);
+}
+
+.ticker-item {
+  display: inline-flex;
+  gap: 0.6em;
+  align-items: baseline;
+  transition: opacity 0.6s ease;
+}
+
+.ticker-dim {
+  opacity: 0.4;
+}
+
+.ticker-badge {
+  font-size: 0.7em;
+  padding: 0.1em 0.4em;
+  border: 1px solid var(--ink-dim);
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.ticker-value {
+  color: var(--ink);
+}

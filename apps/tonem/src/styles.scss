@@ -1,0 +1,24 @@
+:root {
+  --bg: #0a0a0f;
+  --ink: #f2f0e9;
+  --ink-dim: rgba(242, 240, 233, 0.45);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family:
+    'Inter',
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}

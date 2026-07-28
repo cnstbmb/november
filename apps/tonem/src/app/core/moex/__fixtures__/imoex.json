@@ -1,0 +1,7 @@
+{
+"marketdata": {
+	"columns": ["SECID", "CURRENTVALUE", "TIME", "SYSTIME"], 
+	"data": [
+		["IMOEX", 2191.18, "19:00:00", "2026-07-28 19:00:11"]
+	]
+}}

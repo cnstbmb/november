@@ -1,0 +1,21 @@
+<main class="stage">
+  <section class="hero" aria-live="polite">
+    <p class="hero-value">{{ valueOf(store.hero()) }}</p>
+    <p class="hero-label">{{ store.hero().instrument.heroLabel }}</p>
+    @if (heroStatus()) {
+      <p class="hero-status">{{ heroStatus() }}</p>
+    }
+  </section>
+
+  <footer class="ticker" aria-label="Все котировки">
+    @for (entry of store.ticker(); track entry.instrument.id) {
+      <span class="ticker-item" [class.ticker-dim]="isDim(entry)">
+        <span class="ticker-label">{{ entry.instrument.label }}</span>
+        <span class="ticker-value">{{ valueOf(entry) }}</span>
+        @if (entry.quote.source === 'cbr') {
+          <span class="ticker-badge">ЦБ</span>
+        }
+      </span>
+    }
+  </footer>
+</main>

@@ -5,10 +5,13 @@ import {
   ElementRef,
   Signal,
   afterNextRender,
+  effect,
   inject,
+  input,
   viewChild,
 } from '@angular/core';
 import { MoodEngine } from '../../core/mood/mood.engine';
+import { neutralMood } from '../../core/mood/mood.model';
 import { ReducedMotion } from '../../core/motion/reduced-motion';
 import { AuroraFrame, auroraFrame } from './aurora.model';
 
@@ -49,11 +52,25 @@ interface Blob {
 @Component({
   selector: 'app-aurora',
   imports: [],
-  template: '<canvas #canvas class="aurora-canvas" aria-hidden="true"></canvas>',
+  template: `
+    <canvas
+      #canvas
+      class="aurora-canvas"
+      aria-hidden="true"
+      [style.filter]="'blur(' + blur() + 'px)'"
+      [class.is-blurred]="blur() > 0"
+    ></canvas>
+    <span class="aurora-dim" aria-hidden="true" [style.opacity]="dim()"></span>
+  `,
   styleUrl: './aurora.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AuroraComponent {
+  readonly dim = input(0);
+  readonly blur = input(0);
+  readonly speed = input(1);
+  readonly moodEnabled = input(true);
+
   private readonly mood: Signal<{ hue: number; energy: number; turbulence: number }> =
     inject(MoodEngine).mood;
   private readonly reduced = inject(ReducedMotion);
@@ -62,13 +79,20 @@ export class AuroraComponent {
   private ctx: CanvasRenderingContext2D | null = null;
   private rafId: number | null = null;
   private running = false;
-  private startTime = 0;
+  private phase = 0;
+  private lastFrameTime: number | null = null;
   private blobs: readonly Blob[] = [];
   /** Пре-рендеренный тайл зерна (CanvasPattern), создаётся один раз. */
   private grain: CanvasPattern | null = null;
 
   constructor() {
     afterNextRender(() => this.setup());
+    effect(() => {
+      this.moodEnabled();
+      this.blur();
+      this.dim();
+      if (this.reduced.enabled() && this.ctx) this.drawFrame(this.phase);
+    });
     inject(DestroyRef).onDestroy(() => this.teardown());
   }
 
@@ -104,13 +128,14 @@ export class AuroraComponent {
   private startLoop(): void {
     if (this.running || this.reduced.enabled()) return;
     this.running = true;
-    this.startTime = performance.now();
+    this.lastFrameTime = null;
     this.rafId = requestAnimationFrame(this.frame);
   }
 
   /** Остановка rAF-цикла. */
   private stopLoop(): void {
     this.running = false;
+    this.lastFrameTime = null;
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -120,8 +145,12 @@ export class AuroraComponent {
   /** Кадр анимации: рисуем и просим следующий, пока бежим. */
   private readonly frame = (now: number): void => {
     if (!this.running) return;
-    const t = (now - this.startTime) / 1000; // секунды с запуска
-    this.drawFrame(t);
+    if (this.lastFrameTime !== null) {
+      const deltaSeconds = Math.min(0.1, Math.max(0, now - this.lastFrameTime) / 1000);
+      this.phase += deltaSeconds * Math.max(0, this.speed());
+    }
+    this.lastFrameTime = now;
+    this.drawFrame(this.phase);
     this.rafId = requestAnimationFrame(this.frame);
   };
 
@@ -204,7 +233,7 @@ export class AuroraComponent {
     const canvas = ctx.canvas;
     const w = canvas.width;
     const h = canvas.height;
-    const frame: AuroraFrame = auroraFrame(this.mood());
+    const frame: AuroraFrame = auroraFrame(this.moodEnabled() ? this.mood() : neutralMood());
     const minDim = Math.min(w, h);
 
     ctx.clearRect(0, 0, w, h);

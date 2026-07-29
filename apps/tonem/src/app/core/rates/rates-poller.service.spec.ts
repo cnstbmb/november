@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 import { RatesPoller } from './rates-poller.service';
 import { RatesStore } from './rates.store';
 import currencyBatch from '../moex/__fixtures__/currency-batch.json';
@@ -15,7 +16,13 @@ describe('RatesPoller', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), RatesPoller, RatesStore],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        RatesPoller,
+        RatesStore,
+        { provide: LatestQuotesCacheService, useValue: { load: () => ({}), save: () => undefined } },
+      ],
     });
     poller = TestBed.inject(RatesPoller);
     store = TestBed.inject(RatesStore);

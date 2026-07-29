@@ -1,0 +1,25 @@
+:host { display: block; }
+.sound-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .55rem .75rem;
+  color: var(--ink-dim);
+  background: rgb(10 10 15 / 34%);
+  border: 1px solid rgb(242 240 233 / 12%);
+  border-radius: 999px;
+  font: inherit;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: color .2s ease, border-color .2s ease, background .2s ease;
+}
+.sound-button:hover, .sound-button:focus-visible, .sound-button.is-on {
+  color: var(--ink);
+  border-color: rgb(242 240 233 / 30%);
+  background: rgb(242 240 233 / 8%);
+}
+.sound-button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+@media (max-width: 34rem) { .sound-copy { display: none; } }
+@media (prefers-reduced-motion: reduce) { .sound-button { transition: none; } }

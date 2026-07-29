@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { RatesStore } from './rates.store';
-import { RawQuote } from './quote.model';
+import { Quote, RawQuote } from './quote.model';
 import { INSTRUMENTS } from '../instruments/instrument.registry';
+import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 
 const raw = (over: Partial<RawQuote>): RawQuote => ({
   instrumentId: 'usdrub',
@@ -13,10 +15,17 @@ const raw = (over: Partial<RawQuote>): RawQuote => ({
 
 describe('RatesStore', () => {
   let store: RatesStore;
+  let cache: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
   const now = new Date('2026-07-28T12:00:10+03:00');
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [RatesStore] });
+    cache = { load: vi.fn(() => ({})), save: vi.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        RatesStore,
+        { provide: LatestQuotesCacheService, useValue: cache },
+      ],
+    });
     store = TestBed.inject(RatesStore);
   });
 
@@ -45,6 +54,15 @@ describe('RatesStore', () => {
   it('источник cbr сохраняется в котировке', () => {
     store.apply([raw({})], 'cbr', now);
     expect(store.hero().quote.source).toBe('cbr');
+  });
+
+  it('после apply передаёт в офлайн-кэш полный объединённый снимок', () => {
+    store.apply([raw({ instrumentId: 'usdrub' })], 'moex', now);
+    store.apply([raw({ instrumentId: 'eurrub', value: 85 })], 'moex', now);
+
+    const snapshot = cache.save.mock.calls.at(-1)?.[0] as Readonly<Record<string, Quote>>;
+    expect(snapshot['usdrub']?.value).toBe(78.58);
+    expect(snapshot['eurrub']?.value).toBe(85);
   });
 
   it('неизвестный instrumentId игнорируется', () => {

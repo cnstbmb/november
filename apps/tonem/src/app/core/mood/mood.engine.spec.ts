@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 import { RatesStore } from '../rates/rates.store';
 import { RawQuote } from '../rates/quote.model';
 import { MoodEngine } from './mood.engine';
@@ -30,7 +31,12 @@ describe('MoodEngine', () => {
   let engine: MoodEngine;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [RatesStore] });
+    TestBed.configureTestingModule({
+      providers: [
+        RatesStore,
+        { provide: LatestQuotesCacheService, useValue: { load: () => ({}), save: () => undefined } },
+      ],
+    });
     store = TestBed.inject(RatesStore);
   });
 

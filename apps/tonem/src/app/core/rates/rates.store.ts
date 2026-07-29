@@ -1,8 +1,9 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { HERO_INSTRUMENT_ID, INSTRUMENTS, instrumentById } from '../instruments/instrument.registry';
 import { Instrument } from '../instruments/instrument.model';
 import { Quote, QuoteSource, QuoteStatus, RawQuote, unavailableQuote } from './quote.model';
 import { deriveStatus } from '../moex/market-hours';
+import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 
 export interface TickerEntry {
   readonly instrument: Instrument;
@@ -11,7 +12,8 @@ export interface TickerEntry {
 
 @Injectable({ providedIn: 'root' })
 export class RatesStore {
-  private readonly quotesSignal = signal<Readonly<Record<string, Quote>>>({});
+  private readonly cache = inject(LatestQuotesCacheService);
+  private readonly quotesSignal = signal<Readonly<Record<string, Quote>>>(this.cache.load());
 
   /** герой — USD/RUB (настраиваемость придёт в T06) */
   readonly hero = computed<TickerEntry>(() => {
@@ -51,6 +53,7 @@ export class RatesStore {
       };
     }
     this.quotesSignal.set(next);
+    this.cache.save(next);
   }
 
   statuses(): readonly QuoteStatus[] {

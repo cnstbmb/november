@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 import { RatesStore } from '../rates/rates.store';
 import { RawQuote } from '../rates/quote.model';
 import { DerivedEngine } from './derived.engine';
@@ -21,7 +22,13 @@ describe('DerivedEngine', () => {
   let engine: DerivedEngine;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [RatesStore, DerivedEngine] });
+    TestBed.configureTestingModule({
+      providers: [
+        RatesStore,
+        DerivedEngine,
+        { provide: LatestQuotesCacheService, useValue: { load: () => ({}), save: () => undefined } },
+      ],
+    });
     store = TestBed.inject(RatesStore);
     engine = TestBed.inject(DerivedEngine);
     engine.now = () => NOW;

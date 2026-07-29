@@ -6,6 +6,8 @@ const path = require('path');
 
 const SRC = __dirname;
 const OUT = path.resolve(__dirname, '../../public');
+const ICONS_OUT = path.join(OUT, 'icons');
+const PWA_ICON_SIZES = [72, 96, 128, 144, 152, 192, 384, 512];
 
 // Wrap a PNG buffer into a minimal .ico (PNG-embedded, Vista+ / all modern browsers).
 function pngToIco(png, size) {
@@ -33,7 +35,7 @@ async function main() {
     .toFile(path.join(OUT, 'og-card.png'));
   console.log('og-card.png written');
 
-  // favicon.svg -> favicon.png (180) + favicon.ico (32) + apple-touch-icon (180)
+  // favicon.svg -> favicon.ico (32) + apple-touch-icon (180) + PWA icon set
   const svg = fs.readFileSync(path.join(SRC, 'favicon.svg'));
   const png32 = await sharp(svg, { density: 384 }).resize(32, 32).png().toBuffer();
   fs.writeFileSync(path.join(OUT, 'favicon.ico'), pngToIco(png32, 32));
@@ -41,6 +43,15 @@ async function main() {
 
   await sharp(svg, { density: 384 }).resize(180, 180).png().toFile(path.join(OUT, 'apple-touch-icon.png'));
   console.log('apple-touch-icon.png written');
+
+  fs.mkdirSync(ICONS_OUT, { recursive: true });
+  await Promise.all(PWA_ICON_SIZES.map((size) =>
+    sharp(svg, { density: 768 })
+      .resize(size, size)
+      .png({ compressionLevel: 9 })
+      .toFile(path.join(ICONS_OUT, `icon-${size}x${size}.png`)),
+  ));
+  console.log(`PWA icons written (${PWA_ICON_SIZES.join(', ')})`);
 
   // also copy the crisp SVG favicon for modern browsers
   fs.copyFileSync(path.join(SRC, 'favicon.svg'), path.join(OUT, 'favicon.svg'));

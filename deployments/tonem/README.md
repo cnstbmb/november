@@ -183,7 +183,10 @@ nginx serving the built Angular SPA for **tonem.ru** / **www.tonem.ru**.
 - **Site config** (`nginx/tonem.conf`): SPA fallback
   (`try_files $uri $uri/ /index.html`), `index.html` → `Cache-Control:
   no-cache`, content-hashed bundles / media → `Cache-Control: public,
-  max-age=31536000, immutable`, gzip on.
+  max-age=31536000, immutable`, gzip on. Exact locations for
+  `ngsw-worker.js`, `safety-worker.js`, `worker-basic.min.js`, and `ngsw.json`
+  explicitly disable caching so Angular service-worker updates are never
+  trapped by the generic immutable `.js` rule.
 - **Container**: `tonem-web`, internal port **80** (no host port published),
   `restart: always`, on `tonem-network` + the shared `app-network`.
 
@@ -199,7 +202,16 @@ Smoke-test without touching prod (publishes a host port just for the check):
 ```bash
 docker run --rm -p 8081:80 cnstbmb/tonem-web:latest
 # open http://localhost:8081  — /, SPA fallback, and /og-card.png should all 200
+curl -I http://localhost:8081/ngsw-worker.js  # Cache-Control: no-cache, no-store, must-revalidate
+curl -I http://localhost:8081/ngsw.json        # Cache-Control: no-cache, no-store, must-revalidate
+curl http://localhost:8081/manifest.webmanifest
 ```
+
+The production build emits `ngsw-worker.js` and `ngsw.json`; development
+`ng serve` does not generate or register a service worker. After changing PWA
+assets, verify the installed app in a fresh browser profile because an existing
+service worker deliberately keeps serving the previous valid shell until the
+new version is fully downloaded.
 
 ### How prod nginx reaches it
 

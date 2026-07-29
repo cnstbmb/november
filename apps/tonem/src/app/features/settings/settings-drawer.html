@@ -1,0 +1,111 @@
+<div class="backdrop" (click)="onBackdropClick($event)" (keydown)="onDialogKeydown($event)">
+  <section
+    #drawer
+    class="drawer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+    aria-describedby="settings-description"
+  >
+    <header class="header">
+      <div>
+        <p class="eyebrow">пульт от реальности</p>
+        <h2 id="settings-title">Настройки вида</h2>
+        <p id="settings-description">Рынок не изменится. Зато можно переставить цифры.</p>
+      </div>
+      <button #closeButton class="close" type="button" aria-label="Закрыть настройки" (click)="requestClose()">×</button>
+    </header>
+
+    @if (store.imported()) {
+      <p class="imported">Это чужой вид. Ваши настройки целы до первого изменения.</p>
+    }
+
+    <fieldset>
+      <legend>Главная цифра</legend>
+      <label class="choice">
+        <input type="radio" name="hero-mode" value="pinned" [checked]="settings().hero.mode === 'pinned'" (change)="setHeroMode($event)" />
+        <span>стоять смирно</span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="hero-mode" value="rotation" [checked]="settings().hero.mode === 'rotation'" (change)="setHeroMode($event)" />
+        <span>крутить любимчиков</span>
+      </label>
+
+      <label class="stack" for="pinned-instrument">
+        <span>кого возвеличить</span>
+        <select id="pinned-instrument" [value]="settings().hero.pinnedId" (change)="setPinned($event)">
+          @for (instrument of instruments(); track instrument.id) {
+            <option [value]="instrument.id">{{ instrument.label }}</option>
+          }
+        </select>
+      </label>
+
+      <div class="favorites" aria-label="Избранное для ротации">
+        <p>любимчики для ротации</p>
+        <div class="chips">
+          @for (instrument of instruments(); track instrument.id) {
+            <label class="chip">
+              <input type="checkbox" [checked]="isFavorite(instrument.id)" (change)="setFavorite(instrument.id, $event)" />
+              <span>{{ instrument.label }}</span>
+            </label>
+          }
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Дзен</legend>
+      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideLabels" (change)="setZen('hideLabels', $event)" /><span>убрать подписи — я и так всё понимаю</span></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideTicker" (change)="setZen('hideTicker', $event)" /><span>убрать ленту — рынок слишком разговорчив</span></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideSmallNumbers" (change)="setZen('hideSmallNumbers', $event)" /><span>убрать мелкие циферки — мелочность не красит</span></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideClock" (change)="setZen('hideClock', $event)" /><span>убрать часы — время придумали биржи</span></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideHero" (change)="setZen('hideHero', $event)" /><span>убрать эти дурацкие цифры — наконец-то</span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Фон</legend>
+      <label class="range" for="background-dim"><span>затемнение <output>{{ settings().background.dim }}</output></span><input id="background-dim" type="range" min="0" max="1" step="0.05" [value]="settings().background.dim" (input)="setBackgroundNumber('dim', $event)" /></label>
+      <label class="range" for="background-blur"><span>блюр <output>{{ settings().background.blur }} px</output></span><input id="background-blur" type="range" min="0" max="40" step="1" [value]="settings().background.blur" (input)="setBackgroundNumber('blur', $event)" /></label>
+      <label class="range" for="background-speed"><span>скорость <output>{{ settings().background.speed }}×</output></span><input id="background-speed" type="range" min="0.1" max="3" step="0.1" [value]="settings().background.speed" (input)="setBackgroundNumber('speed', $event)" /></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().background.moodEnabled" (change)="setMood($event)" /><span>рынок задаёт настроение</span></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Звук</legend>
+      <label class="switch"><input type="checkbox" [checked]="settings().sound.enabled" (change)="setSoundEnabled($event)" /><span>включить биржевой эмбиент</span></label>
+      <label class="range"><span>громкость <output>{{ volumePercent() }}%</output></span><input type="range" min="0" max="1" step="0.05" [value]="settings().sound.volume" (input)="setVolume($event)" /></label>
+      <p class="sound-status" aria-live="polite">
+        @switch (audio.status()) {
+          @case ('playing') { эфир дышит вместе с рынком }
+          @case ('armed') { нужен один честный жест — так велит браузер }
+          @case ('hidden') { вкладка спрятана, звук на паузе }
+          @case ('blocked') { браузер просит попробовать ещё раз }
+          @case ('unsupported') { этот браузер не умеет WebAudio }
+          @case ('error') { звуковой движок сегодня молчит }
+        }
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Инструменты</legend>
+      <ol class="instrument-list">
+        @for (instrument of instruments(); track instrument.id; let first = $first; let last = $last) {
+          <li>
+            <label class="visibility"><input type="checkbox" [checked]="!isHidden(instrument.id)" (change)="setHidden(instrument.id, $event)" /><span>{{ instrument.label }}</span></label>
+            <div class="reorder">
+              <button type="button" [disabled]="first" [attr.aria-label]="'Поднять ' + instrument.label" (click)="move(instrument.id, -1)">↑</button>
+              <button type="button" [disabled]="last" [attr.aria-label]="'Опустить ' + instrument.label" (click)="move(instrument.id, 1)">↓</button>
+            </div>
+          </li>
+        }
+      </ol>
+    </fieldset>
+
+    <footer>
+      <button class="share" type="button" (click)="share()">поделиться этим видом</button>
+      <p class="share-status" aria-live="polite">
+        @if (shareState() === 'copied') { ссылка скопирована } @else if (shareState() === 'failed') { буфер обмена сопротивляется }
+      </p>
+    </footer>
+  </section>
+</div>

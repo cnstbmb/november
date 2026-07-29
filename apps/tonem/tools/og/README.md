@@ -10,7 +10,8 @@ rasterizes them into `apps/tonem/public/`.
 - `fonts/` — the Inter weights the card uses, kept in-repo so regeneration is
   deterministic (no network fetch). Inter is OFL-licensed.
 - `generate.js` — rasterizes the SVGs with `sharp` → `og-card.png`,
-  `favicon.ico` (32px PNG-embedded), `apple-touch-icon.png`, `favicon.svg`.
+  `favicon.ico` (32px PNG-embedded), `apple-touch-icon.png`, `favicon.svg`, and
+  the eight PWA icons in `public/icons/` (72–512px).
 
 ## Regenerate
 

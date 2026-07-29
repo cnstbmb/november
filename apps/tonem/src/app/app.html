@@ -1,36 +1,73 @@
-<main class="stage">
-  <app-aurora />
+<main
+  class="stage"
+  [class.mood-neutral]="!viewSettings.background().moodEnabled"
+>
+  <app-aurora
+    [dim]="viewSettings.background().dim"
+    [blur]="viewSettings.background().blur"
+    [speed]="viewSettings.background().speed"
+    [moodEnabled]="viewSettings.background().moodEnabled"
+  />
 
-  <section class="hero" aria-live="polite" (click)="openSpark()" (keydown.enter)="openSpark()" (keydown.space)="openSpark(); $event.preventDefault()" tabindex="0" role="button" aria-label="Показать график за сегодня">
-    <p class="hero-value">
-      <app-odometer
-        [value]="store.hero().quote.value"
-        [decimals]="store.hero().instrument.decimals"
-      />
-    </p>
-    <p class="hero-label">{{ store.hero().instrument.heroLabel }}</p>
-    @if (heroStatus()) {
-      <p class="hero-status">{{ heroStatus() }}</p>
-    }
-  </section>
+  <div class="utility-bar">
+    <app-sound-control />
+    <button class="settings-trigger" type="button" (click)="openSettings()" aria-label="Открыть настройки">
+      настроить вид
+    </button>
+  </div>
 
-  <footer class="ticker" aria-label="Все котировки">
-    @for (entry of fullTicker(); track entry.instrument.id) {
-      <span class="ticker-item" [class.ticker-dim]="isDim(entry)">
-        <span class="ticker-label">{{ entry.instrument.label }}</span>
-        <app-odometer
-          class="ticker-value"
-          [value]="entry.quote.value"
-          [decimals]="entry.instrument.decimals"
-        />
-        @if (entry.quote.source === 'cbr') {
-          <span class="ticker-badge">ЦБ</span>
-        }
-      </span>
-    }
-  </footer>
+  @if (!connectivity.online()) {
+    <p class="offline-badge" role="status">офлайн</p>
+  }
+
+  @if (marketView.hero(); as hero) {
+    <section
+      class="hero"
+      aria-live="polite"
+      (click)="openSpark()"
+      (keydown.enter)="openSpark()"
+      (keydown.space)="openSpark(); $event.preventDefault()"
+      [attr.tabindex]="marketView.canOpenHeroSparkline() ? 0 : null"
+      [attr.role]="marketView.canOpenHeroSparkline() ? 'button' : null"
+      [attr.aria-label]="marketView.canOpenHeroSparkline() ? 'Показать график за сегодня' : null"
+    >
+      @if (!viewSettings.zen().hideHero) {
+        <p class="hero-value">
+          <app-odometer [value]="hero.quote.value" [decimals]="hero.instrument.decimals" />
+        </p>
+      }
+      @if (!viewSettings.zen().hideLabels) {
+        <p class="hero-label">{{ hero.instrument.heroLabel }}</p>
+      }
+      @if (heroStatus()) {
+        <p class="hero-status">{{ heroStatus() }}</p>
+      }
+    </section>
+  }
+
+  @if (!viewSettings.zen().hideTicker) {
+    <footer class="ticker" aria-label="Все котировки">
+      @for (entry of marketView.ticker(); track entry.instrument.id) {
+        <span class="ticker-item" [class.ticker-dim]="isDim(entry)" [attr.data-instrument]="entry.instrument.id">
+          @if (!viewSettings.zen().hideLabels) {
+            <span class="ticker-label">{{ entry.instrument.label }}</span>
+          }
+          @if (!viewSettings.zen().hideSmallNumbers) {
+            <app-odometer class="ticker-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+          }
+          @if (entry.quote.source === 'cbr') {
+            <span class="ticker-badge">ЦБ</span>
+          }
+        </span>
+      }
+    </footer>
+  }
 
   @if (sparkInstrument(); as inst) {
     <app-sparkline [instrument]="inst" (closed)="closeSpark()" />
+  }
+
+  @if (settingsOpen()) {
+    <app-settings-drawer (close)="closeSettings()" />
   }
 </main>

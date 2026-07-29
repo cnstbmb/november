@@ -19,6 +19,19 @@
   display: block;
   // апскейлим заниженное внутреннее разрешение до полного вьюпорта
   image-rendering: auto;
+  transition: filter 300ms ease, transform 300ms ease;
+
+  &.is-blurred {
+    transform: scale(1.06); // blur не должен оголять края canvas
+  }
+}
+
+.aurora-dim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: #050509;
+  transition: opacity 300ms ease;
 }
 
 // Виньетка для читаемости: центр темнее, чтобы текст героя читался на любом
@@ -41,4 +54,11 @@
       rgba(10, 10, 15, 0.35) 0%,
       rgba(10, 10, 15, 0) 55%
     );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-canvas,
+  .aurora-dim {
+    transition: none;
+  }
 }

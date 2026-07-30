@@ -29,10 +29,11 @@ export class DerivedEngine {
   });
 
   /** Все 6 производных, в порядке реестра */
-  readonly derivedTicker: Signal<readonly TickerEntry[]> = computed(() =>
-    DERIVED_DEFS.map((def) => ({
+  readonly derivedTicker: Signal<readonly TickerEntry[]> = computed(() => {
+    const referenceTime = this.store.historicalTarget() ?? this.now();
+    return DERIVED_DEFS.map((def) => ({
       instrument: def.instrument,
-      quote: buildDerivedQuote(def, this.quotesById(), this.now()),
-    })),
-  );
+      quote: buildDerivedQuote(def, this.quotesById(), referenceTime),
+    }));
+  });
 }

@@ -8,7 +8,11 @@
   @for (d of digits(); track d.index) {
     @if (d.isDigit) {
       <span class="digit" aria-hidden="true">
-        <span class="reel" [style.transform]="reelTransform(d.slot)">
+        <span
+          class="reel"
+          [class.rebased]="d.rebased"
+          [style.transform]="reelTransform(d.slot)"
+        >
           @for (n of strip; track $index) {
             <span class="cell">{{ n }}</span>
           }

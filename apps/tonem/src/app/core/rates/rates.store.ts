@@ -10,10 +10,18 @@ export interface TickerEntry {
   readonly quote: Quote;
 }
 
+export interface RatesSnapshot {
+  readonly quotes: Readonly<Record<string, Quote>>;
+  readonly historicalTarget: Date | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RatesStore {
   private readonly cache = inject(LatestQuotesCacheService);
   private readonly quotesSignal = signal<Readonly<Record<string, Quote>>>(this.cache.load());
+  private readonly historicalTargetSignal = signal<Date | null>(null);
+
+  readonly historicalTarget = this.historicalTargetSignal.asReadonly();
 
   /** герой — USD/RUB (настраиваемость придёт в T06) */
   readonly hero = computed<TickerEntry>(() => {
@@ -54,6 +62,29 @@ export class RatesStore {
     }
     this.quotesSignal.set(next);
     this.cache.save(next);
+  }
+
+  snapshot(): RatesSnapshot {
+    return {
+      quotes: { ...this.quotesSignal() },
+      historicalTarget: this.historicalTargetSignal(),
+    };
+  }
+
+  restore(snapshot: RatesSnapshot): void {
+    this.quotesSignal.set({ ...snapshot.quotes });
+    this.historicalTargetSignal.set(snapshot.historicalTarget);
+  }
+
+  /** Исторические данные эфемерны и не должны попадать в live/offline-кэш. */
+  applyHistorical(quotes: readonly Quote[], target: Date): void {
+    const next: Record<string, Quote> = {};
+    for (const quote of quotes) {
+      if (!instrumentById(quote.instrumentId)) continue;
+      next[quote.instrumentId] = quote;
+    }
+    this.quotesSignal.set(next);
+    this.historicalTargetSignal.set(new Date(target));
   }
 
   statuses(): readonly QuoteStatus[] {

@@ -6,7 +6,7 @@ export type QuoteSource = 'moex' | 'cbr' | 'binance';
  * stale   — окно торгов открыто, но фид не обновлялся (задержка/проблемы)
  * unavailable — данных нет вовсе
  */
-export type QuoteStatus = 'live' | 'closed' | 'stale' | 'unavailable';
+export type QuoteStatus = 'live' | 'closed' | 'stale' | 'unavailable' | 'historical';
 
 /** Сырая котировка из коннектора, до вычисления статуса */
 export interface RawQuote {

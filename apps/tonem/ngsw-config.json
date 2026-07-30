@@ -22,7 +22,7 @@
       "updateMode": "prefetch",
       "resources": {
         "files": [
-          "/**/*.(avif|gif|ico|jpeg|jpg|otf|png|svg|ttf|webp|woff|woff2)"
+          "/**/*.(avif|gif|ico|jpeg|jpg|mp3|ogg|otf|png|svg|ttf|webp|woff|woff2)"
         ]
       }
     }

@@ -11,6 +11,7 @@ import {
   neutralMood,
   smoothMood,
 } from './mood.model';
+import { HistoricalSnapshot } from '../time-machine/time-machine.model';
 import { MOOD_VAR_ENERGY, MOOD_VAR_HUE, MOOD_VAR_TURBULENCE, moodCssValues } from './mood.palette';
 
 /**
@@ -25,6 +26,11 @@ import { MOOD_VAR_ENERGY, MOOD_VAR_HUE, MOOD_VAR_TURBULENCE, moodCssValues } fro
  * Базовая линия — first-seen значение каждого инструмента за время жизни
  * движка (по сути, открытие сессии с точки зрения клиента).
  */
+export interface MoodSnapshot {
+  readonly baselines: ReadonlyMap<string, number>;
+  readonly mood: SmoothedMood;
+}
+
 @Injectable({ providedIn: 'root' })
 export class MoodEngine {
   private readonly store = inject(RatesStore);
@@ -78,6 +84,40 @@ export class MoodEngine {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  snapshot(): MoodSnapshot {
+    return {
+      baselines: new Map(this.baselines),
+      mood: { ...this.moodSignal() },
+    };
+  }
+
+  restore(snapshot: MoodSnapshot): void {
+    this.baselines.clear();
+    for (const [id, value] of snapshot.baselines) this.baselines.set(id, value);
+    this.moodSignal.set({ ...snapshot.mood });
+  }
+
+  /** Вычисляет настроение выбранного момента относительно отдельного предыдущего снимка. */
+  applyHistorical(baseline: HistoricalSnapshot, current: HistoricalSnapshot): void {
+    this.baselines.clear();
+    const samples: MoodSample[] = [];
+    for (const instrument of liveInstruments()) {
+      const baselineValue = baseline[instrument.id]?.value;
+      const currentValue = current[instrument.id]?.value;
+      if (
+        baselineValue === undefined ||
+        currentValue === undefined ||
+        !Number.isFinite(baselineValue) ||
+        !Number.isFinite(currentValue)
+      ) {
+        continue;
+      }
+      this.baselines.set(instrument.id, baselineValue);
+      samples.push({ id: instrument.id, baseline: baselineValue, current: currentValue });
+    }
+    this.moodSignal.set(samples.length > 0 ? aggregateMood(samples) : neutralMood());
   }
 
   /**

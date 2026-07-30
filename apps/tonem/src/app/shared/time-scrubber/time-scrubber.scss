@@ -1,0 +1,288 @@
+:host {
+  position: fixed;
+  z-index: 4;
+  inset-inline: 0;
+  bottom: max(4.75rem, calc(env(safe-area-inset-bottom) + 4.75rem));
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 0.55rem;
+  padding-inline: 1rem;
+  pointer-events: none;
+}
+
+.time-machine-launcher,
+.time-machine-panel {
+  pointer-events: auto;
+}
+
+.time-machine-launcher,
+.scrubber-header,
+.scrubber-footer,
+.control-label,
+.datetime-row,
+.scrubber-badge {
+  display: flex;
+  align-items: center;
+}
+
+.time-machine-launcher {
+  gap: 0.65rem;
+  touch-action: pan-x;
+}
+
+button {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.time-machine-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.45rem;
+  padding: 0.55rem 0.85rem;
+  color: var(--ink);
+  background: rgb(10 10 15 / 78%);
+  border: 1px solid rgb(242 240 233 / 18%);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  letter-spacing: 0.025em;
+  backdrop-filter: blur(10px);
+}
+
+.time-machine-open:hover,
+.time-machine-open:focus-visible {
+  border-color: rgb(242 240 233 / 38%);
+  background: rgb(20 20 27 / 92%);
+}
+
+.gesture-hint,
+.scrubber-intro,
+.scrubber-note,
+.scrubber-loading,
+.range-ends,
+.datetime-control > label {
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+}
+
+.time-machine-panel {
+  width: min(46rem, calc(100vw - 2rem));
+  padding: 1rem;
+  color: var(--ink);
+  background: rgb(10 10 15 / 94%);
+  border: 1px solid rgb(242 240 233 / 16%);
+  border-radius: 14px;
+  backdrop-filter: blur(16px);
+}
+
+.scrubber-header,
+.scrubber-footer,
+.control-label,
+.range-ends {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.scrubber-title,
+.scrubber-intro,
+.scrubber-error,
+.scrubber-note,
+.scrubber-loading {
+  margin: 0;
+}
+
+.scrubber-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.scrubber-close {
+  width: 2rem;
+  height: 2rem;
+  color: var(--ink-dim);
+  background: transparent;
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.scrubber-close:hover,
+.scrubber-close:focus-visible {
+  color: var(--ink);
+  background: rgb(242 240 233 / 8%);
+}
+
+.scrubber-badge {
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.scrubber-badge strong {
+  font-size: 0.92rem;
+}
+
+.scrubber-badge > span:last-child {
+  color: var(--ink-dim);
+  font-size: 0.72rem;
+}
+
+.scrubber-badge-label {
+  padding: 0.28rem 0.45rem;
+  color: rgb(255 220 187);
+  background: rgb(146 69 16 / 48%);
+  border-radius: 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.scrubber-error {
+  margin-top: 0.75rem;
+  color: rgb(255 191 184);
+  font-size: 0.75rem;
+}
+
+.scrubber-presets {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.scrubber-preset {
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  color: var(--ink-dim);
+  background: rgb(242 240 233 / 6%);
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+
+.scrubber-preset:hover,
+.scrubber-preset:focus-visible {
+  color: var(--ink);
+  background: rgb(242 240 233 / 12%);
+}
+
+.range-control,
+.datetime-control {
+  margin-top: 0.9rem;
+}
+
+.control-label {
+  font-size: 0.74rem;
+}
+
+.control-label output {
+  color: var(--ink-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='range'] {
+  width: 100%;
+  margin: 0.65rem 0 0;
+  accent-color: var(--ink-accent);
+  cursor: ew-resize;
+}
+
+.range-ends {
+  display: flex;
+  margin-top: 0.15rem;
+  font-size: 0.62rem;
+}
+
+.datetime-control > label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.datetime-row {
+  gap: 0.5rem;
+}
+
+.datetime-row input {
+  min-width: 0;
+  flex: 1;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.55rem;
+  color: var(--ink);
+  color-scheme: dark;
+  background: rgb(242 240 233 / 6%);
+  border: 1px solid rgb(242 240 233 / 14%);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.datetime-row button,
+.scrubber-return {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.datetime-row button {
+  color: rgb(10 10 15);
+  background: var(--ink-accent);
+}
+
+.datetime-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.scrubber-footer {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgb(242 240 233 / 9%);
+}
+
+.scrubber-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: rgb(190 255 211);
+  background: rgb(31 105 61 / 42%);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.scrubber-return:hover,
+.scrubber-return:focus-visible {
+  background: rgb(39 132 76 / 55%);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ink-accent);
+  outline-offset: 3px;
+}
+
+
+
+@media (max-width: 40rem) {
+  :host {
+    bottom: max(4.25rem, calc(env(safe-area-inset-bottom) + 4.25rem));
+    padding-inline: 0.65rem;
+  }
+
+  .time-machine-panel {
+    width: calc(100vw - 1.3rem);
+    padding: 0.85rem;
+  }
+
+  .gesture-hint,
+  .scrubber-note {
+    display: none;
+  }
+
+  .scrubber-header,
+  .scrubber-footer {
+    align-items: flex-start;
+  }
+}
+

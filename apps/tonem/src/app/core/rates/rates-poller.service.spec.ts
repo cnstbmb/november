@@ -40,6 +40,22 @@ describe('RatesPoller', () => {
     http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
   };
 
+  it('отменяет in-flight цикл при stop и не смешивает его с новым start', () => {
+    poller.start();
+    const oldCurrency = http.expectOne((r) => r.url.includes('/engines/currency/'));
+    const oldIndex = http.expectOne((r) => r.url.includes('/engines/stock/'));
+    const oldFutures = http.expectOne((r) => r.url.includes('/engines/futures/'));
+
+    poller.stop();
+    expect(oldCurrency.cancelled).toBe(true);
+    expect(oldIndex.cancelled).toBe(true);
+    expect(oldFutures.cancelled).toBe(true);
+
+    poller.start();
+    flushMoexCycle();
+    expect(store.hero().quote.value).toBeCloseTo(79.485, 3);
+  });
+
   it('цикл загружает котировки всех трёх источников в стор', () => {
     poller.start();
     flushMoexCycle();

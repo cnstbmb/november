@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
-import { AmbientAudioEngine } from './core/audio/ambient-audio.engine';
+import { RecordedMusicPlayer } from './core/music/recorded-music-player';
 import { liveInstruments } from './core/instruments/instrument.registry';
 import { LatestQuotesCacheService } from './core/offline/latest-quotes-cache.service';
 import { ConnectivityService } from './core/offline/connectivity.service';
@@ -47,12 +47,14 @@ describe('App', () => {
         { provide: ConnectivityService, useValue: { online: online.asReadonly() } },
         { provide: VIEW_SETTINGS_PLATFORM, useValue: new AppPlatform() },
         {
-          provide: AmbientAudioEngine,
+          provide: RecordedMusicPlayer,
           useValue: {
             status: signal('off'),
-            enableFromGesture: () => Promise.resolve(),
+            currentTrack: () => null,
+            enableFromGesture: () => undefined,
             disable: () => undefined,
             setVolume: () => undefined,
+            next: () => undefined,
           },
         },
       ],

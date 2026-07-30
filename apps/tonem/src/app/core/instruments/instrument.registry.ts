@@ -84,7 +84,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 2,
     market: 'futures',
     placement: 'live',
-    moex: { kind: 'futures', assetCode: 'W4' },
+    moex: { kind: 'futures', assetCode: 'WHEAT' },
   },
   {
     id: 'ai95',
@@ -94,7 +94,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 0,
     market: 'futures',
     placement: 'live',
-    moex: { kind: 'futures', assetCode: 'A995' },
+    moex: { kind: 'futures', assetCode: 'AI95' },
   },
   {
     id: 'coffee',
@@ -104,7 +104,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 2,
     market: 'futures',
     placement: 'live',
-    moex: { kind: 'futures', assetCode: 'CF' },
+    moex: { kind: 'futures', assetCode: 'COFFEE' },
   },
   {
     id: 'oj',
@@ -114,7 +114,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 2,
     market: 'futures',
     placement: 'live',
-    moex: { kind: 'futures', assetCode: 'OJ' },
+    moex: { kind: 'futures', assetCode: 'ORANGE' },
   },
   {
     id: 'sugar',
@@ -124,7 +124,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 2,
     market: 'futures',
     placement: 'live',
-    moex: { kind: 'futures', assetCode: 'SG' },
+    moex: { kind: 'futures', assetCode: 'SUGAR' },
   },
 
   // ── Крипта (Binance, 24/7) ────────────────────────────────────────────────

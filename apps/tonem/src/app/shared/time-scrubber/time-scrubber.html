@@ -1,0 +1,115 @@
+@if (!timeMachine.active()) {
+  <div
+    class="time-machine-launcher"
+    (pointerdown)="beginGesture($event)"
+    (pointerup)="endGesture($event)"
+  >
+    <button
+      class="time-machine-open"
+      type="button"
+      aria-controls="time-machine-panel"
+      [attr.aria-expanded]="panelVisible()"
+      (click)="togglePanel()"
+    >
+      <span aria-hidden="true">↶</span>
+      {{ panelOpen() ? 'скрыть машину времени' : 'назад во времени' }}
+    </button>
+    @if (!panelOpen()) {
+      <span class="gesture-hint" aria-hidden="true">или проведите вверх</span>
+    }
+  </div>
+}
+
+@if (panelVisible()) {
+  <section
+    id="time-machine-panel"
+    class="time-machine-panel"
+    role="region"
+    aria-label="Машина времени"
+    tabindex="-1"
+  >
+    <header class="scrubber-header">
+      @if (timeMachine.active()) {
+        <div class="scrubber-badge" role="status" aria-live="polite">
+          <span class="scrubber-badge-label">прошлое</span>
+          <strong>{{ targetLabel() }}</strong>
+          <span>{{ relativeLabel() }}</span>
+        </div>
+      } @else {
+        <div>
+          <p class="scrubber-title">Назад во времени</p>
+          <p class="scrubber-intro">Выберите момент — live остановится до возврата.</p>
+        </div>
+      }
+
+      @if (!timeMachine.active()) {
+        <button class="scrubber-close" type="button" (click)="closePanel()" aria-label="Закрыть машину времени">
+          ×
+        </button>
+      }
+    </header>
+
+    @if (timeMachine.error()) {
+      <p class="scrubber-error" role="alert">История недоступна — снова показываем live.</p>
+    }
+
+    <nav class="scrubber-presets" aria-label="Быстрые переходы">
+      <button type="button" class="scrubber-preset" (click)="usePreset('day')">вчера</button>
+      <button type="button" class="scrubber-preset" (click)="usePreset('week')">неделю назад</button>
+      <button type="button" class="scrubber-preset" (click)="usePreset('month')">месяц назад</button>
+    </nav>
+
+    <div class="range-control">
+      <div class="control-label">
+        <label for="history-range">Глубина перемотки</label>
+        <output for="history-range">{{ rangeLabel() }}</output>
+      </div>
+      <input
+        id="history-range"
+        type="range"
+        min="1"
+        [max]="maxHoursAgo"
+        step="1"
+        [value]="rangeHours()"
+        aria-label="Сколько часов назад"
+        (input)="updateRange($event)"
+        (change)="commitRange()"
+      />
+      <div class="range-ends" aria-hidden="true">
+        <span>1 час</span>
+        <span>1 год</span>
+      </div>
+    </div>
+
+    <div class="datetime-control">
+      <label for="history-datetime">Точный момент</label>
+      <div class="datetime-row">
+        <input
+          id="history-datetime"
+          type="datetime-local"
+          [max]="maxDateTime"
+          [value]="arbitraryValue()"
+          (input)="updateArbitrary($event)"
+        />
+        <button type="button" [disabled]="!arbitraryValid()" (click)="commitArbitrary()">
+          показать
+        </button>
+      </div>
+    </div>
+
+    <div class="scrubber-footer">
+      @if (timeMachine.loading()) {
+        <span class="scrubber-loading" role="status">загружаем два снимка…</span>
+      } @else {
+        <span class="scrubber-note">Герой, лента и настроение соответствуют выбранному моменту.</span>
+      }
+
+      @if (timeMachine.active()) {
+        <button type="button" class="scrubber-return" (click)="returnToPresent()">
+          <span aria-hidden="true">●</span>
+          вернуться к настоящему
+        </button>
+      }
+    </div>
+  </section>
+}

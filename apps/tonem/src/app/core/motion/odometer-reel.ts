@@ -34,6 +34,8 @@ export interface DigitRoll {
   readonly direction: Direction;
   /** текущий slot барабана (для цифровых колонок) */
   readonly slot: number;
+  /** позиция была возвращена в середину ленты и должна примениться без transition */
+  readonly rebased: boolean;
 }
 
 /** '7' → 7; любой не-цифровой символ → null. */
@@ -89,7 +91,15 @@ export class OdometerReel {
 
       if (digit === null) {
         // разделитель: рендерится статично, барабана нет
-        rolls.push({ index: i, char, isDigit: false, changed: false, direction: 'flat', slot: 0 });
+        rolls.push({
+          index: i,
+          char,
+          isDigit: false,
+          changed: false,
+          direction: 'flat',
+          slot: 0,
+          rebased: false,
+        });
         nextSlots.push(0);
         continue;
       }
@@ -99,11 +109,21 @@ export class OdometerReel {
       const changed = prevDigit !== digit;
 
       let slot = this.slots[i] ?? this.startSlot(digit);
+      let rebased = false;
       if (changed && direction !== 'flat') {
-        slot = advanceSlot(slot, digit, direction);
+        const advanced = advanceSlot(slot, digit, direction);
+        if (advanced < 0 || advanced >= REEL_LENGTH) {
+          // Лента конечна. Возвращаем ту же цифру в центральный цикл без
+          // transition, иначе transform уйдёт за пределы DOM и разряд исчезнет.
+          slot = this.startSlot(digit);
+          rebased = true;
+        } else {
+          slot = advanced;
+        }
       } else if (digitAt(slot) !== digit) {
         // рассинхрон (смена длины/формата или reduced-motion) — без анимации на цифру
         slot = this.startSlot(digit);
+        rebased = true;
       }
 
       rolls.push({
@@ -113,6 +133,7 @@ export class OdometerReel {
         changed,
         direction: changed ? direction : 'flat',
         slot,
+        rebased,
       });
       nextSlots.push(slot);
     }

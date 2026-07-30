@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AmbientAudioEngine } from '../../core/audio/ambient-audio.engine';
+import { RecordedMusicPlayer } from '../../core/music/recorded-music-player';
 import { VIEW_SETTINGS_PLATFORM, ViewSettingsPlatform } from '../../core/view-settings/view-settings.platform';
 import { ViewSettingsStore } from '../../core/view-settings/view-settings.store';
 import { SettingsDrawerComponent } from './settings-drawer';
@@ -28,12 +28,13 @@ describe('SettingsDrawerComponent', () => {
       providers: [
         ViewSettingsStore,
         {
-          provide: AmbientAudioEngine,
+          provide: RecordedMusicPlayer,
           useValue: {
             status: signal('off'),
             enableFromGesture: vi.fn(),
             disable: vi.fn(),
             setVolume: vi.fn(),
+            next: vi.fn(),
           },
         },
         { provide: VIEW_SETTINGS_PLATFORM, useValue: platform },
@@ -57,7 +58,7 @@ describe('SettingsDrawerComponent', () => {
     expect(element.textContent).toContain('убрать часы — время придумали биржи');
     expect(element.textContent).toContain('убрать эти дурацкие цифры — наконец-то');
     expect(element.querySelectorAll("input[type='range']").length).toBe(4);
-    expect(element.textContent).toContain('включить биржевой эмбиент');
+    expect(element.textContent).toContain('включить спокойную музыку');
     expect(element.querySelector('fieldset[disabled]')).toBeNull();
   });
 

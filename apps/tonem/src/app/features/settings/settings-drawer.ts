@@ -9,7 +9,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { AmbientAudioEngine } from '../../core/audio/ambient-audio.engine';
+import { RecordedMusicPlayer } from '../../core/music/recorded-music-player';
 import { instrumentById } from '../../core/instruments/instrument.registry';
 import { Instrument } from '../../core/instruments/instrument.model';
 import {
@@ -31,7 +31,7 @@ export class SettingsDrawerComponent {
   readonly closed = output<void>({ alias: 'close' });
 
   protected readonly store = inject(ViewSettingsStore);
-  protected readonly audio = inject(AmbientAudioEngine);
+  protected readonly audio = inject(RecordedMusicPlayer);
   protected readonly settings = this.store.settings;
   protected readonly shareState = signal<'idle' | 'copied' | 'failed'>('idle');
   protected readonly instruments = computed<readonly Instrument[]>(() =>

@@ -9,8 +9,11 @@
     [moodEnabled]="viewSettings.background().moodEnabled"
   />
 
+  <app-time-scrubber />
+
   <div class="utility-bar">
-    <app-sound-control />
+    <app-sound-control (openInfo)="musicInfoOpen.set(true)" />
+
     <button class="settings-trigger" type="button" (click)="openSettings()" aria-label="Открыть настройки">
       настроить вид
     </button>
@@ -27,9 +30,10 @@
       (click)="openSpark()"
       (keydown.enter)="openSpark()"
       (keydown.space)="openSpark(); $event.preventDefault()"
-      [attr.tabindex]="marketView.canOpenHeroSparkline() ? 0 : null"
-      [attr.role]="marketView.canOpenHeroSparkline() ? 'button' : null"
-      [attr.aria-label]="marketView.canOpenHeroSparkline() ? 'Показать график за сегодня' : null"
+      [attr.tabindex]="canOpenHeroSparkline() ? 0 : null"
+      [attr.role]="canOpenHeroSparkline() ? 'button' : null"
+      [attr.aria-label]="canOpenHeroSparkline() ? 'Показать график за сегодня' : null"
+      [class.hero-historical]="timeMachine.active()"
     >
       @if (!viewSettings.zen().hideHero) {
         <p class="hero-value">
@@ -69,5 +73,12 @@
 
   @if (settingsOpen()) {
     <app-settings-drawer (close)="closeSettings()" />
+  }
+
+  @if (musicInfoOpen()) {
+    <app-music-info
+      [currentTrack]="musicPlayer.currentTrack()"
+      (close)="musicInfoOpen.set(false)"
+    />
   }
 </main>

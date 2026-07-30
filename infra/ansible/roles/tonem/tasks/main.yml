@@ -1,0 +1,151 @@
+---
+# Role: tonem
+# Deploys the self-contained tonem.ru stack on the master host:
+#   - tonem-postgres (dedicated DB)
+#   - tonem-server (NestJS collector + read API)
+#   - tonem-web (nginx static site for tonem.ru)
+#
+# Also issues TLS certs and updates the prod nginx config.
+
+- name: Resolve effective variables
+  ansible.builtin.set_fact:
+    tonem_dir_effective: "{{ tonem_dir | default('/opt/tonem') }}"
+    tonem_nginx_conf_src_effective: "{{ tonem_nginx_conf_src | default(repo_root + '/deployments/prod/nginx-conf/nginx.conf') }}"
+    tonem_nginx_conf_dest_effective: "{{ tonem_nginx_conf_dest | default('/srv/nginx-conf/nginx.conf') }}"
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - repo_root is defined
+      - repo_root | length > 0
+    fail_msg: "repo_root must be defined (path to the november repo on the controller)"
+
+# ── Stage 1: TLS certificates (must exist before nginx.conf references them) ──
+
+- name: Validate certbot variables
+  ansible.builtin.assert:
+    that:
+      - letsencrypt_email is defined
+      - cloudflare_api_token is defined
+      - certbot_credentials_path is defined
+    fail_msg: "letsencrypt_email, cloudflare_api_token, and certbot_credentials_path must be defined for TLS issuance"
+
+- name: Obtain TLS cert for tonem.ru / www.tonem.ru
+  ansible.builtin.command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials {{ certbot_credentials_path }}
+    --dns-cloudflare-propagation-seconds {{ certbot_dns_propagation_seconds | default(60) }}
+    --cert-name tonem.ru
+    --non-interactive --agree-tos --keep-until-expiring
+    -m {{ letsencrypt_email }}
+    -d tonem.ru
+    -d www.tonem.ru
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Obtain TLS cert for api.tonem.ru
+  ansible.builtin.command: >
+    certbot certonly --dns-cloudflare
+    --dns-cloudflare-credentials {{ certbot_credentials_path }}
+    --dns-cloudflare-propagation-seconds {{ certbot_dns_propagation_seconds | default(60) }}
+    --cert-name api.tonem.ru
+    --non-interactive --agree-tos --keep-until-expiring
+    -m {{ letsencrypt_email }}
+    -d api.tonem.ru
+  no_log: true
+  when: not ansible_check_mode
+
+# ── Stage 2: Tonem compose stack ──────────────────────────────────────────
+
+- name: Ensure tonem directory exists
+  ansible.builtin.file:
+    path: "{{ tonem_dir_effective }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy tonem docker-compose.yml
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deployments/tonem/docker-compose.yml"
+    dest: "{{ tonem_dir_effective }}/docker-compose.yml"
+    mode: "0644"
+  register: tonem_compose_copy
+
+- name: Copy tonem .env
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deployments/tonem/.env"
+    dest: "{{ tonem_dir_effective }}/.env"
+    mode: "0600"
+  register: tonem_env_copy
+
+- name: Pull tonem images
+  ansible.builtin.command:
+    cmd: docker compose pull
+    chdir: "{{ tonem_dir_effective }}"
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Stop tonem stack if configs changed
+  ansible.builtin.command:
+    cmd: docker compose down
+    chdir: "{{ tonem_dir_effective }}"
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - tonem_compose_copy.changed or tonem_env_copy.changed
+
+- name: Start tonem stack
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ tonem_dir_effective }}"
+  when: not ansible_check_mode
+
+# ── Stage 3: Prod nginx config (tonem server blocks) ─────────────────────
+
+- name: Copy updated nginx.conf (with tonem server blocks)
+  ansible.builtin.copy:
+    src: "{{ tonem_nginx_conf_src_effective }}"
+    dest: "{{ tonem_nginx_conf_dest_effective }}"
+    mode: "0644"
+  register: nginx_conf_copy
+
+- name: Test nginx config inside webserver container
+  ansible.builtin.command:
+    cmd: docker exec webserver nginx -t
+  changed_when: false
+  when: nginx_conf_copy.changed
+
+- name: Reload nginx inside webserver container
+  ansible.builtin.command:
+    cmd: docker exec webserver nginx -s reload
+  when: nginx_conf_copy.changed
+
+# ── Backup ─────────────────────────────────────────────────────────────────
+
+- name: Install tonem pg_dump backup script
+  ansible.builtin.copy:
+    dest: /usr/local/bin/tonem-backup.sh
+    content: |
+      #!/bin/sh
+      set -eu
+      BACKUP_DIR="/opt/tonem/backups"
+      mkdir -p "${BACKUP_DIR}"
+      TMP="${BACKUP_DIR}/tonem-db.sql.gz.tmp"
+      FINAL="${BACKUP_DIR}/tonem-db.sql.gz"
+      docker exec tonem-postgres pg_dumpall -U tonem | gzip -9 > "${TMP}"
+      mv "${TMP}" "${FINAL}"
+      # Rotate: keep last 7 daily dumps, plus a weekly on Sunday.
+      KEEP=7
+      DAY=$(date +%u)
+      if [ "$DAY" -eq 7 ]; then
+        cp "${FINAL}" "${BACKUP_DIR}/tonem-db-weekly-$(date +%Y-%m-%d).sql.gz"
+      fi
+      cd "${BACKUP_DIR}"
+      ls -t tonem-db-weekly-*.sql.gz 2>/dev/null | tail -n +5 | xargs -r rm -f
+    mode: "0750"
+
+- name: Schedule tonem backup cron (daily at 01:30, before restic at 02:00)
+  ansible.builtin.cron:
+    name: "tonem-backup"
+    minute: "30"
+    hour: "1"
+    job: "/usr/local/bin/tonem-backup.sh"

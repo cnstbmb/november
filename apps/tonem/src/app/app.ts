@@ -1,17 +1,20 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { BinanceWsService } from './core/binance/binance-ws.service';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Instrument } from './core/instruments/instrument.model';
 import { MarketViewStore } from './core/market-view/market-view.store';
 import { ConnectivityService } from './core/offline/connectivity.service';
-import { RatesPoller } from './core/rates/rates-poller.service';
+
 import { TickerEntry } from './core/rates/rates.store';
 import { formatTime } from './core/rates/value.format';
+import { TimeMachineService } from './core/time-machine/time-machine.service';
 import { ViewSettingsStore } from './core/view-settings/view-settings.store';
 import { SettingsDrawerComponent } from './features/settings/settings-drawer';
 import { AuroraComponent } from './shared/aurora/aurora';
 import { OdometerComponent } from './shared/odometer/odometer';
+import { MusicInfoComponent } from './shared/music-info/music-info';
+import { RecordedMusicPlayer } from './core/music/recorded-music-player';
 import { SoundControlComponent } from './shared/sound-control/sound-control';
 import { SparklineComponent } from './shared/sparkline/sparkline';
+import { TimeScrubberComponent } from './shared/time-scrubber/time-scrubber';
 
 @Component({
   selector: 'app-root',
@@ -21,27 +24,45 @@ import { SparklineComponent } from './shared/sparkline/sparkline';
     SparklineComponent,
     SettingsDrawerComponent,
     SoundControlComponent,
+    MusicInfoComponent,
+    TimeScrubberComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
-export class App implements OnInit {
-  private readonly poller = inject(RatesPoller);
-  private readonly binance = inject(BinanceWsService);
+export class App {
   protected readonly marketView = inject(MarketViewStore);
   protected readonly viewSettings = inject(ViewSettingsStore);
   protected readonly connectivity = inject(ConnectivityService);
+  protected readonly timeMachine = inject(TimeMachineService);
+  protected readonly musicPlayer = inject(RecordedMusicPlayer);
 
   protected readonly sparkInstrument = signal<Instrument | null>(null);
   protected readonly settingsOpen = signal(false);
+  protected readonly musicInfoOpen = signal(false);
+  protected readonly canOpenHeroSparkline = computed(
+    () => !this.timeMachine.active() && this.marketView.canOpenHeroSparkline(),
+  );
 
-  ngOnInit(): void {
-    this.poller.start();
-    this.binance.start();
+  constructor() {
+    effect(() => {
+      if (this.timeMachine.active()) this.sparkInstrument.set(null);
+    });
   }
+
 
   protected readonly heroStatus = computed<string>(() => {
     const quote = this.marketView.hero()?.quote;
+    if (this.timeMachine.active()) {
+      if (this.timeMachine.error()) return 'машина времени недоступна';
+      if (this.timeMachine.loading()) return 'загрузка истории…';
+      const target = this.timeMachine.target();
+      const timeLabel = target ? (formatTime(target) ?? target.toISOString()) : '';
+      if (!quote || quote.value === null) {
+        return timeLabel ? `прошлое · данных нет на ${timeLabel}` : 'прошлое · данных нет';
+      }
+      return timeLabel ? `прошлое · ${timeLabel}` : 'прошлое';
+    }
     if (!this.connectivity.online()) {
       if (!quote || quote.value === null) return 'офлайн · сохранённых данных нет';
       if (this.viewSettings.zen().hideClock) return 'офлайн · последние данные';
@@ -58,6 +79,8 @@ export class App implements OnInit {
       }
       case 'stale':
         return 'данные задерживаются…';
+      case 'historical':
+        return 'исторические данные';
       default:
         return '';
     }
@@ -68,7 +91,7 @@ export class App implements OnInit {
   }
 
   protected openSpark(): void {
-    if (!this.marketView.canOpenHeroSparkline()) return;
+    if (!this.canOpenHeroSparkline()) return;
     const instrument = this.marketView.hero()?.instrument;
     if (instrument) this.sparkInstrument.set(instrument);
   }

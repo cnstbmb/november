@@ -83,6 +83,18 @@ describe('MarketViewStore', () => {
     expect(market.hero()?.quote.value).toBe(8_000_000);
   });
 
+  it('disables the live sparkline in historical mode', () => {
+    rates.apply([raw('usdrub', 80)], 'moex', NOW);
+    expect(market.canOpenHeroSparkline()).toBe(true);
+
+    rates.applyHistorical(
+      [{ ...rates.hero().quote, status: 'historical' }],
+      NOW,
+    );
+
+    expect(market.canOpenHeroSparkline()).toBe(false);
+  });
+
   it('rotates only visible, available favorites', () => {
     settings.update((value) => ({
       ...value,

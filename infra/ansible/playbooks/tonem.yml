@@ -1,0 +1,5 @@
+- name: Deploy tonem.ru stack
+  hosts: master
+  become: true
+  roles:
+    - role: tonem

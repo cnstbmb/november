@@ -25,7 +25,7 @@ export type CandleSource =
        * резолвить по assetCode (см. CandlesService).
        */
       readonly secid: string | null;
-      /** assetCode для futures (BR, W4, …), иначе null */
+      /** assetCode для futures (BR, WHEAT, …), иначе null */
       readonly assetCode: string | null;
     }
   | { readonly kind: 'binance'; readonly symbol: string };

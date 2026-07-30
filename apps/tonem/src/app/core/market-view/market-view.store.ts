@@ -57,7 +57,7 @@ export class MarketViewStore {
   });
 
   readonly canOpenHeroSparkline = computed(
-    () => this.hero()?.instrument.placement === 'live',
+    () => this.rates.historicalTarget() === null && this.hero()?.instrument.placement === 'live',
   );
 
   constructor() {

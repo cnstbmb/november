@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
+import { Subscription, catchError, forkJoin, of } from 'rxjs';
 import { INSTRUMENTS, currencySecids } from '../instruments/instrument.registry';
 import { moexAssetCode, moexSecid } from '../instruments/instrument.model';
 import { MoexIssService } from '../moex/moex-iss.service';
@@ -54,33 +54,46 @@ export class RatesPoller {
   private readonly destroyRef = inject(DestroyRef);
 
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private request: Subscription | null = null;
+  private cbrRequest: Subscription | null = null;
   private running = false;
+  private generation = 0;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => this.stop());
+  }
 
   start(): void {
     if (this.running) return;
     this.running = true;
-    this.destroyRef.onDestroy(() => this.stop());
-    this.cycle();
+    const generation = ++this.generation;
+    this.cycle(generation);
   }
 
   stop(): void {
     this.running = false;
+    this.generation++;
+    this.request?.unsubscribe();
+    this.request = null;
+    this.cbrRequest?.unsubscribe();
+    this.cbrRequest = null;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
-  private cycle(): void {
-    forkJoin({
+  private cycle(generation: number): void {
+    this.request = forkJoin({
       currency: this.moex.fetchCurrencyBatch(FX_SECIDS).pipe(catchError(() => of(null))),
       index: this.moex
         .fetchIndex(indexInstrument()?.secid ?? 'IMOEX')
         .pipe(catchError(() => of(null))),
       futures: this.moex.fetchFuturesBoard().pipe(catchError(() => of(null))),
     }).subscribe(({ currency, index, futures }) => {
-      // ответ мог прийти после stop() — стор не трогаем
-      if (!this.running) return;
+      this.request = null;
+      // Ответ от старого поколения после stop/start не должен трогать store.
+      if (!this.running || generation !== this.generation) return;
       const now = new Date();
 
       const currencyQuotes = currency
@@ -89,7 +102,7 @@ export class RatesPoller {
       if (hasAnyValue(currencyQuotes)) {
         this.store.apply(currencyQuotes, 'moex', now);
       } else {
-        this.applyCbrFallback(now);
+        this.applyCbrFallback(now, generation);
       }
 
       const idx = indexInstrument();
@@ -102,23 +115,27 @@ export class RatesPoller {
         this.store.apply(parseFuturesBatch(futures, assets, now), 'moex', now);
       }
 
-      if (this.running) {
-        this.timer = setTimeout(() => this.cycle(), pollDelayMs(this.store.statuses()));
+      if (this.running && generation === this.generation) {
+        this.timer = setTimeout(
+          () => this.cycle(generation),
+          pollDelayMs(this.store.statuses()),
+        );
       }
     });
   }
 
-  private applyCbrFallback(now: Date): void {
+  private applyCbrFallback(now: Date, generation: number): void {
     const mapping = INSTRUMENTS.filter((i) => i.cbrCode).map((i) => ({
       id: i.id,
       cbrCode: i.cbrCode!,
     }));
     if (mapping.length === 0) return;
-    this.cbr
+    this.cbrRequest = this.cbr
       .fetchDaily()
       .pipe(catchError(() => of(null)))
       .subscribe((json) => {
-        if (json && this.running) {
+        this.cbrRequest = null;
+        if (json && this.running && generation === this.generation) {
           this.store.apply(parseCbrDaily(json, mapping), 'cbr', now);
         }
       });

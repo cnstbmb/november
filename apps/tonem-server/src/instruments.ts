@@ -41,11 +41,11 @@ export const LIVE_INSTRUMENTS: readonly LiveInstrument[] = [
 
   // Commodities (MOEX FORTS futures board RFUD)
   { id: 'brent', market: 'futures', moex: { kind: 'futures', assetCode: 'BR' } },
-  { id: 'wheat', market: 'futures', moex: { kind: 'futures', assetCode: 'W4' } },
-  { id: 'ai95', market: 'futures', moex: { kind: 'futures', assetCode: 'A995' } },
-  { id: 'coffee', market: 'futures', moex: { kind: 'futures', assetCode: 'CF' } },
-  { id: 'oj', market: 'futures', moex: { kind: 'futures', assetCode: 'OJ' } },
-  { id: 'sugar', market: 'futures', moex: { kind: 'futures', assetCode: 'SG' } },
+  { id: 'wheat', market: 'futures', moex: { kind: 'futures', assetCode: 'WHEAT' } },
+  { id: 'ai95', market: 'futures', moex: { kind: 'futures', assetCode: 'AI95' } },
+  { id: 'coffee', market: 'futures', moex: { kind: 'futures', assetCode: 'COFFEE' } },
+  { id: 'oj', market: 'futures', moex: { kind: 'futures', assetCode: 'ORANGE' } },
+  { id: 'sugar', market: 'futures', moex: { kind: 'futures', assetCode: 'SUGAR' } },
 
   // Crypto (Binance, 24/7)
   { id: 'btc', market: 'crypto', binance: { symbol: 'BTCUSDT' } },

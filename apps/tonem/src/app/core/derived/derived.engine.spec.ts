@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 import { RatesStore } from '../rates/rates.store';
-import { RawQuote } from '../rates/quote.model';
+import { Quote, RawQuote } from '../rates/quote.model';
 import { DerivedEngine } from './derived.engine';
 import { BREAKFAST_REFERENCES } from './derived.defs';
 
@@ -221,6 +221,24 @@ describe('DerivedEngine', () => {
       night,
     );
     expect(quoteOf('eurusd')?.status).toBe('closed');
+  });
+
+  it('в истории вычисляет статус относительно target, а не текущих часов', () => {
+    const historicalQuote = (instrumentId: string, value: number): Quote => ({
+      instrumentId,
+      value,
+      time: new Date('2026-07-28T12:00:00+03:00'),
+      systime: new Date('2026-07-28T12:00:05+03:00'),
+      source: 'moex',
+      status: 'historical',
+    });
+    engine.now = () => new Date('2027-07-28T12:00:10+03:00');
+    store.applyHistorical(
+      [historicalQuote('usdrub', 80), historicalQuote('eurrub', 88)],
+      NOW,
+    );
+
+    expect(quoteOf('eurusd')?.status).toBe('live');
   });
 
   // ── структура тикера ─────────────────────────────────────────────────

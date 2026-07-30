@@ -2,7 +2,7 @@
 
 # ── Build stage ──────────────────────────────────────────────────────────────
 # Context: repository root (npm workspaces hoist deps to the root node_modules).
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /repo
 
 # Copy workspace manifests first for layer caching.
@@ -18,7 +18,7 @@ RUN npm --workspace tonem-server run prisma:generate \
   && npm --workspace tonem-server run build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
 
@@ -29,7 +29,7 @@ COPY --from=build /repo/apps/tonem-server/dist ./apps/tonem-server/dist
 COPY --from=build /repo/apps/tonem-server/prisma ./apps/tonem-server/prisma
 
 WORKDIR /repo/apps/tonem-server
-EXPOSE 3100
+EXPOSE 3200
 
 # Apply migrations then start the collector + API.
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

@@ -39,7 +39,7 @@
 
 ---
 
-## Фронтир сейчас: T09, T12 (T01–T08, T10 ✅; T11, T13 code-done)
+## Фронтир сейчас: T09, T12 ✅ CODE-DONE; нужны browser/API smoke и production backfill
 
 > Техдолг после ревью фронтира 2026-07-29 (не блокеры, вынести при случае):
 > - **Дубли логики FORTS-контракта** — nearest-contract в 3 местах (front `moex-iss.parser.ts`, front `candles.service.ts`, server `parsers.ts`). Вынести общий helper; реестр инструментов фронт/сервер — сейчас ручное зеркало, риск рассинхрона (общий `packages/` модуль, прецедент есть — `packages/algorithms`).
@@ -184,18 +184,22 @@ Server-блок `api.tonem.ru` + certbot. Контейнер в `deployments/ton
 миграция 0001_init, compose-сервис, README с nginx api-блоком. Не запускалось против живой БД
 (нет локального postgres); prisma migrate deploy — на хосте.
 
-# T09 — Машина времени
+# T09 — Машина времени ✅ CODE-DONE (2026-07-30)
 
 **What to build:** ползунок перемотки (появляется по свайпу/жесту/кнопке «назад во
 времени»). При перемотке фронт идёт на `api.tonem.ru/at?ts=`, герой, лента и
 движок настроения пересчитываются на тот момент. Заметный бейдж «прошлое: <дата
 время>», кнопка «вернуться к настоящему». Live-потоки на паузе в режиме прошлого.
 **Blocked by:** T08, T06
-**Status:** ready-for-agent
+**Status:** code-done (2026-07-30); нужен browser smoke против deployed `api.tonem.ru`
 
-- [ ] Перемотка на вчера/неделю назад показывает цифры и настроение того момента
-- [ ] Падение api.tonem.ru не ломает live-режим (машина времени просто недоступна)
-- [ ] Состояние перемотки тоже сериализуется в URL (можно переслать «момент»)
+- [x] Перемотка на вчера/неделю назад показывает цифры и настроение того момента
+- [x] Падение api.tonem.ru не ломает live-режим (машина времени просто недоступна)
+- [x] Состояние перемотки тоже сериализуется в URL (можно переслать «момент»)
+
+Сделано: доступный range-scrubber, пресеты, точный datetime и свайп; два снимка `/at`
+для historical mood; атомарная пауза/возврат live-потоков; fail-open с немедленным
+восстановлением live snapshot; отмена устаревших запросов; `ts` сосуществует с `view` в hash.
 
 # T10 — Спарклайн по тапу ✅ DONE (2026-07-29)
 
@@ -211,14 +215,14 @@ Server-блок `api.tonem.ru` + certbot. Контейнер в `deployments/ton
 
 Сделано: тап на герое открывает оверлей; закрытие — ×/бэкдроп/свайп вниз; min/max подписи.
 
-# T11 — Генеративный звук ✅ CODE-DONE (2026-07-29)
+# T11 — Генеративный звук ⚠️ DEPRECATED (2026-07-30) → заменено на T14
 
 **What to build:** WebAudio/Tone.js эмбиент-движок: дроны/пэды/редкие ноты, лад и
 плотность следуют за `MoodEngine` (рост — светлее, падение — темнее и медленнее).
 По умолчанию выкл; кнопка «включить звук» (первый жест = разрешение автоплея).
 Громкость и вкл/выкл — в настройках и URL.
 **Blocked by:** T05
-**Status:** code-done (2026-07-29); нужна ручная аудиопроверка в Chrome/Safari/Firefox
+**Status:** ~~code-done (2026-07-29)~~ → **deprecated (2026-07-30)**: полностью заменён на T14 (локальные CC0-записи). Код удалён из runtime и тестов.
 
 - [x] Звук непрерывен и неповторим (генератив, не луп)
 - [x] Смена настроения рынка слышна в течение ~10 секунд
@@ -228,16 +232,25 @@ Server-блок `api.tonem.ru` + certbot. Контейнер в `deployments/ton
 ноты из mood-зависимого лада, плавная автоматизация gain/filter/frequency, autoplay-safe `armed` режим,
 пауза/мьют скрытой вкладки, громкость и intent в настройках/localStorage/URL.
 
-# T12 — Бэкфилл истории
+Удалённые файлы: `core/audio/ambient.model.ts`, `core/audio/ambient-audio.engine.ts`,
+`core/audio/ambient-audio.port.ts`, их spec-файлы. Компонент `SoundControlComponent`
+переписан на `RecordedMusicPlayer`. См. T14.<!-- T11 deprecated: replaced by T14 -->
+
+# T12 — Бэкфилл истории ✅ CODE-DONE (2026-07-30)
 
 **What to build:** скрипт в `tonem-server`: догружает историю из свечей MOEX и
 Binance — часовое разрешение для глубокого прошлого (год+), минутное для последних
 недель. Идемпотентен (skip существующих). Прогресс-лог.
 **Blocked by:** T08
-**Status:** ready-for-agent
+**Status:** code-done (2026-07-30); нужен production run с `DATABASE_URL`
 
-- [ ] Машина времени работает на год назад по всем инструментам
-- [ ] Повторный запуск не дублирует строки
+- [~] Годовая история загружается для всех существовавших инструментов; AI95 до листинга MOEX честно `unavailable`
+- [x] Повторный запуск не дублирует и не перезаписывает строки
+
+Сделано: полная ISS/Binance pagination, непересекающиеся hourly/1m диапазоны,
+Binance close-time без look-ahead, архивное discovery и nearest-expiry roll для FORTS,
+`createMany(skipDuplicates)` чанками, проверки начала/конца/внутренних дыр, progress-log
+и ненулевой exit при частичном покрытии или ошибке источника.
 
 # T13 — PWA ✅ CODE-DONE (2026-07-29)
 
@@ -252,6 +265,37 @@ Binance — часовое разрешение для глубокого про
 Сделано: Angular service worker, branded webmanifest и 8 размеров иконок, install metadata для iOS,
 офлайн-кэш нормализованных последних котировок в `RatesStore`, connectivity badge/статус и корректные
 no-cache nginx-заголовки для control-файлов service worker.
+
+# T14 — Локальная библиотека CC0-записей ✅ CODE-DONE (2026-07-30)
+
+**What to build:** Заменить генеративный WebAudio (T11, deprecated) на локальную
+библиотеку из 10 спокойных записей с проверяемым статусом CC0/Public Domain.
+Проигрыватель (`RecordedMusicPlayer`) на HTMLAudioElement, плейлист с автопереходом,
+кнопки next и info, попап с метаданными и лицензионным реестром.
+**Blocked by:** T06 (settings store)
+**Replaces:** T11
+
+- [x] 10 CC0-записей скачаны в `public/audio/tracks/` (OpenGameArt, verified CC0 1.0)
+- [x] `public/audio/LICENSES.md` — человекочитаемый реестр с композитором, исполнителем, источником, SHA-256
+- [x] `core/music/music-library.ts` — машинно-читаемый каталог (id, assetUrl, title, composer, performer, sourceUrl, license)
+- [x] `core/music/recorded-music-player.ts` — плеер: HTMLAudioElement, gesture-unlock, автопереход по ended, sequential playlist, visibility/pagehide lifecycle, тестируемая factory через InjectionToken
+- [x] `shared/sound-control/` — переписан: кнопка toggle, next, info. Статусные метки обновлены
+- [x] `shared/music-info/` — диалог (`role=dialog`): текущий трек, полный каталог, ссылки на источник и LICENSES.md
+- [x] settings drawer — обновлён: «включить спокойную музыку», новые статусные тексты
+- [x] `ngsw-config.json` — добавлены форматы mp3, ogg (lazy, не prefetch)
+- [x] `ViewSettings.sound.enabled` и `.sound.volume` — обратная совместимость сохранена
+- [x] ambient-audio код помечен deprecated в тикете; файлы удалены из runtime (core/audio/ambient*)
+- [x] 309/309 тестов проходят, build:tonem зелёный
+
+**Состав библиотеки:** 10 треков от Yoiyami, Kistol, cynicmusic (все CC0 1.0 Universal).
+Неоклассическое фортепиано и эмбиент — подходит для yoga/relax сопровождения.
+Треки: First Light Particles, Yoiyami Core Theme, The Budding of Consciousness,
+Bluebonnet, Daisy, Catmint, Forget Me Not, Bedazzled, Waiting II, November Snow.
+
+**Примечание:** Изначально планировались строго классические записи (Satie, Debussy, Chopin),
+но CC0-записи их исполнений практически отсутствуют — все найденные перформансы требуют
+CC-BY/CC-BY-SA атрибуции. Вместо этого выбраны оригинальные неоклассические композиции
+с явной проверяемой CC0-дедикацией.
 
 ---
 

@@ -1,25 +1,70 @@
 :host { display: block; }
-.sound-button {
+
+.sound-control-row {
   display: inline-flex;
   align-items: center;
-  gap: .55rem;
-  padding: .55rem .75rem;
+  gap: 0.35rem;
+}
+
+.sound-button,
+.sound-next,
+.sound-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
   color: var(--ink-dim);
   background: rgb(10 10 15 / 34%);
   border: 1px solid rgb(242 240 233 / 12%);
   border-radius: 999px;
   font: inherit;
-  font-size: .72rem;
-  letter-spacing: .04em;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
   cursor: pointer;
   backdrop-filter: blur(10px);
-  transition: color .2s ease, border-color .2s ease, background .2s ease;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.sound-button:hover, .sound-button:focus-visible, .sound-button.is-on {
+
+.sound-button:hover,
+.sound-button:focus-visible,
+.sound-button.is-on,
+.sound-next:hover,
+.sound-next:focus-visible,
+.sound-info:hover,
+.sound-info:focus-visible {
   color: var(--ink);
   border-color: rgb(242 240 233 / 30%);
   background: rgb(242 240 233 / 8%);
 }
-.sound-button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-@media (max-width: 34rem) { .sound-copy { display: none; } }
-@media (prefers-reduced-motion: reduce) { .sound-button { transition: none; } }
+
+.sound-button:focus-visible,
+.sound-next:focus-visible,
+.sound-info:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.sound-next,
+.sound-info {
+  padding: 0.55rem 0.65rem;
+}
+
+.sound-next.shuffle-on {
+  color: var(--accent-color, #64b5f6);
+  border-color: var(--accent-color, #64b5f6);
+  background: rgb(100 181 246 / 12%);
+}
+
+.sound-copy {
+  @media (max-width: 34rem) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-button,
+  .sound-next,
+  .sound-info {
+    transition: none;
+  }
+}

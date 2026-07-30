@@ -23,3 +23,21 @@ npm --workspace tonem-server run test
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tonem" \
   npm --workspace tonem-server run start:dev
 ```
+
+## History backfill
+
+Build first, then run the production CLI against the target database:
+
+```bash
+npm --workspace tonem-server run build
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/tonem" \
+  npm --workspace tonem-server run backfill -- \
+  --from 2025-07-01 --to 2026-07-01
+```
+
+For local TypeScript development, use `npm --workspace tonem-server run backfill:dev -- ...`.
+Without flags the CLI requests the latest 366 days: hourly candles for deep history and
+1-minute MOEX / Binance candles for the latest 14 days. Inserts use
+`createMany({ skipDuplicates: true })`, so existing collector or higher-resolution ticks
+are never overwritten. The CLI continues after per-instrument failures, prints inserted
+and skipped counts, and exits nonzero if any source cannot cover the requested range.

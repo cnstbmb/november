@@ -42,6 +42,12 @@
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+// Конечную ленту периодически возвращаем в центральный цикл. Та же цифра
+// остаётся видимой, но технический прыжок позиции не должен анимироваться.
+.odometer.animated .reel.rebased {
+  transition: none;
+}
+
 .cell {
   display: block;
   height: 1em;

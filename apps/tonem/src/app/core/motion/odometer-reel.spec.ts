@@ -137,4 +137,19 @@ describe('OdometerReel', () => {
     const s1 = reel.update('5', 'up')[0].slot; // не изменилась — slot тот же
     expect(s1).toBe(s0);
   });
+
+  it('после долгой серии обновлений ни один барабан не уходит за видимую ленту', () => {
+    const reel = new OdometerReel();
+    reel.update('0', 'flat');
+    let rebaseCount = 0;
+
+    for (let value = 1; value <= 80; value++) {
+      const [roll] = reel.update(String(value % 10), 'up');
+      expect(roll.slot).toBeGreaterThanOrEqual(0);
+      expect(roll.slot).toBeLessThan(REEL_LENGTH);
+      if (roll.rebased) rebaseCount++;
+    }
+
+    expect(rebaseCount).toBeGreaterThan(0);
+  });
 });

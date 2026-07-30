@@ -119,6 +119,10 @@ wsl-november.session.sql
 # ProxyAI (skills, checkpoints, and runtime state)
 .proxyai/
 
+# Agent instruction files — repo-local, not part of the project
+AGENTS.md
+PROXYAI.md
+
 
 # environment variables files
 *.env

@@ -116,6 +116,9 @@ configs
 
 wsl-november.session.sql
 
+# ProxyAI (skills, checkpoints, and runtime state)
+.proxyai/
+
 
 # environment variables files
 *.env

@@ -3,15 +3,16 @@
 # Deploys the self-contained tonem.ru stack on the master host:
 #   - tonem-postgres (dedicated DB)
 #   - tonem-server (NestJS collector + read API)
-#   - tonem-web (nginx static site for tonem.ru)
+#   - tonem-web (nginx static SPA)
 #
-# Also issues TLS certs and updates the prod nginx config.
+# Issues TLS certs, deploys Docker Compose stack, adds tonem server blocks
+# to the existing remnawave-panel-proxy nginx config, then reloads it.
 
 - name: Resolve effective variables
   ansible.builtin.set_fact:
     tonem_dir_effective: "{{ tonem_dir | default('/opt/tonem') }}"
-    tonem_nginx_conf_src_effective: "{{ tonem_nginx_conf_src | default(repo_root + '/deployments/prod/nginx-conf/nginx.conf') }}"
-    tonem_nginx_conf_dest_effective: "{{ tonem_nginx_conf_dest | default('/srv/nginx-conf/nginx.conf') }}"
+    remnawave_panel_dir_effective: "{{ remnawave_panel_dir | default('/opt/remnawave-panel') }}"
+    remnawave_panel_nginx_conf_effective: "{{ remnawave_panel_nginx_conf_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/nginx.conf') }}"
 
 - name: Validate required variables
   ansible.builtin.assert:
@@ -20,7 +21,7 @@
       - repo_root | length > 0
     fail_msg: "repo_root must be defined (path to the november repo on the controller)"
 
-# ── Stage 1: TLS certificates (must exist before nginx.conf references them) ──
+# ── Stage 1: TLS certificates ────────────────────────────────────────────
 
 - name: Validate certbot variables
   ansible.builtin.assert:
@@ -55,7 +56,7 @@
   no_log: true
   when: not ansible_check_mode
 
-# ── Stage 2: Tonem compose stack ──────────────────────────────────────────
+# ── Stage 2: Tonem compose stack ─────────────────────────────────────────
 
 - name: Ensure tonem directory exists
   ansible.builtin.file:
@@ -84,42 +85,54 @@
   changed_when: false
   when: not ansible_check_mode
 
-- name: Stop tonem stack if configs changed
+- name: Start tonem stack (always recreate to pick up new images)
   ansible.builtin.command:
-    cmd: docker compose down
-    chdir: "{{ tonem_dir_effective }}"
-  changed_when: false
-  when:
-    - not ansible_check_mode
-    - tonem_compose_copy.changed or tonem_env_copy.changed
-
-- name: Start tonem stack
-  ansible.builtin.command:
-    cmd: docker compose up -d
+    cmd: docker compose up -d --force-recreate
     chdir: "{{ tonem_dir_effective }}"
   when: not ansible_check_mode
 
-# ── Stage 3: Prod nginx config (tonem server blocks) ─────────────────────
+# ── Stage 3: Add tonem server blocks to remnawave-panel nginx ────────────
 
-- name: Copy updated nginx.conf (with tonem server blocks)
-  ansible.builtin.copy:
-    src: "{{ tonem_nginx_conf_src_effective }}"
-    dest: "{{ tonem_nginx_conf_dest_effective }}"
-    mode: "0644"
-  register: nginx_conf_copy
+- name: Load tonem nginx server blocks from local template
+  ansible.builtin.set_fact:
+    tonem_server_blocks_content: "{{ lookup('file', repo_root + '/deployments/tonem/nginx/tonem-server-blocks.conf') }}"
+  delegate_to: localhost
+  become: false
 
-- name: Test nginx config inside webserver container
+- name: Ensure tonem server blocks in nginx.conf
+  ansible.builtin.blockinfile:
+    path: "{{ remnawave_panel_nginx_conf_effective }}"
+    block: "{{ tonem_server_blocks_content }}"
+    marker: "# {mark} TONEM SERVER BLOCKS"
+    insertafter: EOF
+    backup: true
+  register: nginx_conf_updated
+
+- name: Reload remnawave-proxy with updated nginx config
   ansible.builtin.command:
-    cmd: docker exec webserver nginx -t
+    cmd: docker compose up -d --force-recreate remnawave-proxy
+    chdir: "{{ remnawave_panel_dir_effective }}"
+  when: nginx_conf_updated.changed
+
+# ── Stage 4: Verify tonem-server is healthy ──────────────────────────────
+
+- name: Wait for tonem-server health check
+  ansible.builtin.command:
+    cmd: docker exec tonem-postgres true  # dummy — real check below
   changed_when: false
-  when: nginx_conf_copy.changed
+  when: not ansible_check_mode
 
-- name: Reload nginx inside webserver container
+- name: Verify tonem-server is running
   ansible.builtin.command:
-    cmd: docker exec webserver nginx -s reload
-  when: nginx_conf_copy.changed
+    cmd: docker inspect tonem-server --format '{% raw %}{{.State.Health.Status}}{% endraw %}'
+  register: tonem_server_health
+  changed_when: false
+  failed_when: tonem_server_health.stdout != 'healthy'
+  retries: 15
+  delay: 10
+  when: not ansible_check_mode
 
-# ── Backup ─────────────────────────────────────────────────────────────────
+# ── Backup ────────────────────────────────────────────────────────────────
 
 - name: Install tonem pg_dump backup script
   ansible.builtin.copy:

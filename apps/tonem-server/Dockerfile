@@ -5,6 +5,9 @@
 FROM node:22-alpine AS build
 WORKDIR /repo
 
+# Prisma requires openssl on Alpine for engine generation.
+RUN apk add --no-cache openssl openssl-dev
+
 # Copy workspace manifests first for layer caching.
 COPY package.json package-lock.json ./
 COPY apps/tonem-server/package.json apps/tonem-server/package.json
@@ -13,14 +16,20 @@ COPY apps/tonem-server/package.json apps/tonem-server/package.json
 RUN npm ci
 
 # Copy the tonem-server sources + prisma schema, generate client, compile.
+# The PRISMA_CLI_BINARY_TARGETS env tells prisma to pre-fetch the musl engine
+# during generate so it's available in the runtime stage without network access.
 COPY apps/tonem-server apps/tonem-server
-RUN npm --workspace tonem-server run prisma:generate \
+RUN PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x \
+  npm --workspace tonem-server run prisma:generate \
   && npm --workspace tonem-server run build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
+
+# Prisma engine needs openssl at runtime on Alpine.
+RUN apk add --no-cache openssl
 
 # Hoisted production deps + the compiled app + prisma assets.
 COPY --from=build /repo/node_modules ./node_modules

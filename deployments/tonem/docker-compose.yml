@@ -2,17 +2,12 @@
 #
 # Services:
 #   tonem-postgres  — dedicated Postgres database for tonem
-#   tonem-server    — NestJS quote collector + read API (port 3200)
-#   tonem-web       — nginx static SPA for tonem.ru / www.tonem.ru (port 80)
+#   tonem-server    — NestJS quote collector + read API
+#   tonem-web       — nginx static SPA for tonem.ru / www.tonem.ru
 #
-# The stack is independent of the prod compose except for one shared network:
-#   - app-network (external) — tonem-web + tonem-server join it so the prod
-#     nginx (`webserver`) can proxy_pass to them by container name.
-#   - tonem-network (internal) — private bridge for tonem-server ↔ tonem-postgres.
-#
-# The tonem-server container publishes 3200 on the host (127.0.0.1) for optional
-# direct access. The tonem-web container does NOT publish a host port — it is
-# reached exclusively by the prod nginx over app-network.
+# The stack joins remnawave-network so the existing remnawave-panel-proxy
+# nginx (which already binds host ports 80/443) can proxy_pass to
+# tonem-web and tonem-server by container name.
 
 services:
   # ── tonem-postgres ──────────────────────────────────────────────────────────
@@ -27,7 +22,7 @@ services:
     volumes:
       - tonem-pg-data:/var/lib/postgresql/data
     networks:
-      - tonem-network   # private — DB is not exposed to the prod shared network
+      - tonem-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tonem -d tonem"]
       interval: 10s
@@ -41,16 +36,14 @@ services:
     restart: always
     env_file:
       - .env
-    ports:
-      - "127.0.0.1:3200:3200"   # only loopback — prod nginx proxies via app-network
     networks:
-      - tonem-network            # DB access
-      - app-network              # reachable by prod nginx (`webserver`)
+      - tonem-network
+      - remnawave-network
     depends_on:
       tonem-postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3200/latest || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3200/latest || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,9 +55,9 @@ services:
     container_name: tonem-web
     restart: always
     networks:
-      - app-network              # reachable by prod nginx (`webserver`)
+      - remnawave-network
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -72,10 +65,10 @@ services:
 
 networks:
   tonem-network:
-    driver: bridge              # private: tonem-server ↔ tonem-postgres
-  app-network:
-    external: true              # created by deployments/prod/docker-compose.yml
-    name: app-network
+    driver: bridge
+  remnawave-network:
+    external: true
+    name: remnawave-network
 
 volumes:
-  tonem-pg-data:                # persistent Postgres data
+  tonem-pg-data:

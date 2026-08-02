@@ -1,12 +1,9 @@
 // Одометр: вертикальные барабаны цифр + затухающая вспышка.
 // Эстетика — как у приложения: тёмный фон, --ink/--ink-dim, tabular-nums.
 // Все размеры в em, чтобы компонент масштабировался шрифтом родителя
-// (герой clamp(6rem…26vmin) и тикер 0.95rem получают одинаково ровную механику).
+// (hero clamp(5rem…22vmin) и ticker 1.05rem получают одинаково ровную механику).
 
 :host {
-  --odo-up: #6ee7a8; // мягкий зелёный, читается на --bg
-  --odo-down: #f28b8b; // мягкий красный
-
   display: inline-block;
 }
 
@@ -69,18 +66,18 @@
 }
 
 .odometer.flash-up {
-  color: var(--odo-up);
+  color: var(--up);
   animation: odo-glow-up 1s ease-out;
 }
 
 .odometer.flash-down {
-  color: var(--odo-down);
+  color: var(--down);
   animation: odo-glow-down 1s ease-out;
 }
 
 @keyframes odo-glow-up {
   0% {
-    text-shadow: 0 0 0.35em rgba(110, 231, 168, 0.55);
+    text-shadow: 0 0 0.45em rgba(110, 231, 168, 0.5);
   }
   100% {
     text-shadow: 0 0 0 rgba(110, 231, 168, 0);
@@ -89,7 +86,7 @@
 
 @keyframes odo-glow-down {
   0% {
-    text-shadow: 0 0 0.35em rgba(242, 139, 139, 0.55);
+    text-shadow: 0 0 0.45em rgba(242, 139, 139, 0.5);
   }
   100% {
     text-shadow: 0 0 0 rgba(242, 139, 139, 0);

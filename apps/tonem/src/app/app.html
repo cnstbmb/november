@@ -1,21 +1,49 @@
-<main
-  class="stage"
-  [class.mood-neutral]="!viewSettings.background().moodEnabled"
->
-  <app-aurora
-    [dim]="viewSettings.background().dim"
-    [blur]="viewSettings.background().blur"
-    [speed]="viewSettings.background().speed"
-    [moodEnabled]="viewSettings.background().moodEnabled"
-  />
-
-  <app-time-scrubber />
+<main class="stage" [class.mood-neutral]="!viewSettings.background().moodEnabled" [class.zen]="zenMode()">
+  @defer (on idle; prefetch on viewport) {
+    <app-aurora
+      [dim]="viewSettings.background().dim"
+      [blur]="viewSettings.background().blur"
+      [speed]="viewSettings.background().speed"
+      [moodEnabled]="viewSettings.background().moodEnabled"
+    />
+  } @placeholder {
+    <div class="aurora-placeholder"></div>
+  }
 
   <div class="utility-bar">
-    <app-sound-control (openInfo)="musicInfoOpen.set(true)" />
+    <button class="zen-trigger" type="button"
+      (click)="toggleZen()"
+      [attr.aria-label]="zenMode() ? 'Выйти из дзена' : 'Режим дзен'"
+      [title]="zenMode() ? 'Выйти из дзена' : 'Режим дзен'">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        @if (zenMode()) {
+          <circle cx="9" cy="9" r="7"/>
+          <circle cx="9" cy="9" r="3"/>
+        } @else {
+          <circle cx="9" cy="9" r="7"/>
+          <path d="M9 2v14M2 9h14"/>
+        }
+      </svg>
+    </button>
 
-    <button class="settings-trigger" type="button" (click)="openSettings()" aria-label="Открыть настройки">
-      настроить вид
+    <button class="music-trigger" type="button"
+      (click)="toggleMusic()"
+      [class.active]="musicPlaying()"
+      [attr.aria-label]="musicPlaying() ? 'Выключить музыку' : 'Включить музыку'"
+      [title]="musicPlaying() ? 'Выключить музыку' : 'Включить музыку'">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 11V2.5L5.5 5.5H2.5V11H5.5L13.5 14V11Z"/>
+        @if (!musicPlaying()) {
+          <line x1="2" y1="2" x2="14" y2="14"/>
+        }
+      </svg>
+    </button>
+
+    <button class="settings-trigger" type="button" (click)="openSettings()" aria-label="Настройки" title="Настройки">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="9" cy="9" r="3"/>
+        <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4"/>
+      </svg>
     </button>
   </div>
 
@@ -27,12 +55,6 @@
     <section
       class="hero"
       aria-live="polite"
-      (click)="openSpark()"
-      (keydown.enter)="openSpark()"
-      (keydown.space)="openSpark(); $event.preventDefault()"
-      [attr.tabindex]="canOpenHeroSparkline() ? 0 : null"
-      [attr.role]="canOpenHeroSparkline() ? 'button' : null"
-      [attr.aria-label]="canOpenHeroSparkline() ? 'Показать график за сегодня' : null"
       [class.hero-historical]="timeMachine.active()"
     >
       @if (!viewSettings.zen().hideHero) {
@@ -49,36 +71,75 @@
     </section>
   }
 
-  @if (!viewSettings.zen().hideTicker) {
-    <footer class="ticker" aria-label="Все котировки">
-      @for (entry of marketView.ticker(); track entry.instrument.id) {
-        <span class="ticker-item" [class.ticker-dim]="isDim(entry)" [attr.data-instrument]="entry.instrument.id">
-          @if (!viewSettings.zen().hideLabels) {
-            <span class="ticker-label">{{ entry.instrument.label }}</span>
-          }
-          @if (!viewSettings.zen().hideSmallNumbers) {
-            <app-odometer class="ticker-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
-          }
-          @if (entry.quote.source === 'cbr') {
-            <span class="ticker-badge">ЦБ</span>
-          }
-        </span>
-      }
-    </footer>
+  @defer (on idle) {
+    <app-time-scrubber />
+  } @placeholder {
+    <div></div>
   }
 
-  @if (sparkInstrument(); as inst) {
-    <app-sparkline [instrument]="inst" (closed)="closeSpark()" />
+  @if (!viewSettings.zen().hideTicker) {
+    <div
+      class="marquee-track"
+      aria-label="Все котировки"
+      (pointerenter)="marqueePaused.set(true)"
+      (pointerleave)="marqueePaused.set(false)"
+    >
+      <div class="marquee-ribbon" [class.paused]="marqueePaused()">
+        @for (entry of marketView.ticker(); track entry.instrument.id) {
+          <button
+            type="button"
+            class="marquee-chip"
+            [class.favorited]="isFavorite(entry.instrument.id)"
+            (click)="toggleFavorite(entry.instrument.id)"
+            [attr.aria-label]="isFavorite(entry.instrument.id) ? 'Убрать ' + entry.instrument.label + ' из избранного' : 'Добавить ' + entry.instrument.label + ' в избранное'"
+          >
+            <span class="chip-label">{{ entry.instrument.label }}</span>
+            @if (!viewSettings.zen().hideSmallNumbers) {
+              <app-odometer class="chip-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+            }
+          </button>
+        }
+        <!-- Duplicate for seamless loop -->
+        @for (entry of marketView.ticker(); track entry.instrument.id + '_dup') {
+          <button
+            type="button"
+            class="marquee-chip"
+            [class.favorited]="isFavorite(entry.instrument.id)"
+            (click)="toggleFavorite(entry.instrument.id)"
+            [attr.aria-label]="isFavorite(entry.instrument.id) ? 'Убрать ' + entry.instrument.label + ' из избранного' : 'Добавить ' + entry.instrument.label + ' в избранное'"
+          >
+            <span class="chip-label">{{ entry.instrument.label }}</span>
+            @if (!viewSettings.zen().hideSmallNumbers) {
+              <app-odometer class="chip-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+            }
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (favoriteEntries().length) {
+      <div class="favorites-row" aria-label="Избранное">
+        @for (entry of favoriteEntries(); track entry.instrument.id) {
+          <div class="favorite-card">
+            <button
+              type="button"
+              class="favorite-remove"
+              (click)="toggleFavorite(entry.instrument.id)"
+              [attr.aria-label]="'Убрать ' + entry.instrument.label + ' из избранного'"
+            >×</button>
+            <span class="favorite-label">{{ entry.instrument.label }}</span>
+            @if (!viewSettings.zen().hideSmallNumbers && entry.quote.value !== null) {
+              <app-odometer class="favorite-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+            }
+          </div>
+        }
+      </div>
+    }
   }
 
   @if (settingsOpen()) {
-    <app-settings-drawer (close)="closeSettings()" />
-  }
-
-  @if (musicInfoOpen()) {
-    <app-music-info
-      [currentTrack]="musicPlayer.currentTrack()"
-      (close)="musicInfoOpen.set(false)"
-    />
+    @defer (on immediate) {
+      <app-settings-drawer (close)="closeSettings()" />
+    }
   }
 </main>

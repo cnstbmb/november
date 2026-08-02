@@ -57,7 +57,7 @@ export function defaultViewSettings(): ViewSettings {
     hero: {
       mode: 'pinned',
       pinnedId: HERO_INSTRUMENT_ID,
-      favorites: ['usdrub', 'eurrub', 'cnyrub', 'btc', 'eth', 'ton'],
+      favorites: ['usdrub', 'eurrub', 'cnyrub', 'brent'],
     },
     instruments: {
       order: INSTRUMENTS.map((instrument) => instrument.id),

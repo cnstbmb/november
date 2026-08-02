@@ -1,6 +1,6 @@
 :host {
   position: fixed;
-  z-index: 4;
+  z-index: 3;
   inset-inline: 0;
   bottom: max(4.75rem, calc(env(safe-area-inset-bottom) + 4.75rem));
   display: flex;
@@ -266,7 +266,10 @@ input:focus-visible {
 
 @media (max-width: 40rem) {
   :host {
-    bottom: max(4.25rem, calc(env(safe-area-inset-bottom) + 4.25rem));
+    position: fixed;
+    z-index: 3;
+    inset-inline: 0;
+    bottom: max(1rem, env(safe-area-inset-bottom));
     padding-inline: 0.65rem;
   }
 

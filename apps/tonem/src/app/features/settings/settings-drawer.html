@@ -54,23 +54,6 @@
     </fieldset>
 
     <fieldset>
-      <legend>Дзен</legend>
-      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideLabels" (change)="setZen('hideLabels', $event)" /><span>убрать подписи — я и так всё понимаю</span></label>
-      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideTicker" (change)="setZen('hideTicker', $event)" /><span>убрать ленту — рынок слишком разговорчив</span></label>
-      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideSmallNumbers" (change)="setZen('hideSmallNumbers', $event)" /><span>убрать мелкие циферки — мелочность не красит</span></label>
-      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideClock" (change)="setZen('hideClock', $event)" /><span>убрать часы — время придумали биржи</span></label>
-      <label class="switch"><input type="checkbox" [checked]="settings().zen.hideHero" (change)="setZen('hideHero', $event)" /><span>убрать эти дурацкие цифры — наконец-то</span></label>
-    </fieldset>
-
-    <fieldset>
-      <legend>Фон</legend>
-      <label class="range" for="background-dim"><span>затемнение <output>{{ settings().background.dim }}</output></span><input id="background-dim" type="range" min="0" max="1" step="0.05" [value]="settings().background.dim" (input)="setBackgroundNumber('dim', $event)" /></label>
-      <label class="range" for="background-blur"><span>блюр <output>{{ settings().background.blur }} px</output></span><input id="background-blur" type="range" min="0" max="40" step="1" [value]="settings().background.blur" (input)="setBackgroundNumber('blur', $event)" /></label>
-      <label class="range" for="background-speed"><span>скорость <output>{{ settings().background.speed }}×</output></span><input id="background-speed" type="range" min="0.1" max="3" step="0.1" [value]="settings().background.speed" (input)="setBackgroundNumber('speed', $event)" /></label>
-      <label class="switch"><input type="checkbox" [checked]="settings().background.moodEnabled" (change)="setMood($event)" /><span>рынок задаёт настроение</span></label>
-    </fieldset>
-
-    <fieldset>
       <legend>Звук</legend>
       <label class="switch"><input type="checkbox" [checked]="settings().sound.enabled" (change)="setSoundEnabled($event)" /><span>включить спокойную музыку</span></label>
       <label class="range"><span>громкость <output>{{ volumePercent() }}%</output></span><input type="range" min="0" max="1" step="0.05" [value]="settings().sound.volume" (input)="setVolume($event)" /></label>
@@ -84,6 +67,14 @@
           @case ('error') { ошибка воспроизведения }
         }
       </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Фон</legend>
+      <label class="range" for="background-dim"><span>затемнение <output>{{ settings().background.dim }}</output></span><input id="background-dim" type="range" min="0" max="1" step="0.05" [value]="settings().background.dim" (input)="setBackgroundNumber('dim', $event)" /></label>
+      <label class="range" for="background-blur"><span>блюр <output>{{ settings().background.blur }} px</output></span><input id="background-blur" type="range" min="0" max="40" step="1" [value]="settings().background.blur" (input)="setBackgroundNumber('blur', $event)" /></label>
+      <label class="range" for="background-speed"><span>скорость <output>{{ settings().background.speed }}×</output></span><input id="background-speed" type="range" min="0.1" max="3" step="0.1" [value]="settings().background.speed" (input)="setBackgroundNumber('speed', $event)" /></label>
+      <label class="switch"><input type="checkbox" [checked]="settings().background.moodEnabled" (change)="setMood($event)" /><span>рынок задаёт настроение</span></label>
     </fieldset>
 
     <fieldset>

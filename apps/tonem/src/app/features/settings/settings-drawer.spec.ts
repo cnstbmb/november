@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RecordedMusicPlayer } from '../../core/music/recorded-music-player';
+import { CREATE_AUDIO, RecordedMusicPlayer } from '../../core/music/recorded-music-player';
 import { VIEW_SETTINGS_PLATFORM, ViewSettingsPlatform } from '../../core/view-settings/view-settings.platform';
 import { ViewSettingsStore } from '../../core/view-settings/view-settings.store';
 import { SettingsDrawerComponent } from './settings-drawer';
@@ -18,6 +18,24 @@ class DrawerPlatform implements ViewSettingsPlatform {
   onHashChange(): () => void { return () => undefined; }
 }
 
+function fakeAudio(): HTMLAudioElement {
+  return {
+    play: () => Promise.resolve(),
+    pause: () => undefined,
+    load: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    removeAttribute: () => undefined,
+    get volume() { return 1; },
+    set volume(_v: number) {},
+    get currentTime() { return 0; },
+    set currentTime(_v: number) {},
+    get paused() { return false; },
+    get src() { return ''; },
+    set src(_v: string) {},
+  } as unknown as HTMLAudioElement;
+}
+
 describe('SettingsDrawerComponent', () => {
   let platform: DrawerPlatform;
 
@@ -27,16 +45,8 @@ describe('SettingsDrawerComponent', () => {
       imports: [SettingsDrawerComponent],
       providers: [
         ViewSettingsStore,
-        {
-          provide: RecordedMusicPlayer,
-          useValue: {
-            status: signal('off'),
-            enableFromGesture: vi.fn(),
-            disable: vi.fn(),
-            setVolume: vi.fn(),
-            next: vi.fn(),
-          },
-        },
+        { provide: CREATE_AUDIO, useValue: () => fakeAudio() },
+        RecordedMusicPlayer,
         { provide: VIEW_SETTINGS_PLATFORM, useValue: platform },
       ],
     }).compileComponents();
@@ -44,7 +54,7 @@ describe('SettingsDrawerComponent', () => {
 
   afterEach(() => TestBed.resetTestingModule());
 
-  it('renders an accessible modal with all five ironic zen controls', async () => {
+  it('renders an accessible modal with sound, background, and instrument controls', async () => {
     const fixture = TestBed.createComponent(SettingsDrawerComponent);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
@@ -52,13 +62,9 @@ describe('SettingsDrawerComponent', () => {
 
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
     expect(dialog?.getAttribute('aria-labelledby')).toBe('settings-title');
-    expect(element.textContent).toContain('убрать подписи — я и так всё понимаю');
-    expect(element.textContent).toContain('убрать ленту — рынок слишком разговорчив');
-    expect(element.textContent).toContain('убрать мелкие циферки — мелочность не красит');
-    expect(element.textContent).toContain('убрать часы — время придумали биржи');
-    expect(element.textContent).toContain('убрать эти дурацкие цифры — наконец-то');
-    expect(element.querySelectorAll("input[type='range']").length).toBe(4);
     expect(element.textContent).toContain('включить спокойную музыку');
+    expect(element.textContent).toContain('рынок задаёт настроение');
+    expect(element.querySelectorAll("input[type='range']").length).toBe(4);
     expect(element.querySelector('fieldset[disabled]')).toBeNull();
   });
 
@@ -73,13 +79,14 @@ describe('SettingsDrawerComponent', () => {
     expect(closes).toBe(1);
   });
 
-  it('calls the signal store when a zen control changes', async () => {
+  it('calls the signal store when sound toggle changes', async () => {
     const fixture = TestBed.createComponent(SettingsDrawerComponent);
+    const store = TestBed.inject(ViewSettingsStore);
     await fixture.whenStable();
     const labels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLLabelElement>('label'),
     );
-    const label = labels.find((candidate) => candidate.textContent?.includes('убрать подписи'));
+    const label = labels.find((candidate) => candidate.textContent?.includes('включить спокойную музыку'));
     const checkbox = label?.querySelector<HTMLInputElement>('input');
     expect(checkbox).toBeTruthy();
 
@@ -87,7 +94,9 @@ describe('SettingsDrawerComponent', () => {
     checkbox!.dispatchEvent(new Event('change', { bubbles: true }));
     await fixture.whenStable();
 
-    expect(TestBed.inject(ViewSettingsStore).zen().hideLabels).toBe(true);
+    // Sound toggle also fires enableFromGesture which is mocked;
+    // verify the store API was called via the component handler.
+    expect(store.sound().enabled).toBe(true);
   });
 
   it('copies a canonical full URL from the share action', async () => {

@@ -50,11 +50,9 @@ describe('App', () => {
           provide: RecordedMusicPlayer,
           useValue: {
             status: signal('off'),
-            currentTrack: () => null,
-            enableFromGesture: () => undefined,
+            enableFromGesture: () => Promise.resolve(),
             disable: () => undefined,
-            setVolume: () => undefined,
-            next: () => undefined,
+            preload: () => undefined,
           },
         },
       ],
@@ -109,7 +107,7 @@ describe('App', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(el.querySelector('.hero-value')).toBeNull();
-    expect(el.querySelector('.ticker')).toBeNull();
+    expect(el.querySelector('.ticker-list')).toBeNull();
     expect(el.querySelector('.settings-trigger')).toBeTruthy();
   });
 
@@ -118,7 +116,7 @@ describe('App', () => {
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     // До загрузки: только живые (производные с unavailable скрыты).
-    expect(el.querySelectorAll('.ticker-item').length).toBe(liveInstruments().length);
+    expect(el.querySelectorAll('.ticker-row').length).toBe(liveInstruments().length);
 
     // После загрузки сырья для EUR/USD: производная появляется ровно один раз,
     // без дублирующей «dimmed» строки из стора.
@@ -130,10 +128,10 @@ describe('App', () => {
       now,
     );
     await fixture.whenStable();
-    const eurusdRows = el.querySelectorAll(
-      '[data-instrument="eurusd"], .ticker-item',
-    );
-    expect(el.querySelectorAll('[data-instrument="eurusd"]')).toHaveLength(1);
+    const eurusdRows = el.querySelectorAll('.ticker-row');
+    const eurusdLabels = Array.from(eurusdRows)
+      .filter((row) => row.querySelector('.ticker-label')?.textContent?.includes('EUR/USD'));
+    expect(eurusdLabels).toHaveLength(1);
     const labels = Array.from(eurusdRows).map((node) => node.textContent ?? '');
     expect(labels.filter((text) => text.includes('EUR/USD'))).toHaveLength(1);
   });

@@ -127,20 +127,19 @@ describe('RecordedMusicPlayer', () => {
     expect(player.status()).toBe('off');
   });
 
-  it('advances to next track on next()', () => {
+  it('advances to next — single track wraps to same index', () => {
     player.enableFromGesture();
     expect(player.currentIndex()).toBe(0);
     player.next();
-    expect(player.currentIndex()).toBe(1);
+    expect(player.currentIndex()).toBe(0); // single track: wraps to itself
   });
 
-  it('advances to next track when ended event fires', () => {
+  it('fires ended event — single track wraps to same index', () => {
     player.enableFromGesture();
-    // Simulate track ended
     createAudio.mockClear();
     audioEl._fireEvent('ended');
-    expect(createAudio).toHaveBeenCalledTimes(1); // next track created
-    expect(player.currentIndex()).toBe(1);
+    expect(createAudio).toHaveBeenCalledTimes(1); // re-creates same track
+    expect(player.currentIndex()).toBe(0);
   });
 
   it('pauses when tab becomes hidden', () => {
@@ -157,12 +156,9 @@ describe('RecordedMusicPlayer', () => {
     expect(player.status()).toBe('off');
   });
 
-  it('wraps around to first track at end of sequential playlist', () => {
-    const trackCount = player.currentTrack() !== null ? 10 : 10;
+  it('wraps around with single track', () => {
     player.enableFromGesture();
-    for (let i = 0; i < trackCount; i++) {
-      player.next();
-    }
+    player.next();
     expect(player.currentIndex()).toBe(0);
   });
 

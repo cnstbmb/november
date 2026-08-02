@@ -1,19 +1,21 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
-import { Instrument } from './core/instruments/instrument.model';
+import {
+  Component,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { MarketViewStore } from './core/market-view/market-view.store';
 import { ConnectivityService } from './core/offline/connectivity.service';
+import { RecordedMusicPlayer } from './core/music/recorded-music-player';
 
-import { TickerEntry } from './core/rates/rates.store';
 import { formatTime } from './core/rates/value.format';
 import { TimeMachineService } from './core/time-machine/time-machine.service';
 import { ViewSettingsStore } from './core/view-settings/view-settings.store';
-import { SettingsDrawerComponent } from './features/settings/settings-drawer';
 import { AuroraComponent } from './shared/aurora/aurora';
 import { OdometerComponent } from './shared/odometer/odometer';
-import { MusicInfoComponent } from './shared/music-info/music-info';
-import { RecordedMusicPlayer } from './core/music/recorded-music-player';
-import { SoundControlComponent } from './shared/sound-control/sound-control';
-import { SparklineComponent } from './shared/sparkline/sparkline';
+import { SettingsDrawerComponent } from './features/settings/settings-drawer';
 import { TimeScrubberComponent } from './shared/time-scrubber/time-scrubber';
 
 @Component({
@@ -21,10 +23,7 @@ import { TimeScrubberComponent } from './shared/time-scrubber/time-scrubber';
   imports: [
     OdometerComponent,
     AuroraComponent,
-    SparklineComponent,
     SettingsDrawerComponent,
-    SoundControlComponent,
-    MusicInfoComponent,
     TimeScrubberComponent,
   ],
   templateUrl: './app.html',
@@ -37,19 +36,27 @@ export class App {
   protected readonly timeMachine = inject(TimeMachineService);
   protected readonly musicPlayer = inject(RecordedMusicPlayer);
 
-  protected readonly sparkInstrument = signal<Instrument | null>(null);
   protected readonly settingsOpen = signal(false);
-  protected readonly musicInfoOpen = signal(false);
-  protected readonly canOpenHeroSparkline = computed(
-    () => !this.timeMachine.active() && this.marketView.canOpenHeroSparkline(),
+  protected readonly marqueePaused = signal(false);
+
+  protected readonly zenMode = computed(() =>
+    this.viewSettings.zen().hideTicker && this.viewSettings.zen().hideLabels,
+  );
+
+  protected readonly musicPlaying = computed(() =>
+    this.musicPlayer.status() === 'playing',
   );
 
   constructor() {
     effect(() => {
-      if (this.timeMachine.active()) this.sparkInstrument.set(null);
+      void this.timeMachine.active();
+    });
+
+    // Preload the audio track eagerly so it's ready when user enables music.
+    afterNextRender(() => {
+      this.musicPlayer.preload();
     });
   }
-
 
   protected readonly heroStatus = computed<string>(() => {
     const quote = this.marketView.hero()?.quote;
@@ -86,18 +93,46 @@ export class App {
     }
   });
 
-  protected isDim(entry: TickerEntry): boolean {
-    return entry.quote.status === 'closed' || entry.quote.status === 'unavailable';
+  protected isFavorite(id: string): boolean {
+    return this.viewSettings.hero().favorites.includes(id);
   }
 
-  protected openSpark(): void {
-    if (!this.canOpenHeroSparkline()) return;
-    const instrument = this.marketView.hero()?.instrument;
-    if (instrument) this.sparkInstrument.set(instrument);
+  protected toggleFavorite(id: string): void {
+    this.viewSettings.setFavorite(id, !this.isFavorite(id));
   }
 
-  protected closeSpark(): void {
-    this.sparkInstrument.set(null);
+  protected readonly favoriteEntries = computed(() => {
+    const favs = new Set(this.viewSettings.hero().favorites);
+    return this.marketView
+      .ticker()
+      .filter((e) => favs.has(e.instrument.id) && e.quote.value !== null);
+  });
+
+  protected toggleZen(): void {
+    const store = this.viewSettings;
+    const isZen = this.zenMode();
+    // Toggle all zen switches at once
+    store.setZen('hideLabels', !isZen);
+    store.setZen('hideTicker', !isZen);
+    store.setZen('hideSmallNumbers', !isZen);
+    store.setZen('hideClock', !isZen);
+    // In zen mode, hero rotates among favorites
+    store.setHeroMode(isZen ? 'pinned' : 'rotation');
+    // In zen mode, enable music if sound is on
+    if (!isZen && store.sound().enabled) {
+      void this.musicPlayer.enableFromGesture();
+    }
+  }
+
+  protected toggleMusic(): void {
+    if (this.musicPlayer.status() === 'playing' || this.musicPlayer.status() === 'loading') {
+      this.musicPlayer.disable();
+    } else if (this.viewSettings.sound().enabled) {
+      void this.musicPlayer.enableFromGesture();
+    } else {
+      this.viewSettings.setSound('enabled', true);
+      void this.musicPlayer.enableFromGesture();
+    }
   }
 
   protected openSettings(): void {
@@ -106,6 +141,5 @@ export class App {
 
   protected closeSettings(): void {
     this.settingsOpen.set(false);
-    queueMicrotask(() => document.querySelector<HTMLElement>('.settings-trigger')?.focus());
   }
 }

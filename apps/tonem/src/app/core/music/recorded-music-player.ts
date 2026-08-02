@@ -56,6 +56,19 @@ export class RecordedMusicPlayer {
   }
 
   /**
+   * Preloads the audio track without playing it.
+   * Call after app render to cache the file, avoiding delay on first play.
+   */
+  preload(): void {
+    const track = this.currentTrack();
+    if (!track || this.audio) return;
+    const audio = this.createAudio(track.assetUrl);
+    audio.preload = 'auto';
+    audio.load();
+    this.audio = audio;
+  }
+
+  /**
    * Must be called synchronously from a trusted user gesture (click/key).
    * Respects the browser autoplay policy: AudioContext/resume happens implicitly
    * when the first play() follows a user gesture.

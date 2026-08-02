@@ -80,14 +80,14 @@
 
 - name: Pull tonem images
   ansible.builtin.command:
-    cmd: docker compose pull
+    cmd: docker compose pull --policy always
     chdir: "{{ tonem_dir_effective }}"
   changed_when: false
   when: not ansible_check_mode
 
 - name: Start tonem stack (always recreate to pick up new images)
   ansible.builtin.command:
-    cmd: docker compose up -d --force-recreate
+    cmd: docker compose up -d --force-recreate --pull never
     chdir: "{{ tonem_dir_effective }}"
   when: not ansible_check_mode
 

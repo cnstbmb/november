@@ -73,7 +73,7 @@ describe('BinanceWsService', () => {
     expect(MockSocket.instances).toHaveLength(1);
     expect(socket().url).toBe(
       'wss://stream.binance.com:9443/stream?streams=' +
-        'btcusdt@miniTicker/ethusdt@miniTicker/tonusdt@miniTicker',
+        'btcusdt@miniTicker/ethusdt@miniTicker',
     );
   });
 
@@ -102,12 +102,10 @@ describe('BinanceWsService', () => {
     service.start();
     socket().emit('BTCUSDT', '65000', now());
     socket().emit('ETHUSDT', '3200', now());
-    socket().emit('TONUSDT', '5.5', now());
     vi.advanceTimersByTime(500);
 
     expect(store.quoteOf('btc')?.value).toBe(65000);
     expect(store.quoteOf('eth')?.value).toBe(3200);
-    expect(store.quoteOf('ton')?.value).toBe(5.5);
   });
 
   it('битый кадр не роняет стрим: следующий валидный обрабатывается', () => {
@@ -145,9 +143,9 @@ describe('BinanceWsService', () => {
     vi.advanceTimersByTime(BACKOFF_BASE_MS); // reconnect
     expect(MockSocket.instances).toHaveLength(2);
 
-    socket().emit('TONUSDT', '6.1', now());
+    socket().emit('ETHUSDT', '3201', now());
     vi.advanceTimersByTime(500);
-    expect(store.quoteOf('ton')?.value).toBe(6.1);
+    expect(store.quoteOf('eth')?.value).toBe(3201);
   });
 
   it('закрытие сокета тоже ведёт к reconnect', () => {

@@ -1,0 +1,68 @@
+---
+- name: Point the replacement master monitoring agent at its local Loki
+  hosts: migration
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Refuse to run against the old production master
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname not in (groups['master'] | default([]))
+        fail_msg: >-
+          migration-monitoring-agents must target the replacement host while
+          the old host is still the inventory master.
+
+    - name: Allow public Grafana access
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ monitoring_grafana_port | default(3000) | string }}"
+        proto: tcp
+
+    - name: Allow workers to push logs to replacement Loki
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ monitoring_loki_port | default(3100) | string }}"
+        proto: tcp
+        from_ip: "{{ hostvars[item].ansible_host | default(item) }}"
+      loop: "{{ groups['workers'] | default([]) }}"
+
+  roles:
+    - role: monitoring_agent
+      vars:
+        monitoring_loki_push_url: >-
+          http://host.docker.internal:{{ monitoring_loki_port | default(3100) }}/loki/api/v1/push
+        monitoring_agent_role: master
+        monitoring_agent_host_label: "{{ (groups['master'] | default([]) | first) | default(inventory_hostname) }}"
+        monitoring_node_exporter_use_host_network: false
+        monitoring_agent_attach_remnawave_network: true
+        monitoring_log_collector: alloy
+
+- name: Point workers at replacement Loki and permit replacement Prometheus
+  hosts: workers
+  become: true
+  gather_facts: false
+  serial: 1
+
+  pre_tasks:
+    - name: Require exactly one replacement host
+      ansible.builtin.assert:
+        that:
+          - groups['migration'] | default([]) | length == 1
+        fail_msg: migration inventory must contain exactly one replacement host.
+
+    - name: Allow replacement Prometheus to scrape node exporter
+      ansible.builtin.ufw:
+        rule: allow
+        port: "{{ monitoring_node_exporter_port | default(9100) | string }}"
+        proto: tcp
+        from_ip: >-
+          {{ hostvars[(groups['migration'] | first)].ansible_host | default(groups['migration'] | first) }}
+
+  roles:
+    - role: monitoring_agent
+      when: enable_monitoring | default(false) | bool
+      vars:
+        monitoring_loki_push_url: >-
+          http://{{ hostvars[(groups['migration'] | first)].ansible_host | default(groups['migration'] | first) }}:{{ monitoring_loki_port | default(3100) }}/loki/api/v1/push
+        monitoring_agent_role: worker

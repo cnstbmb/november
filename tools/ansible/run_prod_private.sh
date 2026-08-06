@@ -53,7 +53,18 @@ preload_yubikey_key() {
 
   echo "YubiKey detected: loading PKCS#11 key into ssh-agent (PIN may be requested)..."
   if ! ssh-add -s "${provider}" < /dev/tty; then
-    echo "Warning: failed to preload YubiKey key. Continuing without preload."
+    echo "Warning: ssh-agent refused the YubiKey PKCS#11 provider."
+    echo "Falling back to an SSH ControlMaster warmup (PIN may be requested)..."
+
+    local warmup_cmd=("${ROOT_DIR}/tools/ansible/warmup_prod_private.sh")
+    if [ -n "${LIMIT_TARGET}" ]; then
+      warmup_cmd+=(--limit "${LIMIT_TARGET}")
+    fi
+
+    if ! "${warmup_cmd[@]}"; then
+      echo "Error: YubiKey ControlMaster warmup failed."
+      return 1
+    fi
   fi
 }
 
@@ -64,7 +75,7 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
-  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | remnawave-panel | remnashop | adguard-home | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | remnawave-panel | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -85,6 +96,12 @@ resolve_playbook() {
     remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
     remnashop) echo "${ROOT_DIR}/infra/ansible/playbooks/remnashop.yml" ;;
     adguard-home) echo "${ROOT_DIR}/infra/ansible/playbooks/adguard-home.yml" ;;
+    migration-prepare) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-prepare.yml" ;;
+    migration-node) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-node.yml" ;;
+    migration-socks5-allow) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-socks5-allow.yml" ;;
+    migration-backups) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-backups.yml" ;;
+    migration-restic) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-restic.yml" ;;
+    migration-monitoring-agents) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-monitoring-agents.yml" ;;
     *) echo "${value}" ;;
   esac
 }

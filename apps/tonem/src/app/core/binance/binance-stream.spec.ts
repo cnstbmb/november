@@ -10,23 +10,22 @@ import {
 } from './binance-stream';
 
 describe('binanceMapping / combinedStreamUrl', () => {
-  it('строит combined-URL из реестра (btc/eth/ton)', () => {
+  it('строит combined-URL только из активных Binance-пар (btc/eth)', () => {
     const mapping = binanceMapping();
     expect(mapping).toEqual([
       { id: 'btc', symbol: 'BTCUSDT' },
       { id: 'eth', symbol: 'ETHUSDT' },
-      { id: 'ton', symbol: 'TONUSDT' },
     ]);
     expect(combinedStreamUrl(mapping)).toBe(
       'wss://stream.binance.com:9443/stream?streams=' +
-        'btcusdt@miniTicker/ethusdt@miniTicker/tonusdt@miniTicker',
+        'btcusdt@miniTicker/ethusdt@miniTicker',
     );
   });
 
   it('symbolToIdMap маппит символ на id инструмента', () => {
     const map = symbolToIdMap(binanceMapping());
     expect(map.get('BTCUSDT')).toBe('btc');
-    expect(map.get('TONUSDT')).toBe('ton');
+    expect(map.get('TONUSDT')).toBeUndefined();
     expect(map.get('DOGEUSDT')).toBeUndefined();
   });
 });

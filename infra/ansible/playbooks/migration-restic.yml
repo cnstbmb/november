@@ -1,0 +1,50 @@
+---
+- name: Connect the replacement master to the existing external Restic repository
+  hosts: migration
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Refuse to run against the old production master
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname not in (groups['master'] | default([]))
+        fail_msg: >-
+          migration-restic must target only the replacement host before inventory promotion.
+
+  tasks:
+    - name: Configure external Restic backups for the replacement master
+      ansible.builtin.include_role:
+        name: backups
+      vars:
+        backup_remnawave_pg_dump_enabled: false
+        backup_initialize_repository: false
+        backup_additional_paths:
+          - /var/backups/november
+          - /opt/remnawave-panel
+          - /opt/remnawave-node
+          - /opt/tonem
+          - /opt/remnashop
+          - /opt/adguardhome
+          - /opt/monitoring
+          - /etc/letsencrypt
+
+    - name: Run the first external Restic backup
+      ansible.builtin.command: /usr/local/bin/restic-backup.sh
+      register: migration_restic_backup_run
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Verify Restic snapshots for the replacement host
+      ansible.builtin.command: restic snapshots --host {{ inventory_hostname }} --latest 1
+      environment: >-
+        {{
+          {
+            'RESTIC_REPOSITORY': backup_target,
+            'RESTIC_PASSWORD_FILE': '/etc/restic/credentials'
+          } | combine(backup_env | default({}))
+        }}
+      register: migration_restic_snapshot_check
+      changed_when: false
+      when: not ansible_check_mode
+

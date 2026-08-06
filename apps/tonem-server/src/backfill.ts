@@ -21,11 +21,25 @@ const CREATE_MANY_BATCH_SIZE = 1000;
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 const HISTORY_START_GRACE_MS = 10 * DAY_MS;
+// Binance reports TONUSDT=BREAK; this ticker closeTime is its last real trade.
+const BINANCE_HISTORY_END: Readonly<Record<string, number>> = {
+  TONUSDT: 1_783_408_319_314,
+};
 
 export interface ResolutionRange {
   kind: 'coarse' | 'fine';
   from: Date;
   to: Date;
+}
+
+export function binanceHistoryRange(
+  symbol: string,
+  range: ResolutionRange,
+): ResolutionRange | null {
+  const lastTrade = BINANCE_HISTORY_END[symbol];
+  if (lastTrade === undefined) return range;
+  const to = new Date(Math.min(range.to.getTime(), lastTrade + 1));
+  return range.from.getTime() < to.getTime() ? { ...range, to } : null;
 }
 
 export interface MoexCandleRequest {
@@ -502,18 +516,31 @@ async function backfillBinanceInstrument(
   if (!symbol) throw new Error('Missing Binance symbol');
 
   for (const range of ranges) {
-    const resolution = backfillResolution('binance', range.kind);
+    const availableRange = binanceHistoryRange(symbol, range);
+    if (!availableRange) continue;
+    const resolution = backfillResolution('binance', availableRange.kind);
     const interval = String(resolution.interval);
     const fetched = await fetchAllBinanceKlines(
-      { symbol, interval, intervalMs: resolution.intervalMs, from: range.from, to: range.to },
+      {
+        symbol,
+        interval,
+        intervalMs: resolution.intervalMs,
+        from: availableRange.from,
+        to: availableRange.to,
+      },
       dependencies.fetchJson,
     );
-    const eligible = filterCandles(fetched, range.from, range.to, dependencies.now());
+    const eligible = filterCandles(
+      fetched,
+      availableRange.from,
+      availableRange.to,
+      dependencies.now(),
+    );
     validateCandleCoverage(
       `Binance ${symbol} ${interval}`,
       eligible,
-      range.from,
-      range.to,
+      availableRange.from,
+      availableRange.to,
       resolution.intervalMs + 1_000,
     );
     const persistence = await persistCandles(
@@ -524,7 +551,7 @@ async function backfillBinanceInstrument(
     );
     mergeProgress(progress, { fetched: fetched.length, ...persistence });
     dependencies.log(
-      `  ${instrument.id} ${interval} ${range.from.toISOString()}..${range.to.toISOString()}`
+      `  ${instrument.id} ${interval} ${availableRange.from.toISOString()}..${availableRange.to.toISOString()}`
         + `: fetched=${fetched.length} inserted=${persistence.inserted}`
         + ` skipped=${persistence.skipped}`,
     );

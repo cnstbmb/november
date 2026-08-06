@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { DestroyRef, Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { EMPTY, Observable, Subject, catchError, finalize, forkJoin, map, switchMap, tap } from 'rxjs';
 import { BinanceWsService } from '../binance/binance-ws.service';
+import { KrakenWsService } from '../kraken/kraken-ws.service';
 import { liveInstruments } from '../instruments/instrument.registry';
 import { MoodEngine, MoodSnapshot } from '../mood/mood.engine';
 import { Quote, QuoteSource } from '../rates/quote.model';
@@ -102,6 +103,7 @@ export class TimeMachineService {
   private readonly store = inject(RatesStore);
   private readonly poller = inject(RatesPoller);
   private readonly binance = inject(BinanceWsService);
+  private readonly kraken = inject(KrakenWsService);
   private readonly mood = inject(MoodEngine);
   private readonly platform = inject(VIEW_SETTINGS_PLATFORM);
   private readonly apiBase = inject(TIME_MACHINE_API_BASE).replace(/\/$/, '');
@@ -132,6 +134,7 @@ export class TimeMachineService {
       removeHashListener();
       this.poller.stop();
       this.binance.stop();
+      this.kraken.stop();
       this.mood.stop();
     });
 
@@ -179,6 +182,7 @@ export class TimeMachineService {
 
     this.poller.stop();
     this.binance.stop();
+    this.kraken.stop();
     this.mood.stop();
     this.targetSignal.set(new Date(target));
     this.loadingSignal.set(true);
@@ -230,7 +234,9 @@ export class TimeMachineService {
   private toHistoricalQuotes(current: HistoricalSnapshot): Quote[] {
     return liveInstruments().map((instrument) => {
       const entry = current[instrument.id] ?? null;
-      const source: QuoteSource = instrument.market === 'crypto' ? 'binance' : 'moex';
+      const source: QuoteSource = instrument.kraken
+        ? 'kraken'
+        : instrument.market === 'crypto' ? 'binance' : 'moex';
       return {
         instrumentId: instrument.id,
         value: entry?.value ?? null,
@@ -259,6 +265,7 @@ export class TimeMachineService {
     this.mood.start();
     this.poller.start();
     this.binance.start();
+    this.kraken.start();
     if (writeUrl) this.replaceUrl(null);
   }
 

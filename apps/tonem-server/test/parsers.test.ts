@@ -4,6 +4,7 @@ import {
   parseCurrencyBatch,
   parseFuturesBatch,
   parseIndexQuote,
+  parseKrakenTicker,
 } from '../src/parsers';
 
 const TS = new Date('2026-07-28T19:15:00.000Z');
@@ -153,5 +154,32 @@ describe('parseBinancePrices', () => {
   it('tolerates non-array payloads', () => {
     expect(parseBinancePrices({}, mapping, TS)).toEqual([]);
     expect(parseBinancePrices(null, mapping, TS)).toEqual([]);
+  });
+});
+
+describe('parseKrakenTicker', () => {
+  const mapping = [{ id: 'ton', pair: 'TONUSD' }];
+
+  it('maps an online pair last trade into a fresh Kraken tick', () => {
+    const ticks = parseKrakenTicker({
+      pair: 'TONUSD',
+      status: 'online',
+      ticker: { error: [], result: { TONUSD: { c: ['1.3780000', '83.77500'] } } },
+    }, mapping, TS);
+
+    expect(ticks).toEqual([{
+      instrument: 'ton',
+      ts: TS,
+      value: 1.378,
+      meta: { source: 'kraken', pair: 'TONUSD' },
+    }]);
+  });
+
+  it('rejects a paused pair even when the REST ticker still has a last price', () => {
+    expect(parseKrakenTicker({
+      pair: 'TONUSD',
+      status: 'cancel_only',
+      ticker: { error: [], result: { TONUSD: { c: ['1.6000000', '1'] } } },
+    }, mapping, TS)).toEqual([]);
   });
 });

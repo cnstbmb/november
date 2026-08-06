@@ -1,5 +1,6 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
 import { Subscription, catchError, forkJoin, of } from 'rxjs';
+import { BackendLatestService } from '../backend/backend-latest.service';
 import { INSTRUMENTS, currencySecids } from '../instruments/instrument.registry';
 import { moexAssetCode, moexSecid } from '../instruments/instrument.model';
 import { MoexIssService } from '../moex/moex-iss.service';
@@ -51,6 +52,7 @@ export class RatesPoller {
   private readonly moex = inject(MoexIssService);
   private readonly cbr = inject(CbrService);
   private readonly store = inject(RatesStore);
+  private readonly backend = inject(BackendLatestService);
   private readonly destroyRef = inject(DestroyRef);
 
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -90,7 +92,8 @@ export class RatesPoller {
         .fetchIndex(indexInstrument()?.secid ?? 'IMOEX')
         .pipe(catchError(() => of(null))),
       futures: this.moex.fetchFuturesBoard().pipe(catchError(() => of(null))),
-    }).subscribe(({ currency, index, futures }) => {
+      backend: this.backend.fetchKrakenQuotes().pipe(catchError(() => of([]))),
+    }).subscribe(({ currency, index, futures, backend }) => {
       this.request = null;
       // Ответ от старого поколения после stop/start не должен трогать store.
       if (!this.running || generation !== this.generation) return;
@@ -114,6 +117,16 @@ export class RatesPoller {
       if (futures !== null && assets.length > 0) {
         this.store.apply(parseFuturesBatch(futures, assets, now), 'moex', now);
       }
+
+      const fallback = backend.filter((quote) => {
+        const current = this.store.quoteOf(quote.instrumentId);
+        if (!current || current.source !== 'kraken' || current.value === null) return true;
+        const currentTime = current.systime?.getTime() ?? Number.NEGATIVE_INFINITY;
+        const fallbackTime = quote.systime?.getTime() ?? Number.NEGATIVE_INFINITY;
+        return current.status === 'unavailable' || current.status === 'stale'
+          || fallbackTime > currentTime;
+      });
+      if (fallback.length > 0) this.store.apply(fallback, 'kraken', now);
 
       if (this.running && generation === this.generation) {
         this.timer = setTimeout(

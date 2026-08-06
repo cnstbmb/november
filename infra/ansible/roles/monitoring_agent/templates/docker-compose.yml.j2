@@ -24,6 +24,25 @@ services:
       - /sys:/host/sys:ro
       - /:/rootfs:ro,rslave
 
+{% if monitoring_log_collector == 'alloy' %}
+  alloy:
+    image: {{ monitoring_alloy_image }}
+    container_name: monitoring-alloy
+    restart: unless-stopped
+    user: "0:0"
+    command:
+      - run
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "--storage.path=/var/lib/alloy/data"
+      - /etc/alloy/config.alloy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - alloy-data:/var/lib/alloy/data
+      - /var/log:/var/log:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+{% else %}
   promtail:
     image: {{ monitoring_promtail_image }}
     container_name: monitoring-promtail
@@ -38,9 +57,14 @@ services:
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+{% endif %}
 
 volumes:
+{% if monitoring_log_collector == 'alloy' %}
+  alloy-data:
+{% else %}
   promtail-positions:
+{% endif %}
 
 {% if monitoring_agent_attach_remnawave_network | default(false) | bool and not (monitoring_node_exporter_use_host_network | default(true) | bool) %}
 networks:

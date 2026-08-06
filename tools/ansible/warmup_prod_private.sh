@@ -7,6 +7,7 @@ ANSIBLE_CONFIG_DEFAULT="${ROOT_DIR}/ansible.cfg"
 LOCAL_TMP_DEFAULT="${ROOT_DIR}/.tmp/ansible-local"
 CONNECT_TIMEOUT=10
 LIMIT_TARGET=""
+CONTROL_PATH_DEFAULT="${HOME}/.ssh/S.%r@%h:%p"
 
 usage() {
   cat <<EOF
@@ -161,6 +162,9 @@ while IFS=$'\t' read -r host_name host_user host_addr host_port; do
     -o BatchMode=no \
     -o KbdInteractiveAuthentication=yes \
     -o ConnectTimeout="${CONNECT_TIMEOUT}" \
+    -o ControlMaster=auto \
+    -o ControlPersist=10m \
+    -o ControlPath="${CONTROL_PATH_DEFAULT}" \
     -p "${host_port}" \
     "${host_user}@${host_addr}" \
     "exit"; then

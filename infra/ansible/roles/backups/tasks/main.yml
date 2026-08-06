@@ -71,6 +71,7 @@
   when:
     - not ansible_check_mode
     - restic_repository_missing | bool
+    - backup_initialize_repository | bool
   changed_when: restic_init.rc == 0
   failed_when: >-
     restic_init.rc != 0 and
@@ -82,6 +83,18 @@
         'RESTIC_PASSWORD_FILE': '/etc/restic/credentials'
       } | combine(backup_env | default({}))
     }}
+
+- name: Refuse to initialize a missing Restic repository
+  ansible.builtin.assert:
+    that:
+      - not (restic_repository_missing | bool)
+    fail_msg: >-
+      The configured Restic repository is not accessible from this host and
+      backup_initialize_repository is false. Refusing to create a replacement
+      repository; verify the external mount or backend credentials.
+  when:
+    - not ansible_check_mode
+    - not (backup_initialize_repository | bool)
 
 - name: Install backup script
   ansible.builtin.template:

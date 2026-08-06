@@ -18,6 +18,12 @@ export interface BinanceRef {
   readonly symbol: string;
 }
 
+/** Kraken pair names differ between REST (TONUSD) and WebSocket (TON/USD). */
+export interface KrakenRef {
+  readonly pair: string;
+  readonly wsSymbol: string;
+}
+
 /** Размещение в UI: live — живой тик в ленте; derived — производная, считается на лету */
 export type Placement = 'live' | 'derived';
 
@@ -47,6 +53,8 @@ export interface Instrument {
   readonly moex?: MoexRef;
   /** Binance-источник, если инструмент — крипта */
   readonly binance?: BinanceRef;
+  /** Active Kraken source used when the corresponding Binance pair is paused. */
+  readonly kraken?: KrakenRef;
   /** размещение: live (сырой тик) или derived (производная) */
   readonly placement: Placement;
   /** код валюты в daily_json ЦБ (фолбэк), если применимо */

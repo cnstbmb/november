@@ -7,7 +7,7 @@ export RESTIC_PASSWORD_FILE=/etc/restic/credentials
 export {{ env_name }}={{ env_value | quote }}
 {% endfor %}
 
-backup_paths="{{ backup_paths | join(' ') }}"
+backup_paths="{{ ((backup_paths | default([])) + (backup_additional_paths | default([]))) | unique | join(' ') }}"
 
 if [ -x /usr/local/bin/restic-backup-prepare.sh ]; then
   /usr/local/bin/restic-backup-prepare.sh

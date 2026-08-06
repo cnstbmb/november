@@ -8,7 +8,7 @@ const ROOT = path.resolve(__dirname, "../../..");
 const TOKEN_ENV = path.join(ROOT, ".private/ansible/prod/remnashop/.env");
 const API_BASE = process.env.REMNAWAVE_API_BASE || "https://panel.moscow.himenkov.ru/api";
 const PROFILE_UUID = "ba4464ac-3ca1-4599-8047-53300afe0d43";
-const NODE_UUID = "fd23ab8a-e142-42f9-9cef-000656cf7eb1";
+const NODE_UUID = "51a6f00b-0b03-4228-926c-8a031ba88c65";
 const XHTTP_TAG = "VLESS_XHTTP_MOSCOW";
 const XHTTP_HOST = "moscow.himenkov.ru";
 const XHTTP_PATH = "/fluegergeheimer-xhttp/";
@@ -44,7 +44,7 @@ const MOSCOW_SERVICE_DOMAINS = [
   "domain:bot.moscow.himenkov.ru",
   "domain:moscow.himenkov.ru",
 ];
-const MOSCOW_SELF_IP = "5.42.111.142";
+const MOSCOW_SELF_IP = "193.124.64.187";
 
 function readToken() {
   if (process.env.REMNAWAVE_API_TOKEN) return process.env.REMNAWAVE_API_TOKEN;

@@ -1,0 +1,64 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+loki.write "local" {
+  endpoint {
+    url = "{{ monitoring_loki_push_url }}"
+  }
+}
+
+discovery.docker "linux" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+discovery.relabel "docker_logs" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "compose_service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.linux.targets
+  labels        = {
+    job  = "docker",
+    host = "{{ monitoring_agent_host_label if (monitoring_agent_host_label | default('') | length > 0) else inventory_hostname }}",
+    role = "{{ monitoring_agent_role if (monitoring_agent_role | default('') | length > 0) else ('master' if inventory_hostname in (groups['master'] | default([])) else 'worker') }}",
+  }
+  relabel_rules = discovery.relabel.docker_logs.rules
+  forward_to    = [loki.write.local.receiver]
+}
+
+loki.source.file "varlogs" {
+  targets = [
+    {
+      __path__ = "/var/log/*.log",
+      job      = "varlogs",
+      host     = "{{ monitoring_agent_host_label if (monitoring_agent_host_label | default('') | length > 0) else inventory_hostname }}",
+      role     = "{{ monitoring_agent_role if (monitoring_agent_role | default('') | length > 0) else ('master' if inventory_hostname in (groups['master'] | default([])) else 'worker') }}",
+    },
+  ]
+  forward_to = [loki.write.local.receiver]
+
+  file_match {
+    enabled     = true
+    sync_period = "10s"
+  }
+}

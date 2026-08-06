@@ -17,7 +17,7 @@ firewall_master_tcp_ports:
 # Stubby defaults to AdGuard DNS-over-TLS on the first inventory host in group `master`.
 # It uses master's ansible_host and first certbot domain unless overridden below.
 # stubby_manage_config: true
-# stubby_upstream_address: "########" # optional manual override, e.g. 5.42.111.142
+# stubby_upstream_address: "########" # optional manual override, e.g. 193.124.64.187
 # stubby_tls_auth_name: "########" # optional manual override, e.g. moscow.example.com
 # stubby_tls_port: 953
 

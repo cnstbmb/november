@@ -12,7 +12,9 @@ export const BACKOFF_MAX_MS = 30_000;
 
 /** Сопоставление инструментов с Binance-источником: id ↔ торговая пара. */
 export function binanceMapping(): { id: string; symbol: string }[] {
-  return INSTRUMENTS.filter((i) => i.binance).map((i) => ({ id: i.id, symbol: i.binance!.symbol }));
+  return INSTRUMENTS
+    .filter((i) => i.binance && !i.kraken)
+    .map((i) => ({ id: i.id, symbol: i.binance!.symbol }));
 }
 
 /** Карта "BTCUSDT" → "btc" для парсера. */

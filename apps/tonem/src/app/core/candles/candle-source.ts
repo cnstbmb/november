@@ -7,7 +7,7 @@ import { Instrument, MarketKind } from '../instruments/instrument.model';
  * Рынок крипты (24/7) окна не имеет — null, всегда открыт.
  */
 export function moexMarketKind(instrument: Instrument): MarketKind | null {
-  if (instrument.binance) return null; // crypto: ночного правила нет
+  if (instrument.binance || instrument.kraken) return null; // crypto: ночного правила нет
   return instrument.market; // fx | futures | index — у всех есть окно
 }
 
@@ -28,7 +28,8 @@ export type CandleSource =
       /** assetCode для futures (BR, WHEAT, …), иначе null */
       readonly assetCode: string | null;
     }
-  | { readonly kind: 'binance'; readonly symbol: string };
+  | { readonly kind: 'binance'; readonly symbol: string }
+  | { readonly kind: 'kraken'; readonly pair: string };
 
 /**
  * Выбирает источник свечей по инструменту.
@@ -37,6 +38,9 @@ export type CandleSource =
  * тем же правилом ближайшей экспирации, что и котировки.
  */
 export function candleSource(instrument: Instrument): CandleSource | null {
+  if (instrument.kraken) {
+    return { kind: 'kraken', pair: instrument.kraken.pair };
+  }
   if (instrument.binance) {
     return { kind: 'binance', symbol: instrument.binance.symbol };
   }

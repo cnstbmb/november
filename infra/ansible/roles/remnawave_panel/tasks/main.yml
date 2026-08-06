@@ -227,6 +227,31 @@
   register: remnawave_subscription_page_env_template
   when: remnawave_subscription_page_enabled_effective
 
+- name: Check existing Remnawave panel nginx config
+  ansible.builtin.stat:
+    path: "{{ remnawave_panel_nginx_conf_file_effective }}"
+  register: remnawave_panel_existing_nginx_stat
+
+- name: Read existing Remnawave panel nginx config for managed extensions
+  ansible.builtin.slurp:
+    src: "{{ remnawave_panel_nginx_conf_file_effective }}"
+  register: remnawave_panel_existing_nginx
+  no_log: true
+  when: remnawave_panel_existing_nginx_stat.stat.exists
+
+- name: Preserve existing Tonem nginx server blocks
+  ansible.builtin.set_fact:
+    remnawave_panel_preserved_tonem_block: >-
+      {{
+        (
+          (remnawave_panel_existing_nginx.content | b64decode)
+          | regex_search('(?s)# BEGIN TONEM SERVER BLOCKS.*?# END TONEM SERVER BLOCKS')
+        )
+        | default('', true)
+      }}
+  no_log: true
+  when: remnawave_panel_existing_nginx_stat.stat.exists
+
 - name: Render Remnawave panel nginx config
   ansible.builtin.template:
     src: nginx.conf.j2

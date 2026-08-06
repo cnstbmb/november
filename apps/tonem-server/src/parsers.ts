@@ -186,3 +186,28 @@ export function parseBinancePrices(
   }
   return out;
 }
+
+/** Kraken REST ticker guarded by the AssetPairs status from QuoteSourcesService. */
+export function parseKrakenTicker(
+  json: unknown,
+  mapping: readonly { id: string; pair: string }[],
+  ts: Date,
+): TickInput[] {
+  if (!json || typeof json !== 'object') return [];
+  const envelope = json as {
+    pair?: unknown;
+    status?: unknown;
+    ticker?: { error?: unknown; result?: Record<string, { c?: unknown }> } | null;
+  };
+  if (envelope.status !== 'online' || typeof envelope.pair !== 'string') return [];
+  if (!Array.isArray(envelope.ticker?.error) || envelope.ticker.error.length > 0) return [];
+
+  const id = mapping.find(({ pair }) => pair === envelope.pair)?.id;
+  const row = envelope.ticker?.result?.[envelope.pair];
+  const close = Array.isArray(row?.c) ? row.c[0] : undefined;
+  const value = typeof close === 'string' ? Number(close) : num(close);
+  if (!id || value === null || !Number.isFinite(value)) return [];
+
+  const tick = makeTick(id, value, ts, 'kraken', { pair: envelope.pair });
+  return tick ? [tick] : [];
+}

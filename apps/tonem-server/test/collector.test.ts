@@ -35,8 +35,12 @@ function makeSources(): QuoteSourcesService {
     fetchBinancePrices: vi.fn().mockResolvedValue([
       { symbol: 'BTCUSDT', price: '119500.12' },
       { symbol: 'ETHUSDT', price: '3900.55' },
-      { symbol: 'TONUSDT', price: '3.41' },
     ]),
+    fetchKrakenTicker: vi.fn().mockResolvedValue({
+      pair: 'TONUSD',
+      status: 'online',
+      ticker: { error: [], result: { TONUSD: { c: ['1.378', '83.775'] } } },
+    }),
   } as unknown as QuoteSourcesService;
 }
 
@@ -56,7 +60,8 @@ describe('CollectorService', () => {
     now.setSeconds(37, 123); // ensure normalization to minute start
     await svc.collectOnce(now);
 
-    expect(sources.fetchBinancePrices).toHaveBeenCalledWith(['BTCUSDT', 'ETHUSDT', 'TONUSDT']);
+    expect(sources.fetchBinancePrices).toHaveBeenCalledWith(['BTCUSDT', 'ETHUSDT']);
+    expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('TONUSD');
     expect(sources.fetchCurrencyBatch).toHaveBeenCalled();
     expect(sources.fetchIndex).toHaveBeenCalledWith('IMOEX');
     expect(sources.fetchFuturesBoard).toHaveBeenCalled();
@@ -64,6 +69,7 @@ describe('CollectorService', () => {
     const ticks = store.saveTicks.mock.calls[0][0] as { instrument: string; ts: Date }[];
     const instruments = ticks.map((t) => t.instrument);
     expect(instruments).toContain('btc');
+    expect(instruments).toContain('ton');
     expect(instruments).toContain('usdrub');
     expect(instruments).toContain('imoex');
     expect(instruments).toContain('brent');
@@ -82,6 +88,7 @@ describe('CollectorService', () => {
     await svc.collectOnce(new Date(WEEKEND));
 
     expect(sources.fetchBinancePrices).toHaveBeenCalled();
+    expect(sources.fetchKrakenTicker).toHaveBeenCalled();
     expect(sources.fetchCurrencyBatch).not.toHaveBeenCalled();
     expect(sources.fetchIndex).not.toHaveBeenCalled();
     expect(sources.fetchFuturesBoard).not.toHaveBeenCalled();

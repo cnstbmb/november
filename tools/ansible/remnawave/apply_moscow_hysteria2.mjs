@@ -8,12 +8,12 @@ const ROOT = path.resolve(__dirname, "../../..");
 const TOKEN_ENV = path.join(ROOT, ".private/ansible/prod/remnashop/.env");
 const API_BASE = process.env.REMNAWAVE_API_BASE || "https://panel.moscow.himenkov.ru/api";
 const PROFILE_UUID = "ba4464ac-3ca1-4599-8047-53300afe0d43";
-const NODE_UUID = "fd23ab8a-e142-42f9-9cef-000656cf7eb1";
+const NODE_UUID = "51a6f00b-0b03-4228-926c-8a031ba88c65";
 const TAG = "HYSTERIA2_MOSCOW";
 const HOST_REMARK = "MOSCOW HYSTERIA2";
 const PUBLIC_SQUAD_NAME = "Public Squad";
 const MOSCOW_HOST = "moscow.himenkov.ru";
-const MOSCOW_PUBLIC_IP = "5.42.111.142";
+const MOSCOW_PUBLIC_IP = "193.124.64.187";
 const HYSTERIA_PORT = Number(process.env.REMNAWAVE_MOSCOW_HYSTERIA2_PORT || 443);
 const DEFAULT_OUTBOUND = "GRPC_TO_EXIT";
 const SHARED_MOSCOW_INBOUNDS = [
@@ -138,7 +138,6 @@ function shouldShareMoscowRule(rule) {
   if (!hasAnyMoscowClientTag(rule)) return false;
   if (rule.outboundTag === "BLOCK") return true;
   if (rule.outboundTag !== "IPv4") return false;
-  if (Array.isArray(rule.domain) && rule.domain.includes("geosite:youtube")) return true;
   if (Array.isArray(rule.domain) && MOSCOW_SERVICE_DOMAINS.every((domain) => rule.domain.includes(domain))) {
     return true;
   }
@@ -164,6 +163,9 @@ function ensureInboundAndRoutes(config) {
   if (!Array.isArray(config.routing?.rules)) throw new Error("MASTER_NODE profile has no routing.rules array");
 
   config.inbounds = config.inbounds.filter((inbound) => inbound.tag !== TAG);
+  config.routing.rules = config.routing.rules.filter(
+    (rule) => !Array.isArray(rule.domain) || !rule.domain.includes("geosite:youtube"),
+  );
   const xhttpIndex = config.inbounds.findIndex((inbound) => inbound.tag === "VLESS_XHTTP_MOSCOW");
   const insertIndex = xhttpIndex >= 0 ? xhttpIndex + 1 : config.inbounds.length;
   config.inbounds.splice(insertIndex, 0, hysteriaInbound());

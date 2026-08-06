@@ -7,9 +7,11 @@ import { candleSource, moexMarketKind } from './candle-source';
 import { decideSession } from './candle-session';
 import { parseMoexCandles } from './moex-candles.parser';
 import { parseBinanceKlines } from './binance-klines.parser';
+import { parseKrakenOhlc } from './kraken-ohlc.parser';
 
 const ISS_BASE = 'https://iss.moex.com/iss';
 const BINANCE_BASE = 'https://api.binance.com/api/v3';
+const KRAKEN_BASE = 'https://api.kraken.com/0/public';
 
 /**
  * 10-минутные свечи MOEX ISS (достаточно плотно для спарклайна, не тяжело).
@@ -42,6 +44,11 @@ export class CandlesService {
 
     if (source.kind === 'binance') {
       return this.fetchBinance(source.symbol).pipe(
+        map((candles) => ({ candles, session: 'current' as const })),
+      );
+    }
+    if (source.kind === 'kraken') {
+      return this.fetchKraken(source.pair).pipe(
         map((candles) => ({ candles, session: 'current' as const })),
       );
     }
@@ -102,6 +109,15 @@ export class CandlesService {
       })
       .pipe(
         map((json) => parseBinanceKlines(json)),
+        catchError(() => of([])),
+      );
+  }
+
+  private fetchKraken(pair: string): Observable<Candle[]> {
+    return this.http
+      .get(`${KRAKEN_BASE}/OHLC`, { params: { pair, interval: '5' } })
+      .pipe(
+        map(parseKrakenOhlc),
         catchError(() => of([])),
       );
   }

@@ -1,4 +1,4 @@
-export type QuoteSource = 'moex' | 'cbr' | 'binance';
+export type QuoteSource = 'moex' | 'cbr' | 'binance' | 'kraken';
 
 /**
  * live    — рынок торгуется, данные свежие

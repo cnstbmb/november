@@ -6,6 +6,7 @@ import {
   futuresAssets,
   indexSecids,
   instrumentsByMarket,
+  krakenPairs,
 } from './instruments';
 import { anyMoexMarketOpen, isTradingNow } from './market-hours';
 import {
@@ -13,6 +14,7 @@ import {
   parseCurrencyBatch,
   parseFuturesBatch,
   parseIndexQuote,
+  parseKrakenTicker,
   TickInput,
 } from './parsers';
 import { QuoteSourcesService } from './quote-sources';
@@ -68,6 +70,15 @@ export class CollectorService {
         ticks.push(...parseBinancePrices(json, mapping, ts));
       } catch (err) {
         this.logger.warn(`binance fetch failed: ${(err as Error).message}`);
+      }
+
+      for (const mapping of krakenPairs()) {
+        try {
+          const json = await this.sources.fetchKrakenTicker(mapping.pair);
+          ticks.push(...parseKrakenTicker(json, [mapping], ts));
+        } catch (err) {
+          this.logger.warn(`kraken ${mapping.pair} fetch failed: ${(err as Error).message}`);
+        }
       }
     }
 

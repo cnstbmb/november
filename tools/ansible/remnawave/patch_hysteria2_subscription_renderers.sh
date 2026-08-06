@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE="${REMNAWAVE_RENDERER_PATCH_REMOTE:-root@5.42.111.142}"
+REMOTE="${REMNAWAVE_RENDERER_PATCH_REMOTE:-root@193.124.64.187}"
 CONTAINER="${REMNAWAVE_RENDERER_PATCH_CONTAINER:-remnawave}"
 STAMP="$(date -u +%Y%m%d-%H%M%S)"
 REMOTE_BACKUP_DIR="/root/remnawave-hysteria2-renderers-${STAMP}"

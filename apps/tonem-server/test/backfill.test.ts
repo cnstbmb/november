@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BackfillDependencies,
   backfillResolution,
+  binanceHistoryRange,
   buildFuturesRollSchedule,
   fetchAllBinanceKlines,
   fetchAllMoexCandles,
@@ -87,6 +88,21 @@ describe('backfill range planning', () => {
     expect(planResolutionRanges(from, to, cutoff)).toEqual([
       { kind: 'fine', from, to },
     ]);
+  });
+
+  it('never backfills TONUSDT past the verified Binance trading break', () => {
+    const range = {
+      kind: 'fine' as const,
+      from: new Date('2026-07-01T00:00:00.000Z'),
+      to: new Date('2026-08-01T00:00:00.000Z'),
+    };
+    expect(binanceHistoryRange('TONUSDT', range)?.to.toISOString())
+      .toBe('2026-07-07T07:11:59.315Z');
+    expect(binanceHistoryRange('BTCUSDT', range)).toEqual(range);
+    expect(binanceHistoryRange('TONUSDT', {
+      ...range,
+      from: new Date('2026-07-08T00:00:00.000Z'),
+    })).toBeNull();
   });
 });
 

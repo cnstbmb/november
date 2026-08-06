@@ -1,0 +1,82 @@
+---
+- name: Allow the replacement master through the Amsterdam SOCKS5 proxy
+  hosts: workers
+  become: true
+  gather_facts: false
+  vars:
+    migration_socks5_host_ip: "109.234.34.227"
+    migration_socks5_client_ip: "193.124.64.187"
+    migration_socks5_config_path: "/etc/danted.conf"
+    migration_socks5_port: "1080"
+
+  tasks:
+    - name: Remove the obsolete migration rule appended after deny rules
+      ansible.builtin.blockinfile:
+        path: "{{ migration_socks5_config_path }}"
+        marker: "# {mark} ANSIBLE MANAGED NOVEMBER MIGRATION CLIENT"
+        state: absent
+        backup: true
+      notify: Restart Dante
+      when: ansible_host == migration_socks5_host_ip
+
+    - name: Add the replacement master before the Dante client deny rule
+      ansible.builtin.blockinfile:
+        path: "{{ migration_socks5_config_path }}"
+        marker: "# {mark} ANSIBLE MANAGED NOVEMBER MIGRATION CLIENT PASS"
+        insertbefore: '^client block \{'
+        block: |
+          client pass {
+            from: {{ migration_socks5_client_ip }}/32 to: 0.0.0.0/0
+            log: error connect disconnect
+          }
+        backup: true
+      notify: Restart Dante
+      when: ansible_host == migration_socks5_host_ip
+
+    - name: Add the replacement master before the Dante SOCKS deny rule
+      ansible.builtin.blockinfile:
+        path: "{{ migration_socks5_config_path }}"
+        marker: "# {mark} ANSIBLE MANAGED NOVEMBER MIGRATION SOCKS PASS"
+        insertbefore: '^socks block \{'
+        block: |
+          socks pass {
+            from: {{ migration_socks5_client_ip }}/32 to: 0.0.0.0/0
+            command: connect
+            log: error connect disconnect
+          }
+        backup: true
+      notify: Restart Dante
+      when: ansible_host == migration_socks5_host_ip
+
+    - name: Allow SOCKS5 ingress from the replacement master
+      community.general.ufw:
+        rule: allow
+        port: "{{ migration_socks5_port }}"
+        proto: tcp
+        from_ip: "{{ migration_socks5_client_ip }}"
+      when: ansible_host == migration_socks5_host_ip
+
+    - name: Flush Dante restart before verification
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify Dante is active
+      ansible.builtin.command: systemctl is-active danted
+      register: migration_dante_active
+      changed_when: false
+      when:
+        - ansible_host == migration_socks5_host_ip
+        - not ansible_check_mode
+
+    - name: Report the updated SOCKS5 host
+      ansible.builtin.debug:
+        msg: >-
+          SOCKS5 {{ migration_socks5_host_ip }}:{{ migration_socks5_port }}
+          allows {{ migration_socks5_client_ip }}.
+      when: ansible_host == migration_socks5_host_ip
+
+  handlers:
+    - name: Restart Dante
+      ansible.builtin.service:
+        name: danted
+        state: restarted
+      when: not ansible_check_mode

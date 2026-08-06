@@ -1,0 +1,99 @@
+- name: Prepare the replacement master without starting production services
+  hosts: migration
+  become: true
+  gather_facts: true
+
+  vars:
+    migration_prepare_directories_default:
+      - /opt/remnawave-panel
+      - /opt/remnawave-node
+      - /opt/tonem
+      - /opt/remnashop
+
+    # Keep the certificate names identical to the live Moscow installation so
+    # existing nginx templates can be reused during cutover.
+    migration_certificate_sets_default:
+      -
+        - moscow.himenkov.ru
+        - bot.moscow.himenkov.ru
+        - panel.moscow.himenkov.ru
+        - sub.moscow.himenkov.ru
+        - xhttp.moscow.himenkov.ru
+      -
+        - tonem.ru
+        - www.tonem.ru
+      -
+        - api.tonem.ru
+
+  pre_tasks:
+    - name: Refuse to run against a production master
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in (groups['migration'] | default([]))
+          - inventory_hostname not in (groups['master'] | default([]))
+        fail_msg: >-
+          migration-prepare must target a host in the migration group only.
+          Do not place the replacement host in master before cutover.
+
+    - name: Refuse stateful service activation during preparation
+      ansible.builtin.assert:
+        that:
+          - not (enable_remnawave_panel | default(false) | bool)
+          - not (enable_remnawave_node | default(false) | bool)
+          - not (enable_remnashop | default(false) | bool)
+          - not (enable_adguard | default(false) | bool)
+          - not (enable_monitoring | default(false) | bool)
+          - not (enable_backups | default(false) | bool)
+        fail_msg: >-
+          Stateful services must remain disabled on the migration target during
+          the preparation phase.
+
+    - name: Verify Docker is available
+      ansible.builtin.command: docker info
+      check_mode: false
+      changed_when: false
+
+  tasks:
+    - name: Ensure empty service directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop: >-
+        {{
+          migration_prepare_directories
+          | default(migration_prepare_directories_default)
+        }}
+
+    - name: Check the shared Remnawave Docker network
+      ansible.builtin.command: docker network inspect remnawave-network
+      check_mode: false
+      register: migration_remnawave_network
+      changed_when: false
+      failed_when: false
+
+    - name: Create the shared Remnawave Docker network
+      ansible.builtin.command: docker network create remnawave-network
+      when:
+        - not ansible_check_mode
+        - migration_remnawave_network.rc != 0
+      changed_when: true
+
+    - name: Issue staging certificates through DNS-01
+      ansible.builtin.include_role:
+        name: certbot
+      vars:
+        enable_certbot: true
+        certbot_reload_containers: []
+        certbot_domains: "{{ migration_certificate_domains }}"
+      loop: >-
+        {{
+          migration_certificate_sets
+          | default(migration_certificate_sets_default)
+        }}
+      loop_control:
+        loop_var: migration_certificate_domains
+        label: "{{ migration_certificate_domains | first }}"
+      when: migration_issue_certificates | default(true) | bool

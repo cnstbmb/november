@@ -16,15 +16,46 @@ DEFAULT_NODE_COMPOSE_DEST_FILE="/opt/remnawave-node/docker-compose.yml"
 usage() {
   cat <<EOF
 Usage:
-  tools/ansible/bootstrap_remnawave_node_env.sh
+  tools/ansible/bootstrap_remnawave_node_env.sh [--group master|workers|migration]
 
 Interactive helper:
-  - reads master/workers from ${INVENTORY_PATH}
+  - reads master/workers/migration from ${INVENTORY_PATH}
   - asks NODE_PORT and SECRET_KEY/SSL_CERT for each selected host
   - writes private env files in ${NODE_ENV_DIR}
   - writes host vars in ${HOST_VARS_DIR}/<host>/remnawave_node.yml
 EOF
 }
+
+TARGET_GROUP=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --group)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for --group"
+        exit 1
+      fi
+      TARGET_GROUP="$2"
+      case "${TARGET_GROUP}" in
+        master|workers|migration) ;;
+        *)
+          echo "Unsupported group: ${TARGET_GROUP}"
+          usage
+          exit 1
+          ;;
+      esac
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+done
 
 prompt() {
   local var_name="$1"
@@ -194,11 +225,6 @@ EOF
   fi
 }
 
-if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
-  usage
-  exit 0
-fi
-
 if ! command -v ansible-inventory >/dev/null 2>&1; then
   echo "ansible-inventory not found. Install Ansible first."
   exit 1
@@ -214,6 +240,7 @@ mkdir -p "${ROOT_DIR}/.tmp/ansible-local"
 
 master_hosts="$(extract_group_hosts master)"
 worker_hosts="$(extract_group_hosts workers)"
+migration_hosts="$(extract_group_hosts migration)"
 
 if [ ! -f "${ROOT_DIR}/${DEFAULT_NODE_COMPOSE_SRC}" ]; then
   echo "Remnawave node compose file not found: ${ROOT_DIR}/${DEFAULT_NODE_COMPOSE_SRC}"
@@ -230,7 +257,7 @@ echo "Both legacy and current formats are written (.env will contain APP_PORT/NO
 echo "Tip: for long secrets use ':clipboard' or '@/absolute/or/relative/path/to/secret.txt'."
 
 selected_hosts=""
-if [ -n "${master_hosts}" ]; then
+if [ -n "${master_hosts}" ] && { [ -z "${TARGET_GROUP}" ] || [ "${TARGET_GROUP}" = "master" ]; }; then
   prompt_bool include_master "Включить remnawave_node на master?" "${master_enabled_default}"
   if [ "${include_master}" = "true" ]; then
     ensure_group_vars "${MASTER_VARS_PATH}"
@@ -238,11 +265,22 @@ if [ -n "${master_hosts}" ]; then
   fi
 fi
 
-if [ -n "${worker_hosts}" ]; then
+if [ -n "${worker_hosts}" ] && { [ -z "${TARGET_GROUP}" ] || [ "${TARGET_GROUP}" = "workers" ]; }; then
   prompt_bool include_workers "Включить remnawave_node на workers?" "${workers_enabled_default}"
   if [ "${include_workers}" = "true" ]; then
     ensure_group_vars "${WORKERS_VARS_PATH}"
     selected_hosts="${selected_hosts}"$'\n'"${worker_hosts}"
+  fi
+fi
+
+if [ -n "${migration_hosts}" ] && { [ -z "${TARGET_GROUP}" ] || [ "${TARGET_GROUP}" = "migration" ]; }; then
+  migration_default="false"
+  if [ "${TARGET_GROUP}" = "migration" ]; then
+    migration_default="true"
+  fi
+  prompt_bool include_migration "Подготовить remnawave_node для migration?" "${migration_default}"
+  if [ "${include_migration}" = "true" ]; then
+    selected_hosts="${selected_hosts}"$'\n'"${migration_hosts}"
   fi
 fi
 
@@ -311,5 +349,10 @@ EOF
 done <<< "${selected_hosts}"
 
 echo "Done. Now run:"
-echo "  npm run ansible:run:check"
-echo "  npm run ansible:site"
+if [ "${TARGET_GROUP}" = "migration" ]; then
+  echo "  npm run ansible:migration:node:check"
+  echo "  npm run ansible:migration:node"
+else
+  echo "  npm run ansible:run:check"
+  echo "  npm run ansible:site"
+fi

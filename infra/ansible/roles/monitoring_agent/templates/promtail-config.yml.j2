@@ -8,10 +8,14 @@ positions:
 clients:
   - url: >-
       {{
-        'http://host.docker.internal:' ~ monitoring_loki_port ~ '/loki/api/v1/push'
-        if inventory_hostname == ((groups['master'] | default([]) | first) | default(''))
-        else
-        'http://' ~ (hostvars[(groups['master'] | default([]) | first)].ansible_host | default((groups['master'] | default([]) | first))) ~ ':' ~ monitoring_loki_port ~ '/loki/api/v1/push'
+        monitoring_loki_push_url
+        if (monitoring_loki_push_url | default('') | length > 0)
+        else (
+          'http://host.docker.internal:' ~ monitoring_loki_port ~ '/loki/api/v1/push'
+          if inventory_hostname == ((groups['master'] | default([]) | first) | default(''))
+          else
+          'http://' ~ (hostvars[(groups['master'] | default([]) | first)].ansible_host | default((groups['master'] | default([]) | first))) ~ ':' ~ monitoring_loki_port ~ '/loki/api/v1/push'
+        )
       }}
 
 scrape_configs:
@@ -20,8 +24,8 @@ scrape_configs:
       - targets: ["localhost"]
         labels:
           job: varlogs
-          host: "{{ inventory_hostname }}"
-          role: "{{ 'master' if inventory_hostname in (groups['master'] | default([])) else 'worker' }}"
+          host: "{{ monitoring_agent_host_label if (monitoring_agent_host_label | default('') | length > 0) else inventory_hostname }}"
+          role: "{{ monitoring_agent_role if (monitoring_agent_role | default('') | length > 0) else ('master' if inventory_hostname in (groups['master'] | default([])) else 'worker') }}"
           __path__: /var/log/*.log
 
   - job_name: docker
@@ -43,6 +47,6 @@ scrape_configs:
       - target_label: job
         replacement: docker
       - target_label: host
-        replacement: "{{ inventory_hostname }}"
+        replacement: "{{ monitoring_agent_host_label if (monitoring_agent_host_label | default('') | length > 0) else inventory_hostname }}"
       - target_label: role
-        replacement: "{{ 'master' if inventory_hostname in (groups['master'] | default([])) else 'worker' }}"
+        replacement: "{{ monitoring_agent_role if (monitoring_agent_role | default('') | length > 0) else ('master' if inventory_hostname in (groups['master'] | default([])) else 'worker') }}"

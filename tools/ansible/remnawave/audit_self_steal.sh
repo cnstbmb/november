@@ -481,17 +481,17 @@ require_cmd base64
 require_cmd python3
 
 section "Public fallback"
-check_http_status "sub.moscow.himenkov.ru root" "sub.moscow.himenkov.ru:443:5.42.111.142" "https://sub.moscow.himenkov.ru/"
-check_http_status "moscow.himenkov.ru root" "moscow.himenkov.ru:443:5.42.111.142" "https://moscow.himenkov.ru/"
-check_http_status "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:5.42.111.142" "https://sub.moscow.himenkov.ru:10443/"
+check_http_status "sub.moscow.himenkov.ru root" "sub.moscow.himenkov.ru:443:193.124.64.187" "https://sub.moscow.himenkov.ru/"
+check_http_status "moscow.himenkov.ru root" "moscow.himenkov.ru:443:193.124.64.187" "https://moscow.himenkov.ru/"
+check_http_status "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:193.124.64.187" "https://sub.moscow.himenkov.ru:10443/"
 if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
   check_http_status "ENTRY fallback" "${ENTRY_SUBSCRIPTION_SNI#@}:443:${ENTRY_SUBSCRIPTION_ADDRESS#@}" "https://${ENTRY_SUBSCRIPTION_SNI}/"
 fi
 check_http_status "AMSTERDAM fallback" "himenkov.ru:443:109.234.34.227" "https://himenkov.ru/"
 
 section "Header camouflage"
-check_headers_clean "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:5.42.111.142" "https://sub.moscow.himenkov.ru:10443/"
-check_headers_clean "moscow.himenkov.ru root" "moscow.himenkov.ru:443:5.42.111.142" "https://moscow.himenkov.ru/"
+check_headers_clean "MOSCOW 10443 fallback" "sub.moscow.himenkov.ru:10443:193.124.64.187" "https://sub.moscow.himenkov.ru:10443/"
+check_headers_clean "moscow.himenkov.ru root" "moscow.himenkov.ru:443:193.124.64.187" "https://moscow.himenkov.ru/"
 if [ "${ENTRY_AUDIT_ENABLED}" = "true" ]; then
   check_headers_clean "ENTRY fallback" "${ENTRY_SUBSCRIPTION_SNI#@}:443:${ENTRY_SUBSCRIPTION_ADDRESS#@}" "https://${ENTRY_SUBSCRIPTION_SNI}/"
 fi
@@ -544,7 +544,10 @@ check_json_value "MASTER MOSCOW xhttp host" "${ROOT_DIR}/.private/configs/MASTER
 check_json_value "MASTER MOSCOW xhttp path" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.path' "/fluegergeheimer-xhttp/"
 check_json_value "MASTER MOSCOW xhttp mode" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.xhttpSettings.mode' "stream-one"
 check_json_value "MASTER Moscow service domains direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:sub.moscow.himenkov.ru")) and .outboundTag=="IPv4") | .outboundTag' "IPv4"
-check_json_value "MASTER Moscow self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="443" and .outboundTag=="IPv4") | .outboundTag' "IPv4"
+check_json_value "MASTER Moscow self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="443" and .outboundTag=="IPv4") | .outboundTag' "IPv4"
+check_json_value "MASTER Home WiFi default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag==["VLESS_REALITY_HOME_WIFI"] and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "GRPC_TO_EXIT"
+check_json_value "MASTER bridge default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag==["BRIDGE_MASTER_IN"] and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "GRPC_TO_EXIT"
+check_json_value "MASTER Reality default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag==["VLESS_REALITY_MOSCOW"] and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "GRPC_TO_EXIT"
 check_json_value "MASTER MOSCOW xhttp outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("VLESS_XHTTP_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "${MOSCOW_XHTTP_OUTBOUND}"
 check_json_value "MASTER HYSTERIA2 protocol" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .protocol' "hysteria"
 check_json_value "MASTER HYSTERIA2 port" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .port' "443"
@@ -553,13 +556,17 @@ check_json_value "MASTER HYSTERIA2 security" "${ROOT_DIR}/.private/configs/MASTE
 check_json_value "MASTER HYSTERIA2 alpn" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="HYSTERIA2_MOSCOW") | .streamSettings.tlsSettings.alpn[0]' "h3"
 check_json_value "MASTER HYSTERIA2 default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "${MOSCOW_HYSTERIA2_OUTBOUND}"
 check_json_value "MASTER HYSTERIA2 service domains direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:sub.moscow.himenkov.ru")) and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4") | .outboundTag' "IPv4"
-check_json_value "MASTER HYSTERIA2 self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="443" and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag' "IPv4"
-check_json_value "MASTER HYSTERIA2 YouTube direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '[.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube")) and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag] | unique[]' "IPv4"
+check_json_value "MASTER HYSTERIA2 self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="443" and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag' "IPv4"
+check_json_path_absent "MASTER YouTube Moscow direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube")))'
 check_json_path_absent "MASTER HYSTERIA2 RU direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.ip? | index("geoip:ru")))'
 check_json_path_absent "MASTER HYSTERIA2 category-ru direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.domain? | index("geosite:category-ru")))'
-check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("5.42.111.142")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
+check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
 check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru")) and (.inboundTag? | not)) | .balancerTag' "HOME_OR_MOSCOW"
 check_json_value "MASTER Home fallback to Moscow" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .fallbackTag' "IPv4"
+check_json_value "MASTER Home balancer selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .selector | join(",")' "GRPC_TO_HOME_RU"
+check_json_value "MASTER Home observatory selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.subjectSelector | join(",")' "GRPC_TO_HOME_RU"
+check_json_value "MASTER Home observatory interval" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeInterval' "15s"
+check_json_value "MASTER Home observatory probe URL" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeUrl' "https://ya.ru/"
 if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*port: 10085' "${ROOT_DIR}/.private/ansible/prod/group_vars/master.yml" >/dev/null; then
   pass "MASTER 10085 firewall config: allows Docker bridge CIDR"
 else

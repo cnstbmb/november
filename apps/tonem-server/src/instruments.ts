@@ -17,11 +17,16 @@ export interface BinanceRef {
   readonly symbol: string;
 }
 
+export interface KrakenRef {
+  readonly pair: string;
+}
+
 export interface LiveInstrument {
   readonly id: string;
   readonly market: MarketKind;
   readonly moex?: MoexRef;
   readonly binance?: BinanceRef;
+  readonly kraken?: KrakenRef;
 }
 
 /**
@@ -50,7 +55,14 @@ export const LIVE_INSTRUMENTS: readonly LiveInstrument[] = [
   // Crypto (Binance, 24/7)
   { id: 'btc', market: 'crypto', binance: { symbol: 'BTCUSDT' } },
   { id: 'eth', market: 'crypto', binance: { symbol: 'ETHUSDT' } },
-  { id: 'ton', market: 'crypto', binance: { symbol: 'TONUSDT' } },
+  {
+    id: 'ton',
+    market: 'crypto',
+    // Binance is retained for pre-break historical candles only. Live TON
+    // comes from Kraken because every Binance TON spot pair is paused.
+    binance: { symbol: 'TONUSDT' },
+    kraken: { pair: 'TONUSD' },
+  },
 ] as const;
 
 export function instrumentsByMarket(kind: MarketKind): LiveInstrument[] {
@@ -78,9 +90,16 @@ export function futuresAssets(): { id: string; assetCode: string }[] {
 }
 
 export function binanceSymbols(): { id: string; symbol: string }[] {
-  return LIVE_INSTRUMENTS.filter((i) => i.binance).map((i) => ({
+  return LIVE_INSTRUMENTS.filter((i) => i.binance && !i.kraken).map((i) => ({
     id: i.id,
     symbol: i.binance!.symbol,
+  }));
+}
+
+export function krakenPairs(): { id: string; pair: string }[] {
+  return LIVE_INSTRUMENTS.filter((i) => i.kraken).map((i) => ({
+    id: i.id,
+    pair: i.kraken!.pair,
   }));
 }
 

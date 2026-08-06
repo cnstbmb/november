@@ -1,0 +1,54 @@
+---
+- name: Verify migration database containers are running
+  ansible.builtin.command: docker inspect --format={{ '{{' }}.State.Status{{ '}}' }} {{ item }}
+  loop:
+    - remnawave-db
+    - tonem-postgres
+    - remnashop-db
+  register: migration_database_container_states
+  changed_when: false
+  failed_when: migration_database_container_states.stdout != 'running'
+  when: not ansible_check_mode
+
+- name: Ensure migration database backup root exists
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ migration_db_backup_root }}"
+      mode: "0700"
+    - path: /var/backups/remnawave
+      mode: "0700"
+    - path: /opt/monitoring
+      mode: "0755"
+  when: not ansible_check_mode
+
+- name: Install November database backup script
+  ansible.builtin.copy:
+    src: november-db-backup.sh
+    dest: /usr/local/bin/november-db-backup.sh
+    mode: "0750"
+  when: not ansible_check_mode
+
+- name: Schedule November database backups
+  ansible.builtin.cron:
+    name: november-db-backup
+    minute: "{{ migration_db_backup_cron_minute }}"
+    hour: "{{ migration_db_backup_cron_hour }}"
+    job: >-
+      NOVEMBER_BACKUP_ROOT={{ migration_db_backup_root | quote }}
+      NOVEMBER_BACKUP_RETENTION_DAYS={{ migration_db_backup_retention_days | quote }}
+      /usr/local/bin/november-db-backup.sh
+  when: not ansible_check_mode
+
+- name: Create and validate the first November database backups
+  ansible.builtin.command: /usr/local/bin/november-db-backup.sh
+  environment:
+    NOVEMBER_BACKUP_ROOT: "{{ migration_db_backup_root }}"
+    NOVEMBER_BACKUP_RETENTION_DAYS: "{{ migration_db_backup_retention_days | string }}"
+  register: migration_database_backup_run
+  changed_when: true
+  when:
+    - migration_db_backup_run_now | bool
+    - not ansible_check_mode

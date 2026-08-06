@@ -5,3 +5,8 @@ monitoring_node_exporter_use_host_network: true
 monitoring_node_exporter_container_name: "monitoring-node-exporter"
 monitoring_agent_attach_remnawave_network: false
 monitoring_agent_network_name: "{{ remnawave_network_name | default('remnawave-network') }}"
+monitoring_loki_push_url: ""
+monitoring_agent_role: ""
+monitoring_agent_host_label: ""
+monitoring_log_collector: "promtail"
+monitoring_alloy_image: "grafana/alloy:v1.18.0"

@@ -38,6 +38,13 @@ describe('RatesPoller', () => {
     http.expectOne((r) => r.url.includes('/engines/currency/')).flush(currencyBatch);
     http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
     http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
+    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush({
+      ton: {
+        ts: '2026-08-06T18:58:00.000Z',
+        value: 1.378,
+        meta: { source: 'kraken', pair: 'TONUSD' },
+      },
+    });
   };
 
   it('отменяет in-flight цикл при stop и не смешивает его с новым start', () => {
@@ -45,11 +52,13 @@ describe('RatesPoller', () => {
     const oldCurrency = http.expectOne((r) => r.url.includes('/engines/currency/'));
     const oldIndex = http.expectOne((r) => r.url.includes('/engines/stock/'));
     const oldFutures = http.expectOne((r) => r.url.includes('/engines/futures/'));
+    const oldBackend = http.expectOne((r) => r.url === 'https://api.tonem.ru/latest');
 
     poller.stop();
     expect(oldCurrency.cancelled).toBe(true);
     expect(oldIndex.cancelled).toBe(true);
     expect(oldFutures.cancelled).toBe(true);
+    expect(oldBackend.cancelled).toBe(true);
 
     poller.start();
     flushMoexCycle();
@@ -63,6 +72,24 @@ describe('RatesPoller', () => {
     expect(store.hero().quote.value).toBeCloseTo(79.485, 3);
     expect(store.quoteOf('brent')?.value).not.toBeNull();
     expect(store.quoteOf('imoex')?.value).toBeCloseTo(2191.18, 2);
+    expect(store.quoteOf('ton')?.value).toBe(1.378);
+    expect(store.quoteOf('ton')?.source).toBe('kraken');
+  });
+
+  it('backend остаётся fallback и не затирает более свежий Kraken WebSocket тик', () => {
+    const websocketTs = new Date('2026-08-06T18:58:25.000Z');
+    store.apply([{
+      instrumentId: 'ton',
+      value: 1.39,
+      time: websocketTs,
+      systime: websocketTs,
+    }], 'kraken', websocketTs);
+
+    poller.start();
+    flushMoexCycle();
+
+    expect(store.quoteOf('ton')?.value).toBe(1.39);
+    expect(store.quoteOf('ton')?.systime).toEqual(websocketTs);
   });
 
   it('падение MOEX currency → фолбэк на ЦБ с пометкой источника', async () => {
@@ -72,6 +99,7 @@ describe('RatesPoller', () => {
       .flush('boom', { status: 500, statusText: 'ERR' });
     http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
     http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
+    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush({});
 
     const cbrReq = http.expectOne((r) => r.url.includes('cbr-xml-daily.ru'));
     cbrReq.flush(cbrDaily);
@@ -89,6 +117,7 @@ describe('RatesPoller', () => {
       .flush({ marketdata: { columns: ['SECID', 'LAST', 'TIME', 'SYSTIME'], data: [] } });
     http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
     http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
+    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush({});
 
     http.expectOne((r) => r.url.includes('cbr-xml-daily.ru')).flush(cbrDaily);
 

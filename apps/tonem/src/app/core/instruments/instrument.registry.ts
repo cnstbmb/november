@@ -156,7 +156,9 @@ export const INSTRUMENTS: readonly Instrument[] = [
     decimals: 2,
     market: 'crypto',
     placement: 'live',
+    // Keep Binance only as a historical reference; live moved to Kraken.
     binance: { symbol: 'TONUSDT' },
+    kraken: { pair: 'TONUSD', wsSymbol: 'TON/USD' },
   },
 
   // ── Производные (считаются на лету, не хранятся) ──────────────────────────

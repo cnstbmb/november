@@ -4,3 +4,5 @@ backup_external_target_regex: "^(s3:|/mnt/|/media/|/run/media/|/Volumes/)"
 backup_remnawave_pg_dump_enabled: "{{ enable_remnawave_panel | default(false) | bool }}"
 backup_remnawave_pg_dump_container_name: "remnawave-db"
 backup_remnawave_pg_dump_filename: "remnawave-postgres.sql.gz"
+backup_additional_paths: []
+backup_initialize_repository: true

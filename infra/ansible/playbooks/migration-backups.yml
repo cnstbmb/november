@@ -1,0 +1,16 @@
+---
+- name: Install production backups on the replacement master
+  hosts: migration
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Refuse to run against the old production master
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname not in (groups['master'] | default([]))
+        fail_msg: >-
+          migration-backups must target only the replacement host before inventory promotion.
+
+  roles:
+    - role: migration_db_backups

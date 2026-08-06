@@ -63,6 +63,16 @@ describe('candleSource — отображение инструмента в ис
     expect(candleSource(inst)).toEqual({ kind: 'binance', symbol: 'BTCUSDT' });
   });
 
+  it('TON → Kraken OHLC вместо остановленной Binance-пары', () => {
+    const inst: Instrument = {
+      ...base,
+      market: 'crypto',
+      binance: { symbol: 'TONUSDT' },
+      kraken: { pair: 'TONUSD', wsSymbol: 'TON/USD' },
+    };
+    expect(candleSource(inst)).toEqual({ kind: 'kraken', pair: 'TONUSD' });
+  });
+
   it('без источника (derived) → null', () => {
     expect(candleSource(base)).toBeNull();
   });

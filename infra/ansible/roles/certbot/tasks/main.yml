@@ -38,7 +38,9 @@
     name: certbot.timer
     enabled: true
     state: started
-  when: certbot_install | default(true) | bool
+  when:
+    - certbot_install | default(true) | bool
+    - not ansible_check_mode
 
 - name: Resolve certbot domains
   ansible.builtin.set_fact:
@@ -66,21 +68,27 @@
     src: cloudflare.ini.j2
     dest: "{{ certbot_credentials_path }}"
     mode: "0600"
-  when: enable_certbot | default(false) | bool
+  when:
+    - enable_certbot | default(false) | bool
+    - not ansible_check_mode
 
 - name: Ensure certbot deploy hook directory exists
   ansible.builtin.file:
     path: /etc/letsencrypt/renewal-hooks/deploy
     state: directory
     mode: "0755"
-  when: enable_certbot | default(false) | bool
+  when:
+    - enable_certbot | default(false) | bool
+    - not ansible_check_mode
 
 - name: Install certbot deploy hook to reload containers
   ansible.builtin.template:
     src: reload-containers.sh.j2
     dest: /etc/letsencrypt/renewal-hooks/deploy/reload-containers.sh
     mode: "0755"
-  when: enable_certbot | default(false) | bool
+  when:
+    - enable_certbot | default(false) | bool
+    - not ansible_check_mode
 
 - name: Obtain certificate via DNS-01
   ansible.builtin.command: >

@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../../..");
 const TOKEN_ENV = path.join(ROOT, ".private/ansible/prod/remnashop/.env");
 const PROFILE_UUID = "ba4464ac-3ca1-4599-8047-53300afe0d43";
-const NODE_UUID = "fd23ab8a-e142-42f9-9cef-000656cf7eb1";
+const NODE_UUID = "51a6f00b-0b03-4228-926c-8a031ba88c65";
 const OLD_TAG = "VLESS_REALITY_MOSCOW";
 const NEW_TAG = "VLESS_REALITY_HOME_WIFI";
 const HYSTERIA_TAG = "HYSTERIA2_MOSCOW";
@@ -119,7 +119,6 @@ function ensureInbound(config) {
     ...homeWifiBlockRules,
     { type: "field", inboundTag: [NEW_TAG], ip: ["geoip:ru"], outboundTag: LOCAL_MOSCOW_OUTBOUND },
     { type: "field", inboundTag: [NEW_TAG], domain: ["geosite:category-ru"], outboundTag: LOCAL_MOSCOW_OUTBOUND },
-    { type: "field", inboundTag: [NEW_TAG], domain: ["geosite:youtube"], outboundTag: LOCAL_MOSCOW_OUTBOUND },
     { type: "field", inboundTag: [NEW_TAG], outboundTag: AMSTERDAM_OUTBOUND },
   ];
   const isSafetyRule = (rule) =>

@@ -6,6 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 const ISS_BASE = 'https://iss.moex.com/iss';
 const BINANCE_TICKER = 'https://api.binance.com/api/v3/ticker/price';
+const KRAKEN_BASE = 'https://api.kraken.com/0/public';
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -74,5 +75,16 @@ export class QuoteSourcesService {
     const symbolsJson = JSON.stringify(symbols);
     const url = `${BINANCE_TICKER}?symbols=${encodeURIComponent(symbolsJson)}`;
     return getJson(url);
+  }
+
+  /** Pair status is required because ticker keeps the last price after a halt. */
+  async fetchKrakenTicker(pair: string): Promise<unknown> {
+    const info = await getJson(`${KRAKEN_BASE}/AssetPairs?${qs({ pair })}`);
+    const result = (info as { result?: Record<string, { status?: unknown }> } | null)?.result;
+    const status = result ? Object.values(result)[0]?.status : undefined;
+    if (status !== 'online') return { pair, status, ticker: null };
+
+    const ticker = await getJson(`${KRAKEN_BASE}/Ticker?${qs({ pair })}`);
+    return { pair, status, ticker };
   }
 }

@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting, TestRequest } from '@a
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BinanceWsService } from '../binance/binance-ws.service';
+import { KrakenWsService } from '../kraken/kraken-ws.service';
 import { liveInstruments } from '../instruments/instrument.registry';
 import { MoodEngine } from '../mood/mood.engine';
 import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
@@ -74,6 +75,7 @@ describe('TimeMachineService', () => {
   let platform: MemoryPlatform;
   let poller: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
   let binance: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
+  let kraken: { start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> };
   let http: HttpTestingController;
   let store: RatesStore;
   let mood: MoodEngine;
@@ -82,6 +84,7 @@ describe('TimeMachineService', () => {
     platform = new MemoryPlatform();
     poller = { start: vi.fn(), stop: vi.fn() };
     binance = { start: vi.fn(), stop: vi.fn() };
+    kraken = { start: vi.fn(), stop: vi.fn() };
 
     TestBed.configureTestingModule({
       providers: [
@@ -94,6 +97,7 @@ describe('TimeMachineService', () => {
         { provide: VIEW_SETTINGS_PLATFORM, useValue: platform },
         { provide: RatesPoller, useValue: poller },
         { provide: BinanceWsService, useValue: binance },
+        { provide: KrakenWsService, useValue: kraken },
         {
           provide: LatestQuotesCacheService,
           useValue: { load: () => ({ usdrub: liveQuote() }), save: () => undefined },
@@ -123,6 +127,7 @@ describe('TimeMachineService', () => {
     expect(service.active()).toBe(false);
     expect(poller.start).toHaveBeenCalledTimes(1);
     expect(binance.start).toHaveBeenCalledTimes(1);
+    expect(kraken.start).toHaveBeenCalledTimes(1);
     expect(new URLSearchParams(new URL(platform.url).hash.slice(1)).has('ts')).toBe(false);
   });
 
@@ -133,8 +138,10 @@ describe('TimeMachineService', () => {
     expect(service.active()).toBe(true);
     expect(poller.start).not.toHaveBeenCalled();
     expect(binance.start).not.toHaveBeenCalled();
+    expect(kraken.start).not.toHaveBeenCalled();
     expect(poller.stop).toHaveBeenCalledTimes(1);
     expect(binance.stop).toHaveBeenCalledTimes(1);
+    expect(kraken.stop).toHaveBeenCalledTimes(1);
 
     flushPair(http, A, 79, 81);
     expect(store.hero().quote.value).toBe(81);
@@ -156,6 +163,7 @@ describe('TimeMachineService', () => {
     expect(store.hero().quote.value).toBe(80);
     expect(poller.start).toHaveBeenCalledTimes(2);
     expect(binance.start).toHaveBeenCalledTimes(2);
+    expect(kraken.start).toHaveBeenCalledTimes(2);
     expect(new URLSearchParams(new URL(platform.url).hash.slice(1)).has('ts')).toBe(false);
   });
 

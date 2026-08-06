@@ -41,6 +41,18 @@ const btc: Instrument = {
   binance: { symbol: 'BTCUSDT' },
 };
 
+const ton: Instrument = {
+  id: 'ton',
+  label: 'TON',
+  heroLabel: 'долларов за тон',
+  unit: '$',
+  decimals: 2,
+  market: 'crypto',
+  placement: 'live',
+  binance: { symbol: 'TONUSDT' },
+  kraken: { pair: 'TONUSD', wsSymbol: 'TON/USD' },
+};
+
 describe('CandlesService', () => {
   let service: CandlesService;
   let http: HttpTestingController;
@@ -105,6 +117,17 @@ describe('CandlesService', () => {
     const curve = out as { candles: unknown[]; session: string };
     expect(curve.session).toBe('current');
     expect(curve.candles).toHaveLength(3);
+  });
+
+  it('TON: запрашивает активные Kraken OHLC вместо Binance', () => {
+    let out: unknown;
+    service.intraday(ton).subscribe((result) => (out = result));
+    const req = http.expectOne((request) => request.url.includes('api.kraken.com/0/public/OHLC'));
+    expect(req.request.params.get('pair')).toBe('TONUSD');
+    expect(req.request.params.get('interval')).toBe('5');
+    req.flush({ error: [], result: { TONUSD: [[1786039200, '1.386', '1.390', '1.376', '1.378']], last: 1786039200 } });
+    expect((out as { candles: unknown[]; session: string }).candles).toHaveLength(1);
+    expect((out as { session: string }).session).toBe('current');
   });
 
   it('ночь для MOEX: from — предыдущий день, session=last', () => {

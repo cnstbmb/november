@@ -216,7 +216,7 @@ function isQuoteValue(value: unknown): value is number | null {
 }
 
 function isQuoteSource(value: unknown): value is QuoteSource {
-  return value === 'moex' || value === 'cbr' || value === 'binance';
+  return value === 'moex' || value === 'cbr' || value === 'binance' || value === 'kraken';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

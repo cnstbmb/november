@@ -1,0 +1,54 @@
+- name: Deploy a canary Remnawave Node on the replacement master
+  hosts: migration
+  become: true
+  gather_facts: true
+
+  vars:
+    migration_node_tcp_ports_default:
+      - 5335
+      - 9443
+      - 10443
+      - 20443
+    migration_node_udp_ports_default:
+      - 443
+
+  pre_tasks:
+    - name: Refuse to run against a production master
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in (groups['migration'] | default([]))
+          - inventory_hostname not in (groups['master'] | default([]))
+        fail_msg: >-
+          migration-node must target a host in the migration group only.
+          Do not place the replacement host in master before cutover.
+
+    - name: Refuse unrelated stateful service activation
+      ansible.builtin.assert:
+        that:
+          - not (enable_remnawave_panel | default(false) | bool)
+          - not (enable_remnashop | default(false) | bool)
+          - not (enable_adguard | default(false) | bool)
+          - not (enable_monitoring | default(false) | bool)
+          - not (enable_backups | default(false) | bool)
+        fail_msg: >-
+          Panel, shop, AdGuard, monitoring, and backups must remain disabled
+          while the replacement Remnawave Node is tested as a canary.
+
+  roles:
+    - role: firewall
+      vars:
+        allow_http_https: false
+        firewall_extra_tcp_ports: >-
+          {{
+            migration_node_tcp_ports
+            | default(migration_node_tcp_ports_default)
+          }}
+        firewall_extra_udp_ports: >-
+          {{
+            migration_node_udp_ports
+            | default(migration_node_udp_ports_default)
+          }}
+
+    - role: remnawave_node
+      vars:
+        remnawave_node_open_firewall: true

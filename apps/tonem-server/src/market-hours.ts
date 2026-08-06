@@ -6,9 +6,11 @@ import { MarketKind } from './instruments';
 
 /** Trading windows in minutes from MSK midnight (weekdays). crypto = no window (24/7). */
 const WINDOWS: Record<MarketKind, { open: number; close: number } | null> = {
-  fx: { open: 6 * 60 + 50, close: 23 * 60 + 50 }, // 06:50–23:50
-  futures: { open: 9 * 60, close: 23 * 60 + 50 }, // 09:00–23:50
-  index: { open: 9 * 60 + 50, close: 23 * 60 + 50 }, // 09:50–23:50
+  // MOEX CETS system session used by QuoteSourcesService. The 23:50 close
+  // belongs to negotiated trading modes, which are not collected here.
+  fx: { open: 10 * 60, close: 19 * 60 }, // 10:00–19:00
+  futures: { open: 8 * 60 + 50, close: 23 * 60 + 50 }, // 08:50–23:50
+  index: { open: 9 * 60 + 50, close: 19 * 60 }, // IMOEX: 09:50–19:00
   crypto: null, // 24/7
 };
 
@@ -35,7 +37,7 @@ export function isTradingNow(kind: MarketKind, now: Date): boolean {
   const w = WINDOWS[kind];
   if (w === null) return true; // crypto: always open
   const { minutes, weekend } = mskParts(now);
-  if (weekend) return false;
+  if (weekend) return kind === 'futures' && minutes >= 10 * 60 && minutes < 19 * 60;
   return minutes >= w.open && minutes < w.close;
 }
 

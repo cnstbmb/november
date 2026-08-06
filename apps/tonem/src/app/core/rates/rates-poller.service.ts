@@ -10,15 +10,13 @@ import {
   parseIndexQuote,
 } from '../moex/moex-iss.parser';
 import { pollDelayMs } from '../moex/market-hours';
-import { CbrService } from '../cbr/cbr.service';
-import { parseCbrDaily } from '../cbr/cbr.parser';
 import { RawQuote } from './quote.model';
 import { RatesStore } from './rates.store';
 
 const FX_SECIDS = currencySecids();
 
 function currencyMapping(): { id: string; secid: string }[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').flatMap((i) => {
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode).flatMap((i) => {
     const secid = moexSecid(i.moex!);
     return secid ? [{ id: i.id, secid }] : [];
   });
@@ -37,27 +35,21 @@ function indexInstrument(): { id: string; secid: string } | null {
   return inst && secid ? { id: inst.id, secid } : null;
 }
 
-function hasAnyValue(quotes: readonly RawQuote[]): boolean {
-  return quotes.some((q) => q.value !== null);
-}
-
 /**
  * Цикл опроса MOEX с каденсом из pollDelayMs:
  * быстро, пока рынки живы; раз в 5 минут, когда всё закрыто.
- * Фолбэк на ЦБ — если валютный батч упал ИЛИ вернулся пустым
- * (MOEX в maintenance отвечает 200 с пустым marketdata).
+ * USD/EUR приходят с официальным происхождением ЦБ через tonem-server;
+ * CNY и золото опрашиваются напрямую на MOEX.
  */
 @Injectable({ providedIn: 'root' })
 export class RatesPoller {
   private readonly moex = inject(MoexIssService);
-  private readonly cbr = inject(CbrService);
   private readonly store = inject(RatesStore);
   private readonly backend = inject(BackendLatestService);
   private readonly destroyRef = inject(DestroyRef);
 
   private timer: ReturnType<typeof setTimeout> | null = null;
   private request: Subscription | null = null;
-  private cbrRequest: Subscription | null = null;
   private running = false;
   private generation = 0;
 
@@ -77,8 +69,6 @@ export class RatesPoller {
     this.generation++;
     this.request?.unsubscribe();
     this.request = null;
-    this.cbrRequest?.unsubscribe();
-    this.cbrRequest = null;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -92,7 +82,9 @@ export class RatesPoller {
         .fetchIndex(indexInstrument()?.secid ?? 'IMOEX')
         .pipe(catchError(() => of(null))),
       futures: this.moex.fetchFuturesBoard().pipe(catchError(() => of(null))),
-      backend: this.backend.fetchKrakenQuotes().pipe(catchError(() => of([]))),
+      backend: this.backend.fetchFallbackQuotes().pipe(
+        catchError(() => of({ kraken: [], cbr: [] })),
+      ),
     }).subscribe(({ currency, index, futures, backend }) => {
       this.request = null;
       // Ответ от старого поколения после stop/start не должен трогать store.
@@ -102,11 +94,12 @@ export class RatesPoller {
       const currencyQuotes = currency
         ? parseCurrencyBatch(currency, currencyMapping())
         : [];
-      if (hasAnyValue(currencyQuotes)) {
+      if (currencyQuotes.length > 0) {
         this.store.apply(currencyQuotes, 'moex', now);
-      } else {
-        this.applyCbrFallback(now, generation);
       }
+
+      // USD and EUR are official daily CBR rates delivered by tonem-server.
+      if (backend.cbr.length > 0) this.store.apply(backend.cbr, 'cbr', now);
 
       const idx = indexInstrument();
       if (index !== null && idx) {
@@ -118,7 +111,7 @@ export class RatesPoller {
         this.store.apply(parseFuturesBatch(futures, assets, now), 'moex', now);
       }
 
-      const fallback = backend.filter((quote) => {
+      const fallback = backend.kraken.filter((quote) => {
         const current = this.store.quoteOf(quote.instrumentId);
         if (!current || current.source !== 'kraken' || current.value === null) return true;
         const currentTime = current.systime?.getTime() ?? Number.NEGATIVE_INFINITY;
@@ -135,22 +128,5 @@ export class RatesPoller {
         );
       }
     });
-  }
-
-  private applyCbrFallback(now: Date, generation: number): void {
-    const mapping = INSTRUMENTS.filter((i) => i.cbrCode).map((i) => ({
-      id: i.id,
-      cbrCode: i.cbrCode!,
-    }));
-    if (mapping.length === 0) return;
-    this.cbrRequest = this.cbr
-      .fetchDaily()
-      .pipe(catchError(() => of(null)))
-      .subscribe((json) => {
-        this.cbrRequest = null;
-        if (json && this.running && generation === this.generation) {
-          this.store.apply(parseCbrDaily(json, mapping), 'cbr', now);
-        }
-      });
   }
 }

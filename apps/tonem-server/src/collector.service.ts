@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   binanceSymbols,
+  cbrRates,
   currencySecids,
   futuresAssets,
   indexSecids,
@@ -11,6 +12,7 @@ import {
 import { anyMoexMarketOpen, isTradingNow } from './market-hours';
 import {
   parseBinancePrices,
+  parseCbrDailyXml,
   parseCurrencyBatch,
   parseFuturesBatch,
   parseIndexQuote,
@@ -61,13 +63,26 @@ export class CollectorService {
 
     const ticks: TickInput[] = [];
 
+    // ── Official daily USD/EUR rates (MOEX trading is suspended) ────────────
+    try {
+      const mapping = cbrRates();
+      if (mapping.length > 0) {
+        const xml = await this.sources.fetchCbrDailyXml();
+        ticks.push(...parseCbrDailyXml(xml, mapping, ts));
+      }
+    } catch (err) {
+      this.logger.warn(`CBR fetch failed: ${(err as Error).message}`);
+    }
+
     // ── Crypto 24/7 ──────────────────────────────────────────────────────────
     const cryptoInstruments = instrumentsByMarket('crypto');
     if (cryptoInstruments.length > 0 && isTradingNow('crypto', now)) {
       try {
         const mapping = binanceSymbols();
-        const json = await this.sources.fetchBinancePrices(mapping.map((m) => m.symbol));
-        ticks.push(...parseBinancePrices(json, mapping, ts));
+        if (mapping.length > 0) {
+          const json = await this.sources.fetchBinancePrices(mapping.map((m) => m.symbol));
+          ticks.push(...parseBinancePrices(json, mapping, ts));
+        }
       } catch (err) {
         this.logger.warn(`binance fetch failed: ${(err as Error).message}`);
       }
@@ -90,7 +105,7 @@ export class CollectorService {
           const secids = currencySecids();
           const json = await this.sources.fetchCurrencyBatch(secids);
           const mapping = instrumentsByMarket('fx')
-            .filter((i) => i.moex?.kind === 'currency')
+            .filter((i) => i.moex?.kind === 'currency' && !i.cbrCode)
             .map((i) => ({ id: i.id, secid: (i.moex as { secid: string }).secid }));
           ticks.push(...parseCurrencyBatch(json, mapping, ts));
         } catch (err) {

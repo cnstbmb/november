@@ -21,13 +21,17 @@ export interface DerivedDef {
   readonly compute: (quotes: Readonly<Record<string, Quote>>) => number | null;
 }
 
+function positive(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 // ── Формулы ───────────────────────────────────────────────────────────────
 
 /** EUR/USD = EUR/RUB ÷ USD/RUB (кросс через рубль) */
 function computeEurusd(q: Readonly<Record<string, Quote>>): number | null {
   const eurrub = q['eurrub']?.value;
   const usdrub = q['usdrub']?.value;
-  if (eurrub == null || usdrub == null) return null;
+  if (!positive(eurrub) || !positive(usdrub)) return null;
   return eurrub / usdrub;
 }
 
@@ -35,7 +39,7 @@ function computeEurusd(q: Readonly<Record<string, Quote>>): number | null {
 function computeBtcrub(q: Readonly<Record<string, Quote>>): number | null {
   const btc = q['btc']?.value;
   const usdrub = q['usdrub']?.value;
-  if (btc == null || usdrub == null) return null;
+  if (!positive(btc) || !positive(usdrub)) return null;
   return btc * usdrub;
 }
 
@@ -47,7 +51,7 @@ function computeBtcgold(q: Readonly<Record<string, Quote>>): number | null {
   const btc = q['btc']?.value;
   const usdrub = q['usdrub']?.value;
   const gold = q['gold']?.value;
-  if (btc == null || usdrub == null || gold == null) return null;
+  if (!positive(btc) || !positive(usdrub) || !positive(gold)) return null;
   return (btc * usdrub) / gold;
 }
 
@@ -55,29 +59,29 @@ function computeBtcgold(q: Readonly<Record<string, Quote>>): number | null {
 function computeBtcoil(q: Readonly<Record<string, Quote>>): number | null {
   const btc = q['btc']?.value;
   const brent = q['brent']?.value;
-  if (btc == null || brent == null) return null;
+  if (!positive(btc) || !positive(brent)) return null;
   return btc / brent;
 }
 
 /**
  * Индекс завтрака — равновесный индекс из кофе, сока, пшеницы и сахара.
  *
- * Проблема: у компонент разные единицы и масштабы ($/фунт, $/центнер).
- * Решение: нормализуем каждый к фиксированной опорной точке (типичному
- * уровню цен на момент T04), усредняем и масштабируем к базе 100.
+ * У компонентов разные единицы и масштабы ($/фунт и ₽/тонна).
+ * Решение: нормализуем каждый к расчётной цене на фиксированную дату,
+ * усредняем и масштабируем к базе 100.
  *
  *   index = mean(component / REFERENCE) × 100
  *
- * Константы ниже — «снимок» реальных уровней на 2026-07, зафиксированный
- * в конфиге, а не в БД, потому что это эталон для индекса, а не данные.
+ * Константы ниже — расчётные цены ближайших контрактов MOEX на 2026-07-28,
+ * зафиксированные в конфиге, потому что это база индекса, а не live-данные.
  * Индекс показывает относительное движение корзины: 100 = всё по референсу,
  * 110 = корзина подорожала на 10 % от референса.
  */
 export const BREAKFAST_REFERENCES: Readonly<Record<string, number>> = {
-  coffee: 350, // $/фунт (arabica, типичный диапазон 300–400)
-  oj: 300, // $/фунт (концентрат апельсинового сока)
-  wheat: 6.5, // $/центнер (≈ $6.50/бушель ÷ 0.3674 ≈ $17.7/центнер — но MOEX W4 в $/центнер, типично 6–7)
-  sugar: 20, // $/фунт (сырец №11, типичный диапазон 15–25 ¢/фунт)
+  coffee: 3.383, // KCQ6, $/фунт
+  oj: 1.44, // OJU6, $/фунт
+  wheat: 16_810, // W4Q6, ₽/тонна
+  sugar: 63_000, // SuQ6, ₽/тонна
 } as const;
 
 const BREAKFAST_BASE = 100;
@@ -86,7 +90,7 @@ function computeBreakfast(q: Readonly<Record<string, Quote>>): number | null {
   const parts: number[] = [];
   for (const id of ['coffee', 'oj', 'wheat', 'sugar'] as const) {
     const v = q[id]?.value;
-    if (v == null) return null;
+    if (!positive(v)) return null;
     const ref = BREAKFAST_REFERENCES[id];
     parts.push(v / ref);
   }
@@ -100,7 +104,7 @@ function computeBreakfast(q: Readonly<Record<string, Quote>>): number | null {
  */
 function computeRublgold(q: Readonly<Record<string, Quote>>): number | null {
   const gold = q['gold']?.value;
-  if (gold == null) return null;
+  if (!positive(gold)) return null;
   return (1 / gold) * 1000;
 }
 
@@ -142,9 +146,9 @@ export const DERIVED_DEFS: readonly DerivedDef[] = [
 // ── Статус производной ────────────────────────────────────────────────────
 
 /**
- * Правило статуса производной: статус вычисляется через тот же deriveStatus,
- * что и для живых котировок, но с «наихудшим» (наименее свежим) systime среди
- * входов и рынком производного инструмента.
+ * Закрытый или устаревший базовый рынок наследуется производной напрямую.
+ * Для полностью живого или исторического набора дополнительно проверяем
+ * торговое окно самой производной и самый старый systime.
  *
  * Так производная честно отражает состояние своих компонентов:
  * если хоть один вход устарел (stale) или рынок закрыт (closed), это видно.
@@ -156,6 +160,9 @@ export function deriveDerivedStatus(args: {
   now: Date;
 }): QuoteStatus {
   const { inputs, market, now } = args;
+  const statuses = inputs.map((quote) => quote?.status).filter(Boolean);
+  if (statuses.includes('closed')) return 'closed';
+  if (statuses.includes('stale')) return 'stale';
   // наименее свежий systime = самый старый из входов
   let worstSystime: Date | null = null;
   for (const q of inputs) {
@@ -189,7 +196,7 @@ export function buildDerivedQuote(
   }
 
   const value = def.compute(quotes);
-  if (value === null) {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
     return unavailableQuote(id);
   }
 

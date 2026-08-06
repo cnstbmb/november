@@ -8,7 +8,7 @@ import { Instrument, moexSecid } from './instrument.model';
  * derived — производная, считается на лету из живых (DerivedEngine), не хранится в БД.
  */
 export const INSTRUMENTS: readonly Instrument[] = [
-  // ── FX (MOEX CETS, фолбэк ЦБ) ─────────────────────────────────────────────
+  // ── FX (USD/EUR — ЦБ РФ; CNY/золото — MOEX CETS) ─────────────────────────
   {
     id: 'usdrub',
     label: 'USD/RUB',
@@ -36,18 +36,17 @@ export const INSTRUMENTS: readonly Instrument[] = [
     label: 'CNY/RUB',
     heroLabel: 'рублей за юань',
     unit: '₽',
-    decimals: 2,
+    decimals: 4,
     market: 'fx',
     placement: 'live',
     moex: { kind: 'currency', secid: 'CNYRUB_TOM' },
-    cbrCode: 'CNY',
   },
   {
     id: 'gold',
     label: 'Золото',
     heroLabel: 'рублей за грамм',
     unit: '₽',
-    decimals: 0,
+    decimals: 1,
     market: 'fx',
     placement: 'live',
     moex: { kind: 'currency', secid: 'GLDRUB_TOM' },
@@ -59,7 +58,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     label: 'IMOEX',
     heroLabel: 'пунктов индекса Мосбиржи',
     unit: 'п.',
-    decimals: 0,
+    decimals: 2,
     market: 'index',
     placement: 'live',
     moex: { kind: 'index', secid: 'IMOEX' },
@@ -79,9 +78,9 @@ export const INSTRUMENTS: readonly Instrument[] = [
   {
     id: 'wheat',
     label: 'Пшеница',
-    heroLabel: 'долларов за центнер',
-    unit: '$',
-    decimals: 2,
+    heroLabel: 'рублей за тонну',
+    unit: '₽',
+    decimals: 0,
     market: 'futures',
     placement: 'live',
     moex: { kind: 'futures', assetCode: 'WHEAT' },
@@ -101,7 +100,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     label: 'Кофе',
     heroLabel: 'долларов за фунт',
     unit: '$',
-    decimals: 2,
+    decimals: 3,
     market: 'futures',
     placement: 'live',
     moex: { kind: 'futures', assetCode: 'COFFEE' },
@@ -111,7 +110,7 @@ export const INSTRUMENTS: readonly Instrument[] = [
     label: 'Сок',
     heroLabel: 'долларов за фунт',
     unit: '$',
-    decimals: 2,
+    decimals: 3,
     market: 'futures',
     placement: 'live',
     moex: { kind: 'futures', assetCode: 'ORANGE' },
@@ -119,15 +118,15 @@ export const INSTRUMENTS: readonly Instrument[] = [
   {
     id: 'sugar',
     label: 'Сахар',
-    heroLabel: 'долларов за фунт',
-    unit: '$',
-    decimals: 2,
+    heroLabel: 'рублей за тонну',
+    unit: '₽',
+    decimals: 0,
     market: 'futures',
     placement: 'live',
     moex: { kind: 'futures', assetCode: 'SUGAR' },
   },
 
-  // ── Крипта (Binance, 24/7) ────────────────────────────────────────────────
+  // ── Крипта (Kraken USD live; Binance retained for history) ────────────────
   {
     id: 'btc',
     label: 'BTC',
@@ -137,23 +136,25 @@ export const INSTRUMENTS: readonly Instrument[] = [
     market: 'crypto',
     placement: 'live',
     binance: { symbol: 'BTCUSDT' },
+    kraken: { pair: 'BTCUSD', wsSymbol: 'BTC/USD' },
   },
   {
     id: 'eth',
     label: 'ETH',
     heroLabel: 'долларов за эфир',
     unit: '$',
-    decimals: 0,
+    decimals: 2,
     market: 'crypto',
     placement: 'live',
     binance: { symbol: 'ETHUSDT' },
+    kraken: { pair: 'ETHUSD', wsSymbol: 'ETH/USD' },
   },
   {
     id: 'ton',
     label: 'TON',
     heroLabel: 'долларов за тон',
     unit: '$',
-    decimals: 2,
+    decimals: 3,
     market: 'crypto',
     placement: 'live',
     // Keep Binance only as a historical reference; live moved to Kraken.
@@ -231,7 +232,7 @@ export function liveInstruments(): readonly Instrument[] {
 
 /** secid'ы валютного батча MOEX — одним запросом забираем все currency-инструменты */
 export function currencySecids(): string[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency')
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode)
     .map((i) => moexSecid(i.moex!))
     .filter((s): s is string => s !== null);
 }

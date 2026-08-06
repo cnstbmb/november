@@ -27,6 +27,8 @@ export interface LiveInstrument {
   readonly moex?: MoexRef;
   readonly binance?: BinanceRef;
   readonly kraken?: KrakenRef;
+  /** Official CBR daily rate; MOEX ref is retained only for historical backfill. */
+  readonly cbrCode?: string;
 }
 
 /**
@@ -35,9 +37,9 @@ export interface LiveInstrument {
  * decimals are a presentation concern owned by the frontend.
  */
 export const LIVE_INSTRUMENTS: readonly LiveInstrument[] = [
-  // FX (MOEX CETS)
-  { id: 'usdrub', market: 'fx', moex: { kind: 'currency', secid: 'USD000UTSTOM' } },
-  { id: 'eurrub', market: 'fx', moex: { kind: 'currency', secid: 'EUR_RUB__TOM' } },
+  // FX (USD/EUR official CBR live; MOEX refs retained for history)
+  { id: 'usdrub', market: 'fx', moex: { kind: 'currency', secid: 'USD000UTSTOM' }, cbrCode: 'USD' },
+  { id: 'eurrub', market: 'fx', moex: { kind: 'currency', secid: 'EUR_RUB__TOM' }, cbrCode: 'EUR' },
   { id: 'cnyrub', market: 'fx', moex: { kind: 'currency', secid: 'CNYRUB_TOM' } },
   { id: 'gold', market: 'fx', moex: { kind: 'currency', secid: 'GLDRUB_TOM' } },
 
@@ -52,9 +54,9 @@ export const LIVE_INSTRUMENTS: readonly LiveInstrument[] = [
   { id: 'oj', market: 'futures', moex: { kind: 'futures', assetCode: 'ORANGE' } },
   { id: 'sugar', market: 'futures', moex: { kind: 'futures', assetCode: 'SUGAR' } },
 
-  // Crypto (Binance, 24/7)
-  { id: 'btc', market: 'crypto', binance: { symbol: 'BTCUSDT' } },
-  { id: 'eth', market: 'crypto', binance: { symbol: 'ETHUSDT' } },
+  // Crypto (Kraken USD live; Binance retained for historical backfill)
+  { id: 'btc', market: 'crypto', binance: { symbol: 'BTCUSDT' }, kraken: { pair: 'BTCUSD' } },
+  { id: 'eth', market: 'crypto', binance: { symbol: 'ETHUSDT' }, kraken: { pair: 'ETHUSD' } },
   {
     id: 'ton',
     market: 'crypto',
@@ -70,9 +72,16 @@ export function instrumentsByMarket(kind: MarketKind): LiveInstrument[] {
 }
 
 export function currencySecids(): string[] {
-  return LIVE_INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').map(
+  return LIVE_INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode).map(
     (i) => (i.moex as { secid: string }).secid,
   );
+}
+
+export function cbrRates(): { id: string; cbrCode: string }[] {
+  return LIVE_INSTRUMENTS.filter((i) => i.cbrCode).map((i) => ({
+    id: i.id,
+    cbrCode: i.cbrCode!,
+  }));
 }
 
 export function indexSecids(): { id: string; secid: string }[] {

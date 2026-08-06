@@ -59,6 +59,14 @@ describe('DerivedEngine', () => {
     expect(q?.value).toBeNull();
   });
 
+  it('eurusd unavailable, если USD/RUB равен нулю', () => {
+    applyAll([
+      { instrumentId: 'usdrub', value: 0 },
+      { instrumentId: 'eurrub', value: 88 },
+    ]);
+    expect(quoteOf('eurusd')).toMatchObject({ value: null, status: 'unavailable' });
+  });
+
   // ── btcrub ────────────────────────────────────────────────────────────
 
   it('btcrub = btc × usdrub', () => {
@@ -115,6 +123,14 @@ describe('DerivedEngine', () => {
     expect(q?.value).toBeNull();
   });
 
+  it('не возвращает Infinity при нулевой цене Brent', () => {
+    applyAll([
+      { instrumentId: 'btc', value: 120000 },
+      { instrumentId: 'brent', value: 0 },
+    ]);
+    expect(quoteOf('btcoil')).toMatchObject({ value: null, status: 'unavailable' });
+  });
+
   // ── breakfast ─────────────────────────────────────────────────────────
 
   it('breakfast = среднее нормализованных компонентов × 100', () => {
@@ -126,6 +142,16 @@ describe('DerivedEngine', () => {
       { instrumentId: 'sugar', value: ref['sugar'] },     // 1.0
     ]);
     // mean(1,1,1,1) × 100 = 100
+    expect(quoteOf('breakfast')?.value).toBeCloseTo(100, 0);
+  });
+
+  it('breakfast = 100 для расчётных цен MOEX на дату базы 2026-07-28', () => {
+    applyAll([
+      { instrumentId: 'coffee', value: 3.383 }, // $/фунт
+      { instrumentId: 'oj', value: 1.44 }, // $/фунт
+      { instrumentId: 'wheat', value: 16_810 }, // ₽/тонна
+      { instrumentId: 'sugar', value: 63_000 }, // ₽/тонна
+    ]);
     expect(quoteOf('breakfast')?.value).toBeCloseTo(100, 0);
   });
 
@@ -179,6 +205,11 @@ describe('DerivedEngine', () => {
     expect(q?.value).toBeNull();
   });
 
+  it('rublgold unavailable, если gold равен нулю', () => {
+    applyAll([{ instrumentId: 'gold', value: 0 }]);
+    expect(quoteOf('rublgold')).toMatchObject({ value: null, status: 'unavailable' });
+  });
+
   // ── честность: unavailable вход → unavailable производная ────────────
 
   it('вход со статусом unavailable (value null) → производная unavailable, не 0', () => {
@@ -207,6 +238,22 @@ describe('DerivedEngine', () => {
       { instrumentId: 'eurrub', value: 88 },
     ]);
     expect(quoteOf('eurusd')?.status).toBe('stale');
+  });
+
+  it('статус closed наследуется от закрытого базового рынка', () => {
+    applyAll([
+      { instrumentId: 'btc', value: 120000 },
+      { instrumentId: 'usdrub', value: 80 },
+    ]);
+    const closedUsd = store.quoteOf('usdrub')!;
+    store.restore({
+      quotes: {
+        ...store.snapshot().quotes,
+        usdrub: { ...closedUsd, status: 'closed' },
+      },
+      historicalTarget: null,
+    });
+    expect(quoteOf('btcrub')?.status).toBe('closed');
   });
 
   it('статус closed, когда рынок производной закрыт', () => {

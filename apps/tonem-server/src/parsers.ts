@@ -41,6 +41,11 @@ function rowBySecid(block: IssBlock | undefined): Map<string, Map<string, unknow
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
+const positiveNum = (v: unknown): number | null => {
+  const value = num(v);
+  return value !== null && value > 0 ? value : null;
+};
+
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 
 function timesFrom(md: Map<string, unknown> | undefined): {
@@ -68,8 +73,46 @@ function makeTick(
   };
 }
 
+function xmlTag(block: string, tag: string): string | null {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, 'i'));
+  return match?.[1]?.trim() ?? null;
+}
+
+function xmlNumber(value: string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Official Bank of Russia XML_daily response -> normalized daily FX ticks. */
+export function parseCbrDailyXml(
+  xml: unknown,
+  mapping: readonly { id: string; cbrCode: string }[],
+  ts: Date,
+): TickInput[] {
+  if (typeof xml !== 'string') return [];
+  const dateMatch = xml.match(/<ValCurs\b[^>]*\bDate="(\d{2})\.(\d{2})\.(\d{4})"/i);
+  if (!dateMatch) return [];
+  const effectiveDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+  const byCode = new Map<string, number>();
+  for (const match of xml.matchAll(/<Valute\b[^>]*>([\s\S]*?)<\/Valute>/gi)) {
+    const block = match[1];
+    const code = xmlTag(block, 'CharCode');
+    const nominal = xmlNumber(xmlTag(block, 'Nominal'));
+    const rawValue = xmlNumber(xmlTag(block, 'Value'));
+    if (code && nominal !== null && nominal > 0 && rawValue !== null && rawValue > 0) {
+      byCode.set(code, rawValue / nominal);
+    }
+  }
+  return mapping.flatMap(({ id, cbrCode }) => {
+    const value = byCode.get(cbrCode) ?? null;
+    const tick = makeTick(id, value, ts, 'cbr', { cbrCode, effectiveDate });
+    return tick ? [tick] : [];
+  });
+}
+
 /**
- * Currency spot: LAST with fallback to MARKETPRICE (EUR_RUB__TOM's LAST is often null).
+ * MOEX currency spot (currently CNY and gold): LAST with MARKETPRICE fallback.
  * Produces one tick per mapped instrument, timestamped at the collection minute.
  */
 export function parseCurrencyBatch(
@@ -134,24 +177,24 @@ export function parseFuturesBatch(
       .map((row) => ({
         secid: String(row[colSecid]),
         expiry: String(row[colExpiry] ?? ''),
-        last: num(md.get(String(row[colSecid]))?.get('LAST')),
+        last: positiveNum(md.get(String(row[colSecid]))?.get('LAST')),
+        settle: positiveNum(md.get(String(row[colSecid]))?.get('SETTLEPRICE')),
       }));
 
-    // Nearest expiry not before today; otherwise nearest overall.
-    // Among equals prefer the contract with a live price.
+    // Nearest priced contract not before today. A newly listed front contract
+    // may have LAST=0 before its first trade, which must never become a quote.
     const tradable = candidates.filter((c) => c.expiry >= todayYmd);
     const pool = tradable.length > 0 ? tradable : candidates;
-    const chosen = [...pool].sort(
-      (a, b) =>
-        a.expiry.localeCompare(b.expiry) || Number(b.last !== null) - Number(a.last !== null),
-    )[0];
+    const sorted = [...pool].sort((a, b) => a.expiry.localeCompare(b.expiry));
+    const chosen = sorted.find((candidate) => candidate.last !== null || candidate.settle !== null);
 
     if (!chosen) continue;
     const { systime } = timesFrom(md.get(chosen.secid));
-    const tick = makeTick(id, chosen.last, ts, 'moex-futures', {
+    const tick = makeTick(id, chosen.last ?? chosen.settle, ts, 'moex-futures', {
       assetCode,
       secid: chosen.secid,
       expiry: chosen.expiry,
+      priceType: chosen.last !== null ? 'last' : 'settlement',
       ...(systime ? { systime: systime.toISOString() } : {}),
     });
     if (tick) out.push(tick);
@@ -203,7 +246,8 @@ export function parseKrakenTicker(
   if (!Array.isArray(envelope.ticker?.error) || envelope.ticker.error.length > 0) return [];
 
   const id = mapping.find(({ pair }) => pair === envelope.pair)?.id;
-  const row = envelope.ticker?.result?.[envelope.pair];
+  const result = envelope.ticker?.result;
+  const row = result?.[envelope.pair] ?? (result ? Object.values(result)[0] : undefined);
   const close = Array.isArray(row?.c) ? row.c[0] : undefined;
   const value = typeof close === 'string' ? Number(close) : num(close);
   if (!id || value === null || !Number.isFinite(value)) return [];

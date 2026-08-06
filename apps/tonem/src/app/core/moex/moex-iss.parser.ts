@@ -30,6 +30,11 @@ function rowBySecid(block: IssBlock | undefined): Map<string, Map<string, unknow
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
+const positiveNum = (v: unknown): number | null => {
+  const value = num(v);
+  return value !== null && value > 0 ? value : null;
+};
+
 const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 
 function timesFrom(md: Map<string, unknown> | undefined): {
@@ -41,7 +46,7 @@ function timesFrom(md: Map<string, unknown> | undefined): {
   return { time, systime };
 }
 
-/** Валютный спот: LAST, с фолбэком на MARKETPRICE (у EUR_RUB__TOM LAST часто null) */
+/** Валютный спот MOEX (сейчас CNY и золото): LAST, затем MARKETPRICE. */
 export function parseCurrencyBatch(
   json: unknown,
   mapping: readonly { id: string; secid: string }[],
@@ -95,22 +100,21 @@ export function parseFuturesBatch(
       .map((row) => ({
         secid: String(row[colSecid]),
         expiry: String(row[colExpiry] ?? ''),
-        last: num(md.get(String(row[colSecid]))?.get('LAST')),
+        last: positiveNum(md.get(String(row[colSecid]))?.get('LAST')),
+        settle: positiveNum(md.get(String(row[colSecid]))?.get('SETTLEPRICE')),
       }));
 
-    // ближайшая экспирация не раньше сегодня; без неё — ближайшая вообще.
-    // среди равных предпочитаем контракт с живой ценой.
+    // Ближайшая экспирация не раньше сегодня; контракт без положительной
+    // LAST/SETTLEPRICE пропускаем, чтобы ролловер не показывал ложный ноль.
     const tradable = candidates.filter((c) => c.expiry >= todayYmd);
     const pool = tradable.length > 0 ? tradable : candidates;
-    const chosen = [...pool].sort(
-      (a, b) =>
-        a.expiry.localeCompare(b.expiry) || Number(b.last !== null) - Number(a.last !== null),
-    )[0];
+    const sorted = [...pool].sort((a, b) => a.expiry.localeCompare(b.expiry));
+    const chosen = sorted.find((candidate) => candidate.last !== null || candidate.settle !== null);
 
     if (!chosen) {
       return { instrumentId: id, value: null, time: null, systime: null };
     }
     const { time, systime } = timesFrom(md.get(chosen.secid));
-    return { instrumentId: id, value: chosen.last, time, systime };
+    return { instrumentId: id, value: chosen.last ?? chosen.settle, time, systime };
   });
 }

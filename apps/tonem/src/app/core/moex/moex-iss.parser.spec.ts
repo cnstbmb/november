@@ -82,4 +82,40 @@ describe('parseFuturesBatch', () => {
     );
     expect(quotes[0].value).toBeNull();
   });
+
+  it('не принимает LAST=0 и использует положительный SETTLEPRICE', () => {
+    const json = {
+      securities: {
+        columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+        data: [['SuV6', 'SUGAR', '2026-10-01']],
+      },
+      marketdata: {
+        columns: ['SECID', 'LAST', 'SETTLEPRICE', 'TIME', 'SYSTIME'],
+        data: [['SuV6', 0, 71_000, null, '2026-07-28 19:15:00']],
+      },
+    };
+    const [quote] = parseFuturesBatch(json, [{ id: 'sugar', assetCode: 'SUGAR' }], today);
+    expect(quote.value).toBe(71_000);
+  });
+
+  it('пропускает непроторгованный ближний контракт без расчётной цены', () => {
+    const json = {
+      securities: {
+        columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+        data: [
+          ['BR-near', 'BR', '2026-08-01'],
+          ['BR-next', 'BR', '2026-09-01'],
+        ],
+      },
+      marketdata: {
+        columns: ['SECID', 'LAST', 'SETTLEPRICE'],
+        data: [
+          ['BR-near', 0, 0],
+          ['BR-next', 69, 68.8],
+        ],
+      },
+    };
+    const [quote] = parseFuturesBatch(json, [{ id: 'brent', assetCode: 'BR' }], today);
+    expect(quote.value).toBe(69);
+  });
 });

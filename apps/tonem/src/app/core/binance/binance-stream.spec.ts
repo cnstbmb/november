@@ -10,12 +10,12 @@ import {
 } from './binance-stream';
 
 describe('binanceMapping / combinedStreamUrl', () => {
-  it('строит combined-URL только из активных Binance-пар (btc/eth)', () => {
-    const mapping = binanceMapping();
-    expect(mapping).toEqual([
+  it('не включает исторические Binance-пары, когда live идёт из Kraken', () => {
+    expect(binanceMapping()).toEqual([]);
+    const mapping = [
       { id: 'btc', symbol: 'BTCUSDT' },
       { id: 'eth', symbol: 'ETHUSDT' },
-    ]);
+    ];
     expect(combinedStreamUrl(mapping)).toBe(
       'wss://stream.binance.com:9443/stream?streams=' +
         'btcusdt@miniTicker/ethusdt@miniTicker',
@@ -23,7 +23,10 @@ describe('binanceMapping / combinedStreamUrl', () => {
   });
 
   it('symbolToIdMap маппит символ на id инструмента', () => {
-    const map = symbolToIdMap(binanceMapping());
+    const map = symbolToIdMap([
+      { id: 'btc', symbol: 'BTCUSDT' },
+      { id: 'eth', symbol: 'ETHUSDT' },
+    ]);
     expect(map.get('BTCUSDT')).toBe('btc');
     expect(map.get('TONUSDT')).toBeUndefined();
     expect(map.get('DOGEUSDT')).toBeUndefined();

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 import { RatesStore } from '../rates/rates.store';
-import { BinanceWsService } from './binance-ws.service';
+import { BINANCE_LIVE_MAPPING, BinanceWsService } from './binance-ws.service';
 import { BINANCE_SOCKET_FACTORY, BinanceSocket } from './binance.types';
 import { BACKOFF_BASE_MS } from './binance-stream';
 
@@ -53,6 +53,10 @@ describe('BinanceWsService', () => {
       providers: [
         RatesStore,
         BinanceWsService,
+        { provide: BINANCE_LIVE_MAPPING, useValue: [
+          { id: 'btc', symbol: 'BTCUSDT' },
+          { id: 'eth', symbol: 'ETHUSDT' },
+        ] },
         { provide: LatestQuotesCacheService, useValue: { load: () => ({}), save: () => undefined } },
         { provide: BINANCE_SOCKET_FACTORY, useValue: (url: string) => new MockSocket(url) },
       ],

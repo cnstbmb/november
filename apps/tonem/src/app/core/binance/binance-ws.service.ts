@@ -1,4 +1,4 @@
-import { DestroyRef, Injectable, inject } from '@angular/core';
+import { DestroyRef, Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable, Subscription, retry, timer } from 'rxjs';
 import { RawQuote } from '../rates/quote.model';
 import { RatesStore } from '../rates/rates.store';
@@ -17,6 +17,11 @@ import {
 } from './binance-stream';
 import { parseCombinedMessage } from './binance.parser';
 
+export const BINANCE_LIVE_MAPPING = new InjectionToken<readonly { id: string; symbol: string }[]>(
+  'BinanceLiveMapping',
+  { providedIn: 'root', factory: binanceMapping },
+);
+
 /**
  * Живой коннектор крипты: combined WebSocket Binance (miniTicker),
  * троттлинг всплесков, автоматический reconnect с экспоненциальным backoff.
@@ -30,7 +35,7 @@ export class BinanceWsService {
   private readonly destroyRef = inject(DestroyRef);
   private readonly socketFactory: BinanceSocketFactory = inject(BINANCE_SOCKET_FACTORY);
 
-  private readonly mapping = binanceMapping();
+  private readonly mapping = inject(BINANCE_LIVE_MAPPING);
   private readonly symbolToId = symbolToIdMap(this.mapping);
   private readonly url = combinedStreamUrl(this.mapping);
 
@@ -51,7 +56,7 @@ export class BinanceWsService {
 
   /** Подписаться и писать котировки в стор. Идемпотентно. */
   start(): void {
-    if (this.running) return;
+    if (this.running || this.mapping.length === 0) return;
     this.running = true;
     this.destroyRef.onDestroy(() => this.stop());
     this.subscription = this.connect().subscribe((raws) => {

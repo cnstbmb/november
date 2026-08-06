@@ -13,14 +13,14 @@ describe('isTradingNow', () => {
     expect(isTradingNow('fx', at('03:00'))).toBe(false);
   });
 
-  it('fx: ещё закрыт в 06:00, уже торгует в 06:55', () => {
-    expect(isTradingNow('fx', at('06:00'))).toBe(false);
-    expect(isTradingNow('fx', at('06:55'))).toBe(true);
+  it('fx: закрыт до начала системной сессии в 10:00', () => {
+    expect(isTradingNow('fx', at('09:59'))).toBe(false);
+    expect(isTradingNow('fx', at('10:00'))).toBe(true);
   });
 
-  it('fx: торгует вечером 23:30, закрыт после 23:50', () => {
-    expect(isTradingNow('fx', at('23:30'))).toBe(true);
-    expect(isTradingNow('fx', at('23:55'))).toBe(false);
+  it('fx: закрыт с окончания системной сессии в 19:00', () => {
+    expect(isTradingNow('fx', at('18:59'))).toBe(true);
+    expect(isTradingNow('fx', at('19:00'))).toBe(false);
   });
 
   it('index: закрыт рано утром, открыт в 10:00', () => {
@@ -28,10 +28,27 @@ describe('isTradingNow', () => {
     expect(isTradingNow('index', at('10:00'))).toBe(true);
   });
 
-  it('выходные закрыты даже днём', () => {
-    // воскресенье 2026-07-26, 12:00 МСК
+  it('index: закрывается вместе с расчётом IMOEX в 19:00', () => {
+    expect(isTradingNow('index', at('18:59'))).toBe(true);
+    expect(isTradingNow('index', at('19:00'))).toBe(false);
+  });
+
+  it('futures: основная сессия начинается в 08:50', () => {
+    expect(isTradingNow('futures', at('08:49'))).toBe(false);
+    expect(isTradingNow('futures', at('08:50'))).toBe(true);
+  });
+
+  it('futures: выходная сессия работает с 10:00 до 19:00', () => {
+    const sunday = (hhmm: string) => new Date(`2026-07-26T${hhmm}:00+03:00`);
+    expect(isTradingNow('futures', sunday('09:59'))).toBe(false);
+    expect(isTradingNow('futures', sunday('10:00'))).toBe(true);
+    expect(isTradingNow('futures', sunday('18:59'))).toBe(true);
+    expect(isTradingNow('futures', sunday('19:00'))).toBe(false);
+  });
+
+  it('fx и index закрыты в выходные', () => {
     expect(isTradingNow('fx', new Date('2026-07-26T12:00:00+03:00'))).toBe(false);
-    expect(isTradingNow('futures', new Date('2026-07-26T12:00:00+03:00'))).toBe(false);
+    expect(isTradingNow('index', new Date('2026-07-26T12:00:00+03:00'))).toBe(false);
   });
 });
 
@@ -58,6 +75,12 @@ describe('deriveStatus', () => {
     expect(
       deriveStatus({ value: 78.5, systime: at('11:30'), market: 'fx', now: at('12:00') }),
     ).toBe('stale');
+  });
+
+  it('closed после 19:00 для последней котировки CNY, а не stale', () => {
+    expect(
+      deriveStatus({ value: 12.081, systime: at('19:15'), market: 'fx', now: at('22:39') }),
+    ).toBe('closed');
   });
 });
 

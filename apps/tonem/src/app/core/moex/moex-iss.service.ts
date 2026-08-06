@@ -41,7 +41,7 @@ export class MoexIssService {
           'iss.meta': 'off',
           'iss.only': 'securities,marketdata',
           'securities.columns': 'SECID,ASSETCODE,LASTTRADEDATE',
-          'marketdata.columns': 'SECID,LAST,TIME,SYSTIME',
+          'marketdata.columns': 'SECID,LAST,SETTLEPRICE,OPENPOSITION,TIME,SYSTIME',
         },
       },
     );

@@ -54,13 +54,13 @@ describe('KrakenWsService', () => {
     vi.useRealTimers();
   });
 
-  it('subscribes to TON/USD and applies a fresh Kraken quote', () => {
+  it('subscribes to actual USD pairs and applies a fresh Kraken quote', () => {
     service.start();
     expect(socket.url).toBe(KRAKEN_WS_URL);
     socket.onopen?.({});
     expect(JSON.parse(socket.sent[0])).toEqual({
       method: 'subscribe',
-      params: { channel: 'ticker', symbol: ['TON/USD'], snapshot: true },
+      params: { channel: 'ticker', symbol: ['BTC/USD', 'ETH/USD', 'TON/USD'], snapshot: true },
     });
 
     socket.onmessage?.({

@@ -8,6 +8,7 @@ import { liveInstruments } from './core/instruments/instrument.registry';
 import { LatestQuotesCacheService } from './core/offline/latest-quotes-cache.service';
 import { ConnectivityService } from './core/offline/connectivity.service';
 import { RatesStore } from './core/rates/rates.store';
+import { MarketViewStore } from './core/market-view/market-view.store';
 import { Quote, RawQuote } from './core/rates/quote.model';
 import { VIEW_SETTINGS_PLATFORM, ViewSettingsPlatform } from './core/view-settings/view-settings.platform';
 import { ViewSettingsStore } from './core/view-settings/view-settings.store';
@@ -111,12 +112,12 @@ describe('App', () => {
     expect(el.querySelector('.settings-trigger')).toBeTruthy();
   });
 
-  it('лента: живые инструменты + производные, без дублей', async () => {
+  it('лента: живые инструменты + производные в двух копиях для marquee', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    // До загрузки: только живые (производные с unavailable скрыты).
-    expect(el.querySelectorAll('.ticker-row').length).toBe(liveInstruments().length);
+    // Marquee визуально дублирует полный набор для бесшовной прокрутки.
+    expect(el.querySelectorAll('.marquee-chip').length).toBe(liveInstruments().length * 2);
 
     // После загрузки сырья для EUR/USD: производная появляется ровно один раз,
     // без дублирующей «dimmed» строки из стора.
@@ -128,11 +129,28 @@ describe('App', () => {
       now,
     );
     await fixture.whenStable();
-    const eurusdRows = el.querySelectorAll('.ticker-row');
+    const eurusdRows = el.querySelectorAll('.marquee-chip');
     const eurusdLabels = Array.from(eurusdRows)
-      .filter((row) => row.querySelector('.ticker-label')?.textContent?.includes('EUR/USD'));
-    expect(eurusdLabels).toHaveLength(1);
+      .filter((row) => row.querySelector('.chip-label')?.textContent?.includes('EUR/USD'));
+    expect(eurusdLabels).toHaveLength(2);
     const labels = Array.from(eurusdRows).map((node) => node.textContent ?? '');
-    expect(labels.filter((text) => text.includes('EUR/USD'))).toHaveLength(1);
+    expect(labels.filter((text) => text.includes('EUR/USD'))).toHaveLength(2);
+  });
+
+  it('под центральным одометром показывает текущего любимчика при ротации', async () => {
+    const fixture = TestBed.createComponent(App);
+    const settings = TestBed.inject(ViewSettingsStore);
+    const marketView = TestBed.inject(MarketViewStore);
+    settings.setHeroMode('rotation');
+    await fixture.whenStable();
+
+    const label = () => Array.from<HTMLElement>(
+      fixture.nativeElement.querySelectorAll('.hero-label > span'),
+    ).map((part) => part.textContent?.trim()).join(' ');
+    expect(label()).toBe('USD/RUB · рублей за доллар');
+
+    marketView.advanceRotation();
+    await fixture.whenStable();
+    expect(label()).toBe('EUR/RUB · рублей за евро');
   });
 });

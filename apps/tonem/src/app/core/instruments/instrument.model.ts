@@ -53,10 +53,10 @@ export interface Instrument {
   readonly moex?: MoexRef;
   /** Binance-источник, если инструмент — крипта */
   readonly binance?: BinanceRef;
-  /** Active Kraken source used when the corresponding Binance pair is paused. */
+  /** Active Kraken USD source; Binance may remain as a historical candle source. */
   readonly kraken?: KrakenRef;
   /** размещение: live (сырой тик) или derived (производная) */
   readonly placement: Placement;
-  /** код валюты в daily_json ЦБ (фолбэк), если применимо */
+  /** Код официального курса ЦБ; такой инструмент не берётся из live-батча MOEX. */
   readonly cbrCode?: string;
 }

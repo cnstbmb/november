@@ -4,32 +4,30 @@ import { Instrument, moexSecid } from './instrument.model';
  * Реестр инструментов — единый источник правды для фронта и коллектора tonem-server.
  * Порядок = порядок в тикере по умолчанию.
  *
- * live    — сырой тик из коннектора (MOEX / Binance / ЦБ).
+ * live    — сырой тик из коннектора (MOEX / Binance / Kraken).
  * derived — производная, считается на лету из живых (DerivedEngine), не хранится в БД.
  */
 export const INSTRUMENTS: readonly Instrument[] = [
-  // ── FX (USD/EUR — ЦБ РФ; CNY/золото — MOEX CETS) ─────────────────────────
+  // ── FX (USD/EUR — ближайшие MOEX-фьючерсы; CNY/золото — MOEX CETS) ────────
   {
     id: 'usdrub',
-    label: 'USD/RUB',
+    label: 'USD/RUB · фьючерс',
     heroLabel: 'рублей за доллар',
     unit: '₽',
     decimals: 2,
-    market: 'fx',
+    market: 'futures',
     placement: 'live',
-    moex: { kind: 'currency', secid: 'USD000UTSTOM' },
-    cbrCode: 'USD',
+    moex: { kind: 'futures', assetCode: 'Si', priceMultiplier: 0.001 },
   },
   {
     id: 'eurrub',
-    label: 'EUR/RUB',
+    label: 'EUR/RUB · фьючерс',
     heroLabel: 'рублей за евро',
     unit: '₽',
     decimals: 2,
-    market: 'fx',
+    market: 'futures',
     placement: 'live',
-    moex: { kind: 'currency', secid: 'EUR_RUB__TOM' },
-    cbrCode: 'EUR',
+    moex: { kind: 'futures', assetCode: 'Eu', priceMultiplier: 0.001 },
   },
   {
     id: 'cnyrub',
@@ -232,7 +230,7 @@ export function liveInstruments(): readonly Instrument[] {
 
 /** secid'ы валютного батча MOEX — одним запросом забираем все currency-инструменты */
 export function currencySecids(): string[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode)
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency')
     .map((i) => moexSecid(i.moex!))
     .filter((s): s is string => s !== null);
 }

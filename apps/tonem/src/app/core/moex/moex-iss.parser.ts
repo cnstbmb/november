@@ -79,7 +79,7 @@ export function parseIndexQuote(json: unknown, instrumentId: string): RawQuote {
  */
 export function parseFuturesBatch(
   json: unknown,
-  assets: readonly { id: string; assetCode: string }[],
+  assets: readonly { id: string; assetCode: string; priceMultiplier?: number }[],
   today: Date,
 ): RawQuote[] {
   const resp = json as IssResponse;
@@ -94,7 +94,7 @@ export function parseFuturesBatch(
   const colExpiry = sec.columns.indexOf('LASTTRADEDATE');
   const todayYmd = today.toLocaleDateString('en-CA', { timeZone: 'Europe/Moscow' });
 
-  return assets.map(({ id, assetCode }) => {
+  return assets.map(({ id, assetCode, priceMultiplier = 1 }) => {
     const candidates = sec.data
       .filter((row) => row[colAsset] === assetCode)
       .map((row) => ({
@@ -115,6 +115,12 @@ export function parseFuturesBatch(
       return { instrumentId: id, value: null, time: null, systime: null };
     }
     const { time, systime } = timesFrom(md.get(chosen.secid));
-    return { instrumentId: id, value: chosen.last ?? chosen.settle, time, systime };
+    const rawPrice = chosen.last ?? chosen.settle;
+    return {
+      instrumentId: id,
+      value: rawPrice === null ? null : rawPrice * priceMultiplier,
+      time,
+      systime,
+    };
   });
 }

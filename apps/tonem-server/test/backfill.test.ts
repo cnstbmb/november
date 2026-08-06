@@ -257,6 +257,26 @@ describe('Binance pagination', () => {
 });
 
 describe('idempotent batch persistence', () => {
+  it('normalizes a currency futures contract quote before persistence', async () => {
+    const createMany = vi.fn(async (ticks: readonly unknown[]) => ticks.length);
+    const ts = new Date('2026-08-06T20:00:00.000Z');
+
+    await persistCandles(
+      createMany,
+      'usdrub',
+      [{ ts, close: 82_278 }],
+      { source: 'moex-futures', secid: 'SiU6' },
+      0.001,
+    );
+
+    expect(createMany).toHaveBeenCalledWith([{
+      instrument: 'usdrub',
+      ts,
+      value: 82.278,
+      meta: { source: 'moex-futures', secid: 'SiU6' },
+    }]);
+  });
+
   it('uses a skip-duplicates batch, preserves existing ticks, and reports honest counts', async () => {
     const createMany = vi.fn(async () => 1);
     const candles = [

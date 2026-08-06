@@ -54,11 +54,20 @@ export class CandlesService {
     }
 
     // MOEX: currency/index — secid готов; futures — сначала резолвим контракт.
+    const priceMultiplier = instrument.moex?.kind === 'futures'
+      ? (instrument.moex.priceMultiplier ?? 1)
+      : 1;
     return this.resolveMoexSecid(instrument, source, now).pipe(
       switchMap((secid) =>
         secid === null
           ? of([])
-          : this.fetchMoexCandles(source.engine, source.market, secid, decision.fromYmd),
+          : this.fetchMoexCandles(
+              source.engine,
+              source.market,
+              secid,
+              decision.fromYmd,
+              priceMultiplier,
+            ),
       ),
       map((candles) => ({ candles, session: decision.session })),
     );
@@ -87,6 +96,7 @@ export class CandlesService {
     market: string,
     secid: string,
     fromYmd: string,
+    priceMultiplier: number,
   ): Observable<Candle[]> {
     return this.http
       .get(`${ISS_BASE}/engines/${engine}/markets/${market}/securities/${secid}/candles.json`, {
@@ -97,7 +107,7 @@ export class CandlesService {
         },
       })
       .pipe(
-        map((json) => parseMoexCandles(json)),
+        map((json) => parseMoexCandles(json, priceMultiplier)),
         catchError(() => of([])),
       );
   }

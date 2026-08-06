@@ -11,7 +11,12 @@ export type MarketKind = 'fx' | 'futures' | 'index' | 'crypto';
 export type MoexRef =
   | { readonly kind: 'currency'; readonly secid: string }
   | { readonly kind: 'index'; readonly secid: string }
-  | { readonly kind: 'futures'; readonly assetCode: string };
+  | {
+      readonly kind: 'futures';
+      readonly assetCode: string;
+      /** Converts the exchange contract quote to the displayed instrument unit. */
+      readonly priceMultiplier?: number;
+    };
 
 export interface BinanceRef {
   readonly symbol: string;
@@ -27,8 +32,6 @@ export interface LiveInstrument {
   readonly moex?: MoexRef;
   readonly binance?: BinanceRef;
   readonly kraken?: KrakenRef;
-  /** Official CBR daily rate; MOEX ref is retained only for historical backfill. */
-  readonly cbrCode?: string;
 }
 
 /**
@@ -37,9 +40,10 @@ export interface LiveInstrument {
  * decimals are a presentation concern owned by the frontend.
  */
 export const LIVE_INSTRUMENTS: readonly LiveInstrument[] = [
-  // FX (USD/EUR official CBR live; MOEX refs retained for history)
-  { id: 'usdrub', market: 'fx', moex: { kind: 'currency', secid: 'USD000UTSTOM' }, cbrCode: 'USD' },
-  { id: 'eurrub', market: 'fx', moex: { kind: 'currency', secid: 'EUR_RUB__TOM' }, cbrCode: 'EUR' },
+  // FX: USD/EUR use the nearest actively traded MOEX futures contract.
+  // Si/Eu prices are quoted in RUB per 1,000 USD/EUR, hence the multiplier.
+  { id: 'usdrub', market: 'futures', moex: { kind: 'futures', assetCode: 'Si', priceMultiplier: 0.001 } },
+  { id: 'eurrub', market: 'futures', moex: { kind: 'futures', assetCode: 'Eu', priceMultiplier: 0.001 } },
   { id: 'cnyrub', market: 'fx', moex: { kind: 'currency', secid: 'CNYRUB_TOM' } },
   { id: 'gold', market: 'fx', moex: { kind: 'currency', secid: 'GLDRUB_TOM' } },
 
@@ -72,16 +76,9 @@ export function instrumentsByMarket(kind: MarketKind): LiveInstrument[] {
 }
 
 export function currencySecids(): string[] {
-  return LIVE_INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode).map(
+  return LIVE_INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').map(
     (i) => (i.moex as { secid: string }).secid,
   );
-}
-
-export function cbrRates(): { id: string; cbrCode: string }[] {
-  return LIVE_INSTRUMENTS.filter((i) => i.cbrCode).map((i) => ({
-    id: i.id,
-    cbrCode: i.cbrCode!,
-  }));
 }
 
 export function indexSecids(): { id: string; secid: string }[] {
@@ -91,10 +88,13 @@ export function indexSecids(): { id: string; secid: string }[] {
   }));
 }
 
-export function futuresAssets(): { id: string; assetCode: string }[] {
+export function futuresAssets(): { id: string; assetCode: string; priceMultiplier?: number }[] {
   return LIVE_INSTRUMENTS.filter((i) => i.moex?.kind === 'futures').map((i) => ({
     id: i.id,
     assetCode: (i.moex as { assetCode: string }).assetCode,
+    ...('priceMultiplier' in i.moex! && i.moex.priceMultiplier !== undefined
+      ? { priceMultiplier: i.moex.priceMultiplier }
+      : {}),
   }));
 }
 

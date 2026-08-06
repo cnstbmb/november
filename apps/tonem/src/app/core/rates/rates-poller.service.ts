@@ -16,16 +16,18 @@ import { RatesStore } from './rates.store';
 const FX_SECIDS = currencySecids();
 
 function currencyMapping(): { id: string; secid: string }[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode).flatMap((i) => {
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').flatMap((i) => {
     const secid = moexSecid(i.moex!);
     return secid ? [{ id: i.id, secid }] : [];
   });
 }
 
-function futuresAssets(): { id: string; assetCode: string }[] {
+function futuresAssets(): { id: string; assetCode: string; priceMultiplier?: number }[] {
   return INSTRUMENTS.filter((i) => i.moex?.kind === 'futures').flatMap((i) => {
     const assetCode = moexAssetCode(i.moex!);
-    return assetCode ? [{ id: i.id, assetCode }] : [];
+    if (!assetCode) return [];
+    const priceMultiplier = i.moex?.kind === 'futures' ? i.moex.priceMultiplier : undefined;
+    return [{ id: i.id, assetCode, ...(priceMultiplier !== undefined ? { priceMultiplier } : {}) }];
   });
 }
 
@@ -38,8 +40,8 @@ function indexInstrument(): { id: string; secid: string } | null {
 /**
  * Цикл опроса MOEX с каденсом из pollDelayMs:
  * быстро, пока рынки живы; раз в 5 минут, когда всё закрыто.
- * USD/EUR приходят с официальным происхождением ЦБ через tonem-server;
- * CNY и золото опрашиваются напрямую на MOEX.
+ * USD/EUR приходят из ближайших Si/Eu фьючерсов MOEX;
+ * CNY и золото — из валютного спота MOEX.
  */
 @Injectable({ providedIn: 'root' })
 export class RatesPoller {
@@ -83,7 +85,7 @@ export class RatesPoller {
         .pipe(catchError(() => of(null))),
       futures: this.moex.fetchFuturesBoard().pipe(catchError(() => of(null))),
       backend: this.backend.fetchFallbackQuotes().pipe(
-        catchError(() => of({ kraken: [], cbr: [] })),
+        catchError(() => of({ kraken: [] })),
       ),
     }).subscribe(({ currency, index, futures, backend }) => {
       this.request = null;
@@ -97,9 +99,6 @@ export class RatesPoller {
       if (currencyQuotes.length > 0) {
         this.store.apply(currencyQuotes, 'moex', now);
       }
-
-      // USD and EUR are official daily CBR rates delivered by tonem-server.
-      if (backend.cbr.length > 0) this.store.apply(backend.cbr, 'cbr', now);
 
       const idx = indexInstrument();
       if (index !== null && idx) {

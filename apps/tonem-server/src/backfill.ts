@@ -344,12 +344,13 @@ export async function persistCandles(
   instrument: string,
   candles: readonly CandleRow[],
   meta: Record<string, unknown>,
+  priceMultiplier = 1,
 ): Promise<PersistenceResult> {
   if (candles.length === 0) return { eligible: 0, inserted: 0, skipped: 0 };
   const ticks = candles.map((candle) => ({
     instrument,
     ts: candle.ts,
-    value: candle.close,
+    value: candle.close * priceMultiplier,
     meta,
   }));
   let inserted = 0;
@@ -486,11 +487,18 @@ async function backfillMoexRange(
   request: MoexCandleRequest,
   now: Date,
   meta: Record<string, unknown>,
+  priceMultiplier = 1,
 ): Promise<Omit<BackfillProgress, 'instrument'> & { firstEligible?: Date; lastEligible?: Date }> {
   const fetched = await fetchAllMoexCandles(request, dependencies.fetchJson);
   const eligible = filterCandles(fetched, request.from, request.to, now);
   assertNoLargeGaps(`MOEX ${request.secid} ${request.interval}m`, eligible, HISTORY_START_GRACE_MS);
-  const persistence = await persistCandles(dependencies.createMany, instrument, eligible, meta);
+  const persistence = await persistCandles(
+    dependencies.createMany,
+    instrument,
+    eligible,
+    meta,
+    priceMultiplier,
+  );
   dependencies.log(
     `  ${instrument}/${request.secid} ${request.interval}m ${request.from.toISOString()}`
       + `..${request.to.toISOString()}: fetched=${fetched.length}`
@@ -639,7 +647,11 @@ async function backfillFuturesInstrument(
           assetCode: moex.assetCode,
           secid: segment.contract.secid,
           interval,
+          ...(moex.priceMultiplier !== undefined
+            ? { priceMultiplier: moex.priceMultiplier }
+            : {}),
         },
+        moex.priceMultiplier,
       );
       if (to.getTime() - from.getTime() > HISTORY_START_GRACE_MS) {
         assertRangeCoverage(

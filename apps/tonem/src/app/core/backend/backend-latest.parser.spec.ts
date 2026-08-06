@@ -38,7 +38,7 @@ describe('parseBackendKrakenQuotes', () => {
     ).toEqual([]);
   });
 
-  it('separates official CBR and Kraken fallback quotes', () => {
+  it('keeps Kraken fallback quotes and ignores legacy CBR rows', () => {
     expect(parseBackendFallbackQuotes({
       usdrub: {
         ts: '2026-08-06T18:58:00.000Z',
@@ -56,12 +56,6 @@ describe('parseBackendKrakenQuotes', () => {
         meta: { source: 'cbr', cbrCode: 'USD' },
       },
     })).toEqual({
-      cbr: [{
-        instrumentId: 'usdrub',
-        value: 80.25,
-        time: new Date('2026-08-06T18:58:00.000Z'),
-        systime: new Date('2026-08-06T18:58:00.000Z'),
-      }],
       kraken: [{
         instrumentId: 'btc',
         value: 64_000,

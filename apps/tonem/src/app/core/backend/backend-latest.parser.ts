@@ -28,35 +28,12 @@ export function parseBackendKrakenQuotes(value: unknown): RawQuote[] {
   return out;
 }
 
-/** Accept only server ticks whose instrument and currency code match the registry. */
-export function parseBackendCbrQuotes(value: unknown): RawQuote[] {
-  const root = record(value);
-  if (!root) return [];
-  const out: RawQuote[] = [];
-  for (const [instrumentId, candidate] of Object.entries(root)) {
-    const instrument = instrumentById(instrumentId);
-    const entry = record(candidate);
-    const meta = record(entry?.['meta']);
-    const timestamp = typeof entry?.['ts'] === 'string' ? Date.parse(entry['ts']) : NaN;
-    const quoteValue = entry?.['value'];
-    if (!instrument?.cbrCode || meta?.['source'] !== 'cbr') continue;
-    if (meta['cbrCode'] !== instrument.cbrCode) continue;
-    if (typeof quoteValue !== 'number' || !Number.isFinite(quoteValue) || quoteValue <= 0) continue;
-    if (!Number.isFinite(timestamp)) continue;
-    const at = new Date(timestamp);
-    out.push({ instrumentId, value: quoteValue, time: at, systime: at });
-  }
-  return out;
-}
-
 export interface BackendFallbackQuotes {
   readonly kraken: RawQuote[];
-  readonly cbr: RawQuote[];
 }
 
 export function parseBackendFallbackQuotes(value: unknown): BackendFallbackQuotes {
   return {
     kraken: parseBackendKrakenQuotes(value),
-    cbr: parseBackendCbrQuotes(value),
   };
 }

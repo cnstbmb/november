@@ -9,6 +9,7 @@ import imoexJson from '../moex/__fixtures__/imoex.json';
 import fortsBatch from '../moex/__fixtures__/forts-batch.json';
 
 const backendLatest = {
+  // Legacy rows may still exist in the database; live FX must ignore them.
   usdrub: {
     ts: '2026-08-06T18:58:00.000Z',
     value: 80.25,
@@ -23,6 +24,25 @@ const backendLatest = {
     ts: '2026-08-06T18:58:00.000Z',
     value: 1.378,
     meta: { source: 'kraken', pair: 'TONUSD' },
+  },
+};
+
+const fortsWithFx = {
+  securities: {
+    ...fortsBatch.securities,
+    data: [
+      ['SiU6', 'Si', '2026-09-17'],
+      ['EuU6', 'Eu', '2026-09-17'],
+      ...fortsBatch.securities.data,
+    ],
+  },
+  marketdata: {
+    ...fortsBatch.marketdata,
+    data: [
+      ['SiU6', 82_278, '18:41:09', '2026-07-28 22:08:59'],
+      ['EuU6', 94_658, '18:41:09', '2026-07-28 22:08:59'],
+      ...fortsBatch.marketdata.data,
+    ],
   },
 };
 
@@ -54,7 +74,7 @@ describe('RatesPoller', () => {
   const flushMoexCycle = () => {
     http.expectOne((r) => r.url.includes('/engines/currency/')).flush(currencyBatch);
     http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
-    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
+    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
     http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
   };
 
@@ -73,15 +93,15 @@ describe('RatesPoller', () => {
 
     poller.start();
     flushMoexCycle();
-    expect(store.hero().quote.value).toBeCloseTo(80.25, 2);
-    expect(store.hero().quote.source).toBe('cbr');
+    expect(store.hero().quote.value).toBeCloseTo(82.278, 3);
+    expect(store.hero().quote.source).toBe('moex');
   });
 
-  it('цикл загружает котировки всех трёх источников в стор', () => {
+  it('цикл загружает MOEX и Kraken котировки в стор', () => {
     poller.start();
     flushMoexCycle();
 
-    expect(store.hero().quote.value).toBeCloseTo(80.25, 2);
+    expect(store.hero().quote.value).toBeCloseTo(82.278, 3);
     expect(store.quoteOf('brent')?.value).not.toBeNull();
     expect(store.quoteOf('imoex')?.value).toBeCloseTo(2191.18, 2);
     expect(store.quoteOf('ton')?.value).toBe(1.378);
@@ -104,42 +124,40 @@ describe('RatesPoller', () => {
     expect(store.quoteOf('ton')?.systime).toEqual(websocketTs);
   });
 
-  it('USD/EUR всегда приходят из официального CBR backend независимо от MOEX', async () => {
-    poller.start();
-    http
-      .expectOne((r) => r.url.includes('/engines/currency/'))
-      .flush('boom', { status: 500, statusText: 'ERR' });
-    http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
-    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
-    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
-
-    expect(store.hero().quote.source).toBe('cbr');
-    expect(store.hero().quote.value).not.toBeNull();
-    // не-FX инструменты остались от MOEX
-    expect(store.quoteOf('imoex')?.source).toBe('moex');
-  });
-
-  it('пустой MOEX marketdata не мешает получить USD/EUR из CBR backend', () => {
-    poller.start();
-    http
-      .expectOne((r) => r.url.includes('/engines/currency/'))
-      .flush({ marketdata: { columns: ['SECID', 'LAST', 'TIME', 'SYSTIME'], data: [] } });
-    http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
-    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
-    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
-
-    expect(store.hero().quote.source).toBe('cbr');
-    expect(store.hero().quote.value).not.toBeNull();
-  });
-
-  it('не запрашивает приостановленные USD/EUR инструменты у MOEX', () => {
+  it('USD/EUR приходят из ближайших MOEX-фьючерсов и игнорируют legacy CBR backend', async () => {
     poller.start();
     const currency = http.expectOne((r) => r.url.includes('/engines/currency/'));
     expect(currency.request.params.get('securities')).toBe('CNYRUB_TOM,GLDRUB_TOM');
     currency.flush(currencyBatch);
     http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
-    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsBatch);
+    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
     http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
-    expect(store.quoteOf('usdrub')?.source).toBe('cbr');
+
+    expect(store.quoteOf('usdrub')).toMatchObject({ source: 'moex', value: 82.278 });
+    expect(store.quoteOf('eurrub')).toMatchObject({ source: 'moex', value: 94.658 });
+  });
+
+  it('пустой валютный спот не мешает получить USD/EUR из фьючерсов', () => {
+    poller.start();
+    http
+      .expectOne((r) => r.url.includes('/engines/currency/'))
+      .flush({ marketdata: { columns: ['SECID', 'LAST', 'TIME', 'SYSTIME'], data: [] } });
+    http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
+    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
+    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
+
+    expect(store.hero().quote.source).toBe('moex');
+    expect(store.hero().quote.value).toBeCloseTo(82.278, 3);
+  });
+
+  it('не запрашивает приостановленные USD/EUR spot-инструменты у MOEX', () => {
+    poller.start();
+    const currency = http.expectOne((r) => r.url.includes('/engines/currency/'));
+    expect(currency.request.params.get('securities')).toBe('CNYRUB_TOM,GLDRUB_TOM');
+    currency.flush(currencyBatch);
+    http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
+    http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
+    http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
+    expect(store.quoteOf('usdrub')?.source).toBe('moex');
   });
 });

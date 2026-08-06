@@ -20,7 +20,7 @@ const num = (v: unknown): number | null =>
  * ts — begin (МСК-строка "2026-07-28 10:00:00"), close — цена закрытия.
  * Кривой ответ → пустой массив, без исключений.
  */
-export function parseMoexCandles(json: unknown): Candle[] {
+export function parseMoexCandles(json: unknown, priceMultiplier = 1): Candle[] {
   const block = (json as CandlesResponse)?.candles;
   if (!block || !Array.isArray(block.columns) || !Array.isArray(block.data)) return [];
 
@@ -42,10 +42,10 @@ export function parseMoexCandles(json: unknown): Candle[] {
     const low = colLow >= 0 ? num(row[colLow]) : null;
     out.push({
       ts,
-      close,
-      ...(open !== null ? { open } : {}),
-      ...(high !== null ? { high } : {}),
-      ...(low !== null ? { low } : {}),
+      close: close * priceMultiplier,
+      ...(open !== null ? { open: open * priceMultiplier } : {}),
+      ...(high !== null ? { high: high * priceMultiplier } : {}),
+      ...(low !== null ? { low: low * priceMultiplier } : {}),
     });
   }
   return out;

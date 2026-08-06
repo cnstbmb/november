@@ -8,18 +8,15 @@ const MOEX_OPEN = new Date('2026-07-28T09:00:00.000Z'); // 12:00 MSK
 // A weekend — MOEX closed, crypto still 24/7. 2026-08-01 is a Saturday.
 const WEEKEND = new Date('2026-08-01T17:00:00.000Z'); // 20:00 MSK Saturday
 
-const CBR_XML = `<ValCurs Date="29.07.2026">
-  <Valute><CharCode>USD</CharCode><Nominal>1</Nominal><Value>78,6980</Value></Valute>
-  <Valute><CharCode>EUR</CharCode><Nominal>1</Nominal><Value>89,6292</Value></Valute>
-</ValCurs>`;
-
 function makeSources(): QuoteSourcesService {
   return {
-    fetchCbrDailyXml: vi.fn().mockResolvedValue(CBR_XML),
     fetchCurrencyBatch: vi.fn().mockResolvedValue({
       marketdata: {
         columns: ['SECID', 'LAST', 'MARKETPRICE'],
-        data: [['USD000UTSTOM', 91.25, 91.2]],
+        data: [
+          ['CNYRUB_TOM', 11.25, 11.2],
+          ['GLDRUB_TOM', 8_750, 8_740],
+        ],
       },
     }),
     fetchIndex: vi.fn().mockResolvedValue({
@@ -31,11 +28,19 @@ function makeSources(): QuoteSourcesService {
     fetchFuturesBoard: vi.fn().mockResolvedValue({
       securities: {
         columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
-        data: [['BR-9.26', 'BR', '2026-09-01']],
+        data: [
+          ['SiU6', 'Si', '2026-09-17'],
+          ['EuU6', 'Eu', '2026-09-17'],
+          ['BR-9.26', 'BR', '2026-09-01'],
+        ],
       },
       marketdata: {
         columns: ['SECID', 'LAST'],
-        data: [['BR-9.26', 68.5]],
+        data: [
+          ['SiU6', 82_278],
+          ['EuU6', 94_658],
+          ['BR-9.26', 68.5],
+        ],
       },
     }),
     fetchBinancePrices: vi.fn().mockResolvedValue([
@@ -73,17 +78,31 @@ describe('CollectorService', () => {
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('BTCUSD');
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('ETHUSD');
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('TONUSD');
-    expect(sources.fetchCurrencyBatch).toHaveBeenCalled();
+    expect(sources.fetchCurrencyBatch).toHaveBeenCalledWith(['CNYRUB_TOM', 'GLDRUB_TOM']);
     expect(sources.fetchIndex).toHaveBeenCalledWith('IMOEX');
     expect(sources.fetchFuturesBoard).toHaveBeenCalled();
 
-    const ticks = store.saveTicks.mock.calls[0][0] as { instrument: string; ts: Date }[];
+    const ticks = store.saveTicks.mock.calls[0][0] as {
+      instrument: string;
+      ts: Date;
+      value: number;
+      meta?: Record<string, unknown>;
+    }[];
     const instruments = ticks.map((t) => t.instrument);
     expect(instruments).toContain('btc');
     expect(instruments).toContain('ton');
     expect(instruments).toContain('usdrub');
+    expect(instruments).toContain('eurrub');
     expect(instruments).toContain('imoex');
     expect(instruments).toContain('brent');
+    expect(ticks.find((tick) => tick.instrument === 'usdrub')).toMatchObject({
+      value: 82.278,
+      meta: { source: 'moex-futures', assetCode: 'Si', secid: 'SiU6' },
+    });
+    expect(ticks.find((tick) => tick.instrument === 'eurrub')).toMatchObject({
+      value: 94.658,
+      meta: { source: 'moex-futures', assetCode: 'Eu', secid: 'EuU6' },
+    });
     // every tick ts is truncated to the minute
     for (const t of ticks) {
       expect(t.ts.getSeconds()).toBe(0);
@@ -91,7 +110,7 @@ describe('CollectorService', () => {
     }
   });
 
-  it('collects CBR + crypto when MOEX is closed after the weekend session', async () => {
+  it('collects only 24/7 crypto when MOEX is closed after the weekend session', async () => {
     const sources = makeSources();
     const store = makeStore();
     const svc = new CollectorService(sources, store);

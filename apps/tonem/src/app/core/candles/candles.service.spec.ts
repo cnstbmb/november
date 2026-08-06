@@ -19,6 +19,17 @@ const usdrub: Instrument = {
   moex: { kind: 'currency', secid: 'USD000UTSTOM' },
 };
 
+const usdFuture: Instrument = {
+  id: 'usdrub',
+  label: 'USD/RUB · фьючерс',
+  heroLabel: 'рублей за доллар',
+  unit: '₽',
+  decimals: 2,
+  market: 'futures',
+  placement: 'live',
+  moex: { kind: 'futures', assetCode: 'Si', priceMultiplier: 0.001 },
+};
+
 const brent: Instrument = {
   id: 'brent',
   label: 'Нефть',
@@ -102,6 +113,32 @@ describe('CandlesService', () => {
     candlesReq.flush(moexFixture);
 
     expect((out as { candles: unknown[] }).candles).toHaveLength(4);
+  });
+
+  it('валютный futures: приводит цену контракта за 1000 USD к цене одного USD', () => {
+    const now = new Date('2026-07-28T12:00:00+03:00');
+    let out: unknown;
+    service.intraday(usdFuture, now).subscribe((result) => (out = result));
+
+    http
+      .expectOne((request) => request.url.includes('/engines/futures/markets/forts/boards/RFUD/'))
+      .flush({
+        securities: {
+          columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+          data: [['SiU6', 'Si', '2026-09-17']],
+        },
+      });
+    http
+      .expectOne((request) => request.url.includes('/securities/SiU6/candles.json'))
+      .flush({
+        candles: {
+          columns: ['open', 'close', 'high', 'low', 'begin'],
+          data: [[82_000, 82_278, 82_300, 81_950, '2026-07-28 10:00:00']],
+        },
+      });
+
+    const [candle] = (out as { candles: { open: number; close: number }[] }).candles;
+    expect(candle).toMatchObject({ open: 82, close: 82.278 });
   });
 
   it('crypto: запрашивает Binance klines, всегда current', () => {

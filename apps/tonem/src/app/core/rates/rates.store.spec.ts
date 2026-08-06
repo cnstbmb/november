@@ -51,11 +51,6 @@ describe('RatesStore', () => {
     expect(store.hero().quote.status).toBe('closed');
   });
 
-  it('источник cbr сохраняется в котировке', () => {
-    store.apply([raw({})], 'cbr', now);
-    expect(store.hero().quote.source).toBe('cbr');
-  });
-
   it('после apply передаёт в офлайн-кэш полный объединённый снимок', () => {
     store.apply([raw({ instrumentId: 'usdrub' })], 'moex', now);
     store.apply([raw({ instrumentId: 'eurrub', value: 85 })], 'moex', now);

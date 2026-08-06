@@ -147,10 +147,10 @@ describe('App', () => {
     const label = () => Array.from<HTMLElement>(
       fixture.nativeElement.querySelectorAll('.hero-label > span'),
     ).map((part) => part.textContent?.trim()).join(' ');
-    expect(label()).toBe('USD/RUB · рублей за доллар');
+    expect(label()).toBe('USD/RUB · фьючерс · рублей за доллар');
 
     marketView.advanceRotation();
     await fixture.whenStable();
-    expect(label()).toBe('EUR/RUB · рублей за евро');
+    expect(label()).toBe('EUR/RUB · фьючерс · рублей за евро');
   });
 });

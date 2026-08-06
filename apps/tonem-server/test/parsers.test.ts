@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseBinancePrices,
-  parseCbrDailyXml,
   parseCurrencyBatch,
   parseFuturesBatch,
   parseIndexQuote,
@@ -9,37 +8,6 @@ import {
 } from '../src/parsers';
 
 const TS = new Date('2026-07-28T19:15:00.000Z');
-
-describe('parseCbrDailyXml', () => {
-  it('normalizes official CBR rates by nominal', () => {
-    const xml = `<?xml version="1.0" encoding="windows-1251"?>
-      <ValCurs Date="29.07.2026" name="Foreign Currency Market">
-        <Valute ID="R01235"><NumCode>840</NumCode><CharCode>USD</CharCode><Nominal>1</Nominal><Value>78,6980</Value></Valute>
-        <Valute ID="R01239"><NumCode>978</NumCode><CharCode>EUR</CharCode><Nominal>1</Nominal><Value>89,6292</Value></Valute>
-        <Valute ID="R01375"><NumCode>156</NumCode><CharCode>CNY</CharCode><Nominal>10</Nominal><Value>115,9110</Value></Valute>
-      </ValCurs>`;
-    const ticks = parseCbrDailyXml(xml, [
-      { id: 'usdrub', cbrCode: 'USD' },
-      { id: 'eurrub', cbrCode: 'EUR' },
-      { id: 'cnyrub', cbrCode: 'CNY' },
-    ], TS);
-    expect(ticks.map((tick) => [tick.instrument, tick.value])).toEqual([
-      ['usdrub', 78.698],
-      ['eurrub', 89.6292],
-      ['cnyrub', 11.5911],
-    ]);
-    expect(ticks[0].meta).toMatchObject({
-      source: 'cbr',
-      cbrCode: 'USD',
-      effectiveDate: '2026-07-29',
-    });
-  });
-
-  it('rejects malformed or non-positive rates', () => {
-    expect(parseCbrDailyXml('<html>oops</html>', [{ id: 'usdrub', cbrCode: 'USD' }], TS))
-      .toEqual([]);
-  });
-});
 
 describe('parseCurrencyBatch', () => {
   const mapping = [
@@ -164,6 +132,26 @@ describe('parseFuturesBatch', () => {
     };
     const ticks = parseFuturesBatch(json, [{ id: 'sugar', assetCode: 'SUGAR' }], today, TS);
     expect(ticks[0].value).toBe(71_000);
+  });
+
+  it('normalizes Si/Eu contract prices to one unit of currency', () => {
+    const json = {
+      securities: {
+        columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+        data: [['SiU6', 'Si', '2026-09-17']],
+      },
+      marketdata: {
+        columns: ['SECID', 'LAST'],
+        data: [['SiU6', 82_278]],
+      },
+    };
+    const [tick] = parseFuturesBatch(
+      json,
+      [{ id: 'usdrub', assetCode: 'Si', priceMultiplier: 0.001 }],
+      today,
+      TS,
+    );
+    expect(tick.value).toBe(82.278);
   });
 
   it('skips an unpriced front contract in favor of the next liquid one', () => {

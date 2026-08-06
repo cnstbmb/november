@@ -10,7 +10,12 @@ export type MarketKind = 'fx' | 'futures' | 'index' | 'crypto';
 export type MoexRef =
   | { readonly kind: 'currency'; readonly secid: string }
   | { readonly kind: 'index'; readonly secid: string }
-  | { readonly kind: 'futures'; readonly assetCode: string };
+  | {
+      readonly kind: 'futures';
+      readonly assetCode: string;
+      /** Converts a contract quote to the unit displayed by the instrument. */
+      readonly priceMultiplier?: number;
+    };
 
 /** Описание источника Binance (крипта, combined WebSocket) */
 export interface BinanceRef {
@@ -57,6 +62,4 @@ export interface Instrument {
   readonly kraken?: KrakenRef;
   /** размещение: live (сырой тик) или derived (производная) */
   readonly placement: Placement;
-  /** Код официального курса ЦБ; такой инструмент не берётся из live-батча MOEX. */
-  readonly cbrCode?: string;
 }

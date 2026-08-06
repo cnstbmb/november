@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { vi } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
@@ -35,10 +36,12 @@ const raw = (over: Partial<RawQuote>): RawQuote => ({
 describe('App', () => {
   let cachedQuotes: Readonly<Record<string, Quote>>;
   let online: ReturnType<typeof signal<boolean>>;
+  let enableMusic: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     cachedQuotes = {};
     online = signal(true);
+    enableMusic = vi.fn(() => Promise.resolve());
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -51,7 +54,7 @@ describe('App', () => {
           provide: RecordedMusicPlayer,
           useValue: {
             status: signal('off'),
-            enableFromGesture: () => Promise.resolve(),
+            enableFromGesture: enableMusic,
             disable: () => undefined,
             preload: () => undefined,
           },
@@ -158,6 +161,34 @@ describe('App', () => {
     marketView.advanceRotation();
     await fixture.whenStable();
     expect(label()).toBe('EUR/RUB · фьючерс · рублей за евро');
+  });
+
+  it('дзен включает музыку и показывает карусель любимчиков с названием и единицами', async () => {
+    const fixture = TestBed.createComponent(App);
+    const settings = TestBed.inject(ViewSettingsStore);
+    const marketView = TestBed.inject(MarketViewStore);
+    settings.update((value) => ({
+      ...value,
+      hero: { ...value.hero, favorites: ['eurrub', 'btc'] },
+      zen: { ...value.zen, hideHero: true },
+    }));
+    const el = fixture.nativeElement as HTMLElement;
+
+    el.querySelector<HTMLButtonElement>('.zen-trigger')?.click();
+    await fixture.whenStable();
+
+    const label = () => Array.from<HTMLElement>(
+      el.querySelectorAll('.hero-label > span'),
+    ).map((part) => part.textContent?.trim()).join(' ');
+    expect(settings.zen().active).toBe(true);
+    expect(settings.zen().hideHero).toBe(false);
+    expect(settings.hero().mode).toBe('rotation');
+    expect(enableMusic).toHaveBeenCalledOnce();
+    expect(label()).toBe('EUR/RUB · фьючерс · рублей за евро');
+
+    marketView.advanceRotation();
+    await fixture.whenStable();
+    expect(label()).toBe('BTC · долларов за биткоин');
   });
 
   it('клик по плитке любимчика закрепляет его на hero в режиме «стоять смирно»', async () => {

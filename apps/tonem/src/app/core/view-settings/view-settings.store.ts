@@ -46,10 +46,15 @@ export class ViewSettingsStore {
   }
 
   setHeroMode(mode: HeroMode): void {
-    this.update((settings) => ({
-      ...settings,
-      hero: { ...settings.hero, mode },
-    }));
+    this.update((settings) => {
+      if (settings.zen.active && mode === 'pinned') {
+        return withZenMode(settings, false);
+      }
+      return {
+        ...settings,
+        hero: { ...settings.hero, mode },
+      };
+    });
   }
 
   setPinnedInstrument(id: string): void {
@@ -119,6 +124,10 @@ export class ViewSettingsStore {
     }));
   }
 
+  setZenMode(active: boolean): void {
+    this.update((settings) => withZenMode(settings, active));
+  }
+
   setBackground<K extends keyof BackgroundViewSettings>(
     key: K,
     value: BackgroundViewSettings[K],
@@ -176,4 +185,20 @@ export class ViewSettingsStore {
   private replaceUrl(settings: ViewSettings): void {
     this.platform.replaceUrl(canonicalViewUrl(this.platform.currentUrl(), settings));
   }
+}
+
+function withZenMode(settings: ViewSettings, active: boolean): ViewSettings {
+  return {
+    ...settings,
+    hero: { ...settings.hero, mode: active ? 'rotation' : 'pinned' },
+    zen: {
+      ...settings.zen,
+      active,
+      hideLabels: false,
+      hideTicker: active,
+      hideSmallNumbers: active,
+      hideClock: active,
+      hideHero: false,
+    },
+  };
 }

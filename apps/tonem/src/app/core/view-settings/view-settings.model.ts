@@ -2,6 +2,13 @@ import { HERO_INSTRUMENT_ID, INSTRUMENTS } from '../instruments/instrument.regis
 
 export const VIEW_SETTINGS_VERSION = 1 as const;
 export const VIEW_SETTINGS_STORAGE_KEY = 'tonem.view-settings';
+export const DEFAULT_FAVORITE_INSTRUMENT_IDS = [
+  'usdrub',
+  'eurrub',
+  'cnyrub',
+  'brent',
+  'btc',
+] as const;
 
 export type HeroMode = 'pinned' | 'rotation';
 
@@ -17,6 +24,7 @@ export interface InstrumentViewSettings {
 }
 
 export interface ZenViewSettings {
+  readonly active: boolean;
   readonly hideLabels: boolean;
   readonly hideTicker: boolean;
   readonly hideSmallNumbers: boolean;
@@ -24,7 +32,7 @@ export interface ZenViewSettings {
   readonly hideHero: boolean;
 }
 
-export type ZenSettingKey = keyof ZenViewSettings;
+export type ZenSettingKey = Exclude<keyof ZenViewSettings, 'active'>;
 
 export interface BackgroundViewSettings {
   /** Затемнение поверх фона: 0 — как есть, 1 — полная темнота. */
@@ -57,13 +65,14 @@ export function defaultViewSettings(): ViewSettings {
     hero: {
       mode: 'pinned',
       pinnedId: HERO_INSTRUMENT_ID,
-      favorites: ['usdrub', 'eurrub', 'cnyrub', 'brent'],
+      favorites: DEFAULT_FAVORITE_INSTRUMENT_IDS,
     },
     instruments: {
       order: INSTRUMENTS.map((instrument) => instrument.id),
       hidden: [],
     },
     zen: {
+      active: false,
       hideLabels: false,
       hideTicker: false,
       hideSmallNumbers: false,

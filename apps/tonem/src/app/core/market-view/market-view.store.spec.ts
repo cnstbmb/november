@@ -95,15 +95,19 @@ describe('MarketViewStore', () => {
     expect(market.canOpenHeroSparkline()).toBe(false);
   });
 
-  it('rotates only visible, available favorites', () => {
+  it('rotates through favorites even before a derived value becomes available', () => {
     settings.update((value) => ({
       ...value,
       hero: { ...value.hero, mode: 'rotation', favorites: ['usdrub', 'btcrub'] },
     }));
 
-    expect(market.rotationFavorites().map((entry) => entry.instrument.id)).toEqual(['usdrub']);
+    expect(market.rotationFavorites().map((entry) => entry.instrument.id)).toEqual([
+      'usdrub',
+      'btcrub',
+    ]);
     market.advanceRotation();
-    expect(market.hero()?.instrument.id).toBe('usdrub');
+    expect(market.hero()?.instrument.id).toBe('btcrub');
+    expect(market.hero()?.quote.status).toBe('unavailable');
 
     rates.apply([raw('usdrub', 80), raw('btc', 100_000)], 'moex', NOW);
 
@@ -114,7 +118,7 @@ describe('MarketViewStore', () => {
     expect(market.hero()?.instrument.id).toBe('btcrub');
   });
 
-  it('does not rotate into hidden favorites', () => {
+  it('keeps hidden tape entries in the favorites rotation', () => {
     settings.update((value) => ({
       ...value,
       hero: { ...value.hero, mode: 'rotation', favorites: ['usdrub', 'btc'] },
@@ -122,7 +126,10 @@ describe('MarketViewStore', () => {
     settings.setInstrumentHidden('btc', true);
     market.advanceRotation();
 
-    expect(market.rotationFavorites().map((entry) => entry.instrument.id)).toEqual(['usdrub']);
-    expect(market.hero()?.instrument.id).toBe('usdrub');
+    expect(market.rotationFavorites().map((entry) => entry.instrument.id)).toEqual([
+      'usdrub',
+      'btc',
+    ]);
+    expect(market.hero()?.instrument.id).toBe('btc');
   });
 });

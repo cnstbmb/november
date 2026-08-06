@@ -11,7 +11,7 @@ interface ViewPayloadV1 {
   readonly v: 1;
   readonly h: { readonly m: 'pinned' | 'rotation'; readonly p: string; readonly f: readonly string[] };
   readonly i: { readonly o: readonly string[]; readonly x: readonly string[] };
-  readonly z: { readonly l: boolean; readonly t: boolean; readonly n: boolean; readonly c: boolean; readonly h: boolean };
+  readonly z: { readonly a: boolean; readonly l: boolean; readonly t: boolean; readonly n: boolean; readonly c: boolean; readonly h: boolean };
   readonly b: { readonly d: number; readonly b: number; readonly s: number; readonly m: boolean };
   readonly s: { readonly e: boolean; readonly v: number };
 }
@@ -67,24 +67,41 @@ export function normalizeViewSettings(value: unknown): ViewSettings {
   const sound = record(root['sound']);
   const order = completeOrder(instruments?.['order']);
   const hiddenSet = new Set(knownIdList(instruments?.['hidden'], defaults.instruments.hidden));
+  const requestedFavorites = knownIdList(hero?.['favorites'], defaults.hero.favorites);
+  const legacyZenActive =
+    zen?.['hideTicker'] === true &&
+    zen?.['hideSmallNumbers'] === true &&
+    zen?.['hideClock'] === true;
+  const zenActive = boolean(zen?.['active'], legacyZenActive);
 
   return {
     version: VIEW_SETTINGS_VERSION,
     hero: {
-      mode: hero?.['mode'] === 'rotation' ? 'rotation' : 'pinned',
+      mode: zenActive || hero?.['mode'] === 'rotation' ? 'rotation' : 'pinned',
       pinnedId: knownId(hero?.['pinnedId'], defaults.hero.pinnedId),
-      favorites: knownIdList(hero?.['favorites'], defaults.hero.favorites),
+      favorites: requestedFavorites.length > 0
+        ? requestedFavorites
+        : [...defaults.hero.favorites],
     },
     instruments: {
       order,
       hidden: order.filter((id) => hiddenSet.has(id)),
     },
     zen: {
-      hideLabels: boolean(zen?.['hideLabels'], defaults.zen.hideLabels),
-      hideTicker: boolean(zen?.['hideTicker'], defaults.zen.hideTicker),
-      hideSmallNumbers: boolean(zen?.['hideSmallNumbers'], defaults.zen.hideSmallNumbers),
-      hideClock: boolean(zen?.['hideClock'], defaults.zen.hideClock),
-      hideHero: boolean(zen?.['hideHero'], defaults.zen.hideHero),
+      active: zenActive,
+      hideLabels: zenActive
+        ? false
+        : boolean(zen?.['hideLabels'], defaults.zen.hideLabels),
+      hideTicker: zenActive
+        ? true
+        : boolean(zen?.['hideTicker'], defaults.zen.hideTicker),
+      hideSmallNumbers: zenActive
+        ? true
+        : boolean(zen?.['hideSmallNumbers'], defaults.zen.hideSmallNumbers),
+      hideClock: zenActive
+        ? true
+        : boolean(zen?.['hideClock'], defaults.zen.hideClock),
+      hideHero: zenActive ? false : boolean(zen?.['hideHero'], defaults.zen.hideHero),
     },
     background: {
       dim: numberIn(background?.['dim'], defaults.background.dim, 0, 1),
@@ -106,6 +123,7 @@ function toPayload(settings: ViewSettings): ViewPayloadV1 {
     h: { m: value.hero.mode, p: value.hero.pinnedId, f: value.hero.favorites },
     i: { o: value.instruments.order, x: value.instruments.hidden },
     z: {
+      a: value.zen.active,
       l: value.zen.hideLabels,
       t: value.zen.hideTicker,
       n: value.zen.hideSmallNumbers,
@@ -142,6 +160,7 @@ export function deserializeViewSettings(serialized: string | null): ViewSettings
       hero: { mode: hero?.['m'], pinnedId: hero?.['p'], favorites: hero?.['f'] },
       instruments: { order: instruments?.['o'], hidden: instruments?.['x'] },
       zen: {
+        active: zen?.['a'],
         hideLabels: zen?.['l'],
         hideTicker: zen?.['t'],
         hideSmallNumbers: zen?.['n'],

@@ -50,6 +50,41 @@ function createStore(platform: FakePlatform): ViewSettingsStore {
 afterEach(() => TestBed.resetTestingModule());
 
 describe('ViewSettingsStore', () => {
+  it('starts with the useful market set in favorites', () => {
+    expect(defaultViewSettings().hero.favorites).toEqual([
+      'usdrub',
+      'eurrub',
+      'cnyrub',
+      'brent',
+      'btc',
+    ]);
+  });
+
+  it('restores the useful market set when the last favorite is removed', () => {
+    const platform = new FakePlatform();
+    const store = createStore(platform);
+    store.update((value) => ({
+      ...value,
+      hero: { ...value.hero, favorites: ['usdrub'] },
+    }));
+
+    store.setFavorite('usdrub', false);
+
+    expect(store.hero().favorites).toEqual(defaultViewSettings().hero.favorites);
+  });
+
+  it('exits Dzen when the user explicitly pins the hero mode', () => {
+    const platform = new FakePlatform();
+    const store = createStore(platform);
+    store.setZenMode(true);
+
+    store.setHeroMode('pinned');
+
+    expect(store.zen().active).toBe(false);
+    expect(store.zen().hideTicker).toBe(false);
+    expect(store.hero().mode).toBe('pinned');
+  });
+
   it('uses versioned local settings as the personal default', () => {
     const platform = new FakePlatform();
     const personal = {
@@ -146,5 +181,20 @@ describe('ViewSettingsStore', () => {
 
   it('rejects unknown schema versions instead of guessing', () => {
     expect(deserializeViewSettings(JSON.stringify({ v: 99 }))).toBeNull();
+  });
+
+  it('recognizes legacy Dzen settings and restores its visible hero labels', () => {
+    const legacy = JSON.parse(serializeViewSettings(defaultViewSettings())) as {
+      z: Record<string, boolean>;
+    };
+    delete legacy.z['a'];
+    Object.assign(legacy.z, { l: true, t: true, n: true, c: true, h: true });
+
+    const restored = deserializeViewSettings(JSON.stringify(legacy));
+
+    expect(restored?.zen.active).toBe(true);
+    expect(restored?.zen.hideLabels).toBe(false);
+    expect(restored?.zen.hideHero).toBe(false);
+    expect(restored?.hero.mode).toBe('rotation');
   });
 });

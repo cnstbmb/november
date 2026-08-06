@@ -63,11 +63,11 @@
           <app-odometer [value]="hero.quote.value" [decimals]="hero.instrument.decimals" />
         </p>
       }
-      @if (!viewSettings.zen().hideLabels) {
+      @if (zenMode() || !viewSettings.zen().hideLabels) {
         <p class="hero-label">
           <span class="hero-instrument">{{ hero.instrument.label }}</span>
           <span aria-hidden="true">·</span>
-          <span>{{ hero.instrument.heroLabel }}</span>
+          <span class="hero-unit">{{ hero.instrument.heroLabel }}</span>
         </p>
       }
       @if (heroStatus()) {

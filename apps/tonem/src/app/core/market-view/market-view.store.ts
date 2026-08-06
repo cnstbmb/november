@@ -40,7 +40,7 @@ export class MarketViewStore {
 
   readonly rotationFavorites = computed<readonly TickerEntry[]>(() => {
     const favorites = new Set(this.viewSettings.hero().favorites);
-    return this.ticker().filter((entry) => favorites.has(entry.instrument.id));
+    return this.ordered().filter((entry) => favorites.has(entry.instrument.id));
   });
 
   /** Hidden affects the tape only: a pinned hero remains exact, even when unavailable. */

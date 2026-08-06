@@ -42,9 +42,7 @@ export class App {
   protected readonly marqueePaused = signal(false);
   protected readonly marqueeCopies = [false, true] as const;
 
-  protected readonly zenMode = computed(() =>
-    this.viewSettings.zen().hideTicker && this.viewSettings.zen().hideLabels,
-  );
+  protected readonly zenMode = computed(() => this.viewSettings.zen().active);
 
   protected readonly musicPlaying = computed(() =>
     this.musicPlayer.status() === 'playing',
@@ -116,16 +114,10 @@ export class App {
 
   protected toggleZen(): void {
     const store = this.viewSettings;
-    const isZen = this.zenMode();
-    // Toggle all zen switches at once
-    store.setZen('hideLabels', !isZen);
-    store.setZen('hideTicker', !isZen);
-    store.setZen('hideSmallNumbers', !isZen);
-    store.setZen('hideClock', !isZen);
-    // In zen mode, hero rotates among favorites
-    store.setHeroMode(isZen ? 'pinned' : 'rotation');
-    // In zen mode, enable music if sound is on
-    if (!isZen && store.sound().enabled) {
+    const enteringZen = !this.zenMode();
+    store.setZenMode(enteringZen);
+    this.marketView.resetRotation();
+    if (enteringZen) {
       void this.musicPlayer.enableFromGesture();
     }
   }

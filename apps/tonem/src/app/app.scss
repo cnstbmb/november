@@ -200,8 +200,7 @@
 
 .marquee-ribbon {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.3rem 1rem 0.1rem;
+  padding-block: 0.3rem 0.1rem;
   width: max-content;
   will-change: transform;
   animation: marquee-scroll 60s linear infinite;
@@ -209,6 +208,16 @@
   &.paused {
     animation-play-state: paused;
   }
+}
+
+.marquee-group {
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  justify-content: space-around;
+  min-width: 100vw;
+  padding-inline: 0.25rem;
 }
 
 @keyframes marquee-scroll {
@@ -286,8 +295,11 @@
   z-index: 1;
 }
 
-.favorite-card {
+.favorite-item {
   position: relative;
+}
+
+.favorite-card {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -296,12 +308,21 @@
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: 0.5rem;
+  color: inherit;
+  cursor: pointer;
   transition: border-color 200ms ease, background 200ms ease;
   animation: card-enter 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
 
-  &:hover {
+  &:hover,
+  &:focus-visible,
+  &[aria-pressed='true'] {
     background: var(--surface);
     border-color: var(--ink-accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ink-accent);
+    outline-offset: 2px;
   }
 }
 
@@ -336,7 +357,8 @@
   opacity: 0;
   transition: opacity 150ms ease, color 150ms ease, border-color 150ms ease;
 
-  .favorite-card:hover & {
+  .favorite-item:hover &,
+  .favorite-item:focus-within & {
     opacity: 1;
   }
 

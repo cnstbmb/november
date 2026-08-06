@@ -11,7 +11,6 @@ import { TimeMachineService } from '../../core/time-machine/time-machine.service
 
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_HOURS_AGO = 24 * 365;
-const OPEN_GESTURE_PX = 48;
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   dateStyle: 'long',
@@ -20,6 +19,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 
 @Component({
   selector: 'app-time-scrubber',
+  host: { tabindex: '-1' },
   imports: [],
   templateUrl: './time-scrubber.html',
   styleUrl: './time-scrubber.scss',
@@ -28,17 +28,13 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 export class TimeScrubberComponent {
   protected readonly timeMachine = inject(TimeMachineService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  protected readonly panelOpen = signal(false);
   protected readonly rangeHours = signal(24);
   protected readonly arbitraryValue = signal('');
   protected readonly maxDateTime = toLocalDateTimeValue(new Date());
   protected readonly maxHoursAgo = MAX_HOURS_AGO;
 
-  private gestureStart: { x: number; y: number } | null = null;
-  private hadFocusedPanel = false;
-
   protected readonly panelVisible = computed(
-    () => this.panelOpen() || this.timeMachine.active() || this.timeMachine.error(),
+    () => this.timeMachine.active() || this.timeMachine.error(),
   );
   protected readonly targetLabel = computed(() => {
     const target = this.timeMachine.target();
@@ -63,38 +59,14 @@ export class TimeScrubberComponent {
     effect(() => {
       const panelOwnsFocus = this.timeMachine.active() || this.timeMachine.error();
       if (panelOwnsFocus) {
-        this.hadFocusedPanel = true;
         queueMicrotask(() => this.focus('.time-machine-panel'));
-      } else if (this.hadFocusedPanel) {
-        this.hadFocusedPanel = false;
-        queueMicrotask(() => this.focus('.time-machine-open'));
       }
     });
-  }
-
-  protected togglePanel(): void {
-    this.panelOpen.update((open) => !open);
-    if (this.panelOpen()) queueMicrotask(() => this.focus('.time-machine-panel'));
   }
 
   protected closePanel(): void {
     if (this.timeMachine.active()) return;
     this.timeMachine.dismissError();
-    this.panelOpen.set(false);
-  }
-
-  protected beginGesture(event: PointerEvent): void {
-    this.gestureStart = { x: event.clientX, y: event.clientY };
-  }
-
-  protected endGesture(event: PointerEvent): void {
-    if (!this.gestureStart) return;
-    const deltaX = event.clientX - this.gestureStart.x;
-    const deltaY = event.clientY - this.gestureStart.y;
-    this.gestureStart = null;
-    if (deltaY <= -OPEN_GESTURE_PX || Math.abs(deltaX) >= OPEN_GESTURE_PX * 1.5) {
-      this.panelOpen.set(true);
-    }
   }
 
   protected updateRange(event: Event): void {
@@ -121,7 +93,10 @@ export class TimeScrubberComponent {
 
   protected returnToPresent(): void {
     this.timeMachine.setTarget(null);
-    this.panelOpen.set(false);
+    queueMicrotask(() => {
+      const stage = this.host.nativeElement.closest('.stage');
+      (stage?.querySelector<HTMLElement>('.hero') ?? this.host.nativeElement).focus();
+    });
   }
 
   private focus(selector: string): void {

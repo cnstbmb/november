@@ -4,15 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TimeMachineService } from '../../core/time-machine/time-machine.service';
 import { TimeScrubberComponent } from './time-scrubber';
 
-function pointerEvent(type: string, x: number, y: number): Event {
-  const event = new Event(type, { bubbles: true });
-  Object.defineProperties(event, {
-    clientX: { value: x },
-    clientY: { value: y },
-  });
-  return event;
-}
-
 describe('TimeScrubberComponent', () => {
   const target = signal<Date | null>(null);
   const loading = signal(false);
@@ -40,39 +31,30 @@ describe('TimeScrubberComponent', () => {
     });
   });
 
-  it('opens accessibly from the button and exposes range, presets and arbitrary datetime', async () => {
+  it('does not render the back-in-time launcher while live', async () => {
     const fixture = TestBed.createComponent(TimeScrubberComponent);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    const open = el.querySelector('.time-machine-open') as HTMLButtonElement;
-
-    expect(open.getAttribute('aria-expanded')).toBe('false');
+    expect(el.querySelector('.time-machine-launcher')).toBeNull();
+    expect(el.querySelector('.time-machine-open')).toBeNull();
     expect(el.querySelector('.time-machine-panel')).toBeNull();
-    open.click();
-    await fixture.whenStable();
+  });
 
-    expect(open.getAttribute('aria-expanded')).toBe('true');
+  it('keeps historical controls available for an already active target', async () => {
+    target.set(new Date('2026-07-28T12:34:00.000Z'));
+    const fixture = TestBed.createComponent(TimeScrubberComponent);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.time-machine-panel')).toBeTruthy();
     expect(el.querySelector('input[type="range"]')).toBeTruthy();
     expect(el.querySelector('input[type="datetime-local"]')).toBeTruthy();
     expect(el.querySelectorAll('.scrubber-preset')).toHaveLength(3);
   });
 
-  it('opens from an upward swipe gesture on the launcher', async () => {
-    const fixture = TestBed.createComponent(TimeScrubberComponent);
-    await fixture.whenStable();
-    const launcher = fixture.nativeElement.querySelector('.time-machine-launcher') as HTMLElement;
-
-    launcher.dispatchEvent(pointerEvent('pointerdown', 20, 100));
-    launcher.dispatchEvent(pointerEvent('pointerup', 22, 30));
-    await fixture.whenStable();
-
-    expect(fixture.nativeElement.querySelector('.time-machine-panel')).toBeTruthy();
-  });
-
   it('commits range and preset controls to the service', async () => {
+    target.set(new Date('2026-07-28T12:34:00.000Z'));
     const fixture = TestBed.createComponent(TimeScrubberComponent);
-    await fixture.whenStable();
-    (fixture.nativeElement.querySelector('.time-machine-open') as HTMLButtonElement).click();
     await fixture.whenStable();
 
     const range = fixture.nativeElement.querySelector('input[type="range"]') as HTMLInputElement;
@@ -101,7 +83,7 @@ describe('TimeScrubberComponent', () => {
     expect(fixture.nativeElement.querySelector('.time-machine-panel')).toBeNull();
   });
 
-  it('moves focus into history and restores it to the launcher on return', async () => {
+  it('moves focus into history and removes the panel on return', async () => {
     const fixture = TestBed.createComponent(TimeScrubberComponent);
     await fixture.whenStable();
 
@@ -113,7 +95,9 @@ describe('TimeScrubberComponent', () => {
     (fixture.nativeElement.querySelector('.scrubber-return') as HTMLButtonElement).click();
     await fixture.whenStable();
     await Promise.resolve();
-    expect(document.activeElement).toBe(fixture.nativeElement.querySelector('.time-machine-open'));
+    expect(fixture.nativeElement.querySelector('.time-machine-panel')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.time-machine-open')).toBeNull();
+    expect(document.activeElement).toBe(fixture.nativeElement);
   });
 
   it('shows an obvious past badge with both date and time and returns to present', async () => {

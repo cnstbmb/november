@@ -11,12 +11,10 @@
   pointer-events: none;
 }
 
-.time-machine-launcher,
 .time-machine-panel {
   pointer-events: auto;
 }
 
-.time-machine-launcher,
 .scrubber-header,
 .scrubber-footer,
 .control-label,
@@ -26,39 +24,12 @@
   align-items: center;
 }
 
-.time-machine-launcher {
-  gap: 0.65rem;
-  touch-action: pan-x;
-}
-
 button {
   border: 0;
   font: inherit;
   cursor: pointer;
 }
 
-.time-machine-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 2.45rem;
-  padding: 0.55rem 0.85rem;
-  color: var(--ink);
-  background: rgb(10 10 15 / 78%);
-  border: 1px solid rgb(242 240 233 / 18%);
-  border-radius: 999px;
-  font-size: 0.76rem;
-  letter-spacing: 0.025em;
-  backdrop-filter: blur(10px);
-}
-
-.time-machine-open:hover,
-.time-machine-open:focus-visible {
-  border-color: rgb(242 240 233 / 38%);
-  background: rgb(20 20 27 / 92%);
-}
-
-.gesture-hint,
 .scrubber-intro,
 .scrubber-note,
 .scrubber-loading,
@@ -278,7 +249,6 @@ input:focus-visible {
     padding: 0.85rem;
   }
 
-  .gesture-hint,
   .scrubber-note {
     display: none;
   }
@@ -288,4 +258,3 @@ input:focus-visible {
     align-items: flex-start;
   }
 }
-

@@ -118,6 +118,12 @@ describe('App', () => {
     const el = fixture.nativeElement as HTMLElement;
     // Marquee визуально дублирует полный набор для бесшовной прокрутки.
     expect(el.querySelectorAll('.marquee-chip').length).toBe(liveInstruments().length * 2);
+    const groups = el.querySelectorAll('.marquee-group');
+    expect(groups).toHaveLength(2);
+    expect(groups[0].querySelectorAll('.marquee-chip')).toHaveLength(liveInstruments().length);
+    expect(groups[1].querySelectorAll('.marquee-chip')).toHaveLength(liveInstruments().length);
+    expect(groups[1].getAttribute('aria-hidden')).toBe('true');
+    expect(groups[1].querySelector('button')).toBeNull();
 
     // После загрузки сырья для EUR/USD: производная появляется ровно один раз,
     // без дублирующей «dimmed» строки из стора.
@@ -152,5 +158,29 @@ describe('App', () => {
     marketView.advanceRotation();
     await fixture.whenStable();
     expect(label()).toBe('EUR/RUB · фьючерс · рублей за евро');
+  });
+
+  it('клик по плитке любимчика закрепляет его на hero в режиме «стоять смирно»', async () => {
+    const fixture = TestBed.createComponent(App);
+    const settings = TestBed.inject(ViewSettingsStore);
+    TestBed.inject(RatesStore).apply(
+      [raw({ instrumentId: 'eurrub', value: 85.1 })],
+      'moex',
+      new Date('2026-07-28T12:00:10+03:00'),
+    );
+    settings.setHeroMode('rotation');
+    await fixture.whenStable();
+
+    const cards = Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('.favorite-card'),
+    );
+    const euro = cards.find((card) => card.textContent?.includes('EUR/RUB'));
+    expect(euro).toBeTruthy();
+    euro?.click();
+    await fixture.whenStable();
+
+    expect(settings.hero().mode).toBe('pinned');
+    expect(settings.hero().pinnedId).toBe('eurrub');
+    expect(fixture.nativeElement.querySelector('.hero-instrument')?.textContent).toContain('EUR/RUB');
   });
 });

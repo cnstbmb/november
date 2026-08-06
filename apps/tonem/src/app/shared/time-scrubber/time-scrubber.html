@@ -1,22 +1,3 @@
-@if (!timeMachine.active()) {
-  <div
-    class="time-machine-launcher"
-    (pointerdown)="beginGesture($event)"
-    (pointerup)="endGesture($event)"
-  >
-    <button
-      class="time-machine-open"
-      type="button"
-      aria-controls="time-machine-panel"
-      [attr.aria-expanded]="panelVisible()"
-      (click)="togglePanel()"
-    >
-      <span aria-hidden="true">↶</span>
-      {{ panelOpen() ? 'скрыть машину времени' : 'назад во времени' }}
-    </button>
-  </div>
-}
-
 @if (panelVisible()) {
   <section
     id="time-machine-panel"

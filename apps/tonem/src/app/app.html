@@ -54,6 +54,7 @@
   @if (marketView.hero(); as hero) {
     <section
       class="hero"
+      tabindex="-1"
       aria-live="polite"
       [class.hero-historical]="timeMachine.active()"
     >
@@ -89,34 +90,43 @@
       (pointerleave)="marqueePaused.set(false)"
     >
       <div class="marquee-ribbon" [class.paused]="marqueePaused()">
-        @for (entry of marketView.ticker(); track entry.instrument.id) {
-          <button
-            type="button"
-            class="marquee-chip"
-            [class.favorited]="isFavorite(entry.instrument.id)"
-            (click)="toggleFavorite(entry.instrument.id)"
-            [attr.aria-label]="isFavorite(entry.instrument.id) ? 'Убрать ' + entry.instrument.label + ' из избранного' : 'Добавить ' + entry.instrument.label + ' в избранное'"
-          >
-            <span class="chip-label">{{ entry.instrument.label }}</span>
-            @if (!viewSettings.zen().hideSmallNumbers) {
-              <app-odometer class="chip-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+        <ng-template #marqueeChip let-entry>
+          <span class="chip-label">{{ entry.instrument.label }}</span>
+          @if (!viewSettings.zen().hideSmallNumbers) {
+            <app-odometer class="chip-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+          }
+        </ng-template>
+
+        @for (duplicate of marqueeCopies; track duplicate) {
+          <div class="marquee-group" [attr.aria-hidden]="duplicate ? 'true' : null">
+            @for (entry of marketView.ticker(); track entry.instrument.id) {
+              @if (duplicate) {
+                <div
+                  class="marquee-chip"
+                  [class.favorited]="isFavorite(entry.instrument.id)"
+                  (click)="toggleFavorite(entry.instrument.id)"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="marqueeChip"
+                    [ngTemplateOutletContext]="{ $implicit: entry }"
+                  />
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="marquee-chip"
+                  [class.favorited]="isFavorite(entry.instrument.id)"
+                  (click)="toggleFavorite(entry.instrument.id)"
+                  [attr.aria-label]="isFavorite(entry.instrument.id) ? 'Убрать ' + entry.instrument.label + ' из избранного' : 'Добавить ' + entry.instrument.label + ' в избранное'"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="marqueeChip"
+                    [ngTemplateOutletContext]="{ $implicit: entry }"
+                  />
+                </button>
+              }
             }
-          </button>
-        }
-        <!-- Duplicate for seamless loop -->
-        @for (entry of marketView.ticker(); track entry.instrument.id + '_dup') {
-          <button
-            type="button"
-            class="marquee-chip"
-            [class.favorited]="isFavorite(entry.instrument.id)"
-            (click)="toggleFavorite(entry.instrument.id)"
-            [attr.aria-label]="isFavorite(entry.instrument.id) ? 'Убрать ' + entry.instrument.label + ' из избранного' : 'Добавить ' + entry.instrument.label + ' в избранное'"
-          >
-            <span class="chip-label">{{ entry.instrument.label }}</span>
-            @if (!viewSettings.zen().hideSmallNumbers) {
-              <app-odometer class="chip-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
-            }
-          </button>
+          </div>
         }
       </div>
     </div>
@@ -124,17 +134,25 @@
     @if (favoriteEntries().length) {
       <div class="favorites-row" aria-label="Избранное">
         @for (entry of favoriteEntries(); track entry.instrument.id) {
-          <div class="favorite-card">
+          <div class="favorite-item">
+            <button
+              type="button"
+              class="favorite-card"
+              (click)="pinFavorite(entry.instrument.id)"
+              [attr.aria-pressed]="viewSettings.hero().mode === 'pinned' && viewSettings.hero().pinnedId === entry.instrument.id"
+              [attr.aria-label]="'Показать ' + entry.instrument.label + ' на главной карточке и включить режим стоять смирно'"
+            >
+              <span class="favorite-label">{{ entry.instrument.label }}</span>
+              @if (!viewSettings.zen().hideSmallNumbers && entry.quote.value !== null) {
+                <app-odometer class="favorite-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
+              }
+            </button>
             <button
               type="button"
               class="favorite-remove"
               (click)="toggleFavorite(entry.instrument.id)"
               [attr.aria-label]="'Убрать ' + entry.instrument.label + ' из избранного'"
             >×</button>
-            <span class="favorite-label">{{ entry.instrument.label }}</span>
-            @if (!viewSettings.zen().hideSmallNumbers && entry.quote.value !== null) {
-              <app-odometer class="favorite-value" [value]="entry.quote.value" [decimals]="entry.instrument.decimals" />
-            }
           </div>
         }
       </div>

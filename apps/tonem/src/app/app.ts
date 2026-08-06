@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   afterNextRender,
@@ -25,6 +26,7 @@ import { TimeScrubberComponent } from './shared/time-scrubber/time-scrubber';
     AuroraComponent,
     SettingsDrawerComponent,
     TimeScrubberComponent,
+    NgTemplateOutlet,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -38,6 +40,7 @@ export class App {
 
   protected readonly settingsOpen = signal(false);
   protected readonly marqueePaused = signal(false);
+  protected readonly marqueeCopies = [false, true] as const;
 
   protected readonly zenMode = computed(() =>
     this.viewSettings.zen().hideTicker && this.viewSettings.zen().hideLabels,
@@ -98,6 +101,10 @@ export class App {
 
   protected toggleFavorite(id: string): void {
     this.viewSettings.setFavorite(id, !this.isFavorite(id));
+  }
+
+  protected pinFavorite(id: string): void {
+    this.viewSettings.pinInstrument(id);
   }
 
   protected readonly favoriteEntries = computed(() => {

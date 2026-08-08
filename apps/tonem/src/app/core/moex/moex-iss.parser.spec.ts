@@ -96,6 +96,30 @@ describe('parseFuturesBatch', () => {
     };
     const [quote] = parseFuturesBatch(json, [{ id: 'sugar', assetCode: 'SUGAR' }], today);
     expect(quote.value).toBe(71_000);
+    expect(quote.priceType).toBe('settlement');
+  });
+
+  it('предпочитает проторгованный контракт ближайшему settlement-only', () => {
+    const json = {
+      securities: {
+        columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+        data: [
+          ['95-near', 'AI95', '2026-08-01'],
+          ['95-next', 'AI95', '2026-09-01'],
+        ],
+      },
+      marketdata: {
+        columns: ['SECID', 'LAST', 'SETTLEPRICE', 'TIME', 'SYSTIME'],
+        data: [
+          ['95-near', 0, 71_000, null, '2026-07-28 12:00:00'],
+          ['95-next', 72_500, 72_000, '11:59:00', '2026-07-28 12:00:00'],
+        ],
+      },
+    };
+
+    const [quote] = parseFuturesBatch(json, [{ id: 'ai95', assetCode: 'AI95' }], today);
+    expect(quote.value).toBe(72_500);
+    expect(quote.priceType).toBe('last');
   });
 
   it('пропускает непроторгованный ближний контракт без расчётной цены', () => {

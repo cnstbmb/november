@@ -5,6 +5,8 @@ import { Quote, QuoteSource, QuoteStatus, RawQuote, unavailableQuote } from './q
 import { deriveStatus } from '../moex/market-hours';
 import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
 
+export type QuoteFreshness = 'response' | 'source-timestamp';
+
 export interface TickerEntry {
   readonly instrument: Instrument;
   readonly quote: Quote;
@@ -44,17 +46,24 @@ export class RatesStore {
   }
 
   /** Применить пачку сырых котировок: статус вычисляется по торговому окну */
-  apply(raws: readonly RawQuote[], source: QuoteSource, now: Date): void {
+  apply(
+    raws: readonly RawQuote[],
+    source: QuoteSource,
+    now: Date,
+    freshness: QuoteFreshness = 'response',
+  ): void {
     const next: Record<string, Quote> = { ...this.quotesSignal() };
     for (const raw of raws) {
       const instrument = instrumentById(raw.instrumentId);
       if (!instrument) continue;
+      const receivedAt = freshness === 'response' ? now : raw.systime;
       next[raw.instrumentId] = {
         ...raw,
         source,
+        receivedAt,
         status: deriveStatus({
           value: raw.value,
-          systime: raw.systime,
+          receivedAt,
           market: instrument.market,
           now,
         }),
@@ -62,6 +71,30 @@ export class RatesStore {
     }
     this.quotesSignal.set(next);
     this.cache.save(next);
+  }
+
+  /** Пересчитать статусы по часам, не смешивая время цены со временем ответа. */
+  refreshStatuses(now: Date): void {
+    if (this.historicalTargetSignal() !== null) return;
+    const current = this.quotesSignal();
+    const next: Record<string, Quote> = { ...current };
+    let changed = false;
+
+    for (const [instrumentId, quote] of Object.entries(current)) {
+      const instrument = instrumentById(instrumentId);
+      if (!instrument) continue;
+      const status = deriveStatus({
+        value: quote.value,
+        receivedAt: quote.receivedAt ?? quote.systime,
+        market: instrument.market,
+        now,
+      });
+      if (status === quote.status) continue;
+      next[instrumentId] = { ...quote, status };
+      changed = true;
+    }
+
+    if (changed) this.quotesSignal.set(next);
   }
 
   snapshot(): RatesSnapshot {

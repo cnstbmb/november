@@ -28,12 +28,17 @@ describe('market-hours', () => {
     expect(isTradingNow('index', new Date('2026-07-28T16:00:00.000Z'))).toBe(false);
   });
 
-  it('futures open at 08:50 on weekdays and 10:00-19:00 on weekends', () => {
-    expect(isTradingNow('futures', new Date('2026-07-28T05:49:00.000Z'))).toBe(false);
-    expect(isTradingNow('futures', new Date('2026-07-28T05:50:00.000Z'))).toBe(true);
+  it('futures open at 06:50 on weekdays and 10:00-19:00 on weekends', () => {
+    expect(isTradingNow('futures', new Date('2026-07-28T03:49:00.000Z'))).toBe(false);
+    expect(isTradingNow('futures', new Date('2026-07-28T03:50:00.000Z'))).toBe(true);
     expect(isTradingNow('futures', new Date('2026-08-01T06:59:00.000Z'))).toBe(false);
     expect(isTradingNow('futures', new Date('2026-08-01T07:00:00.000Z'))).toBe(true);
     expect(isTradingNow('futures', new Date('2026-08-01T16:00:00.000Z'))).toBe(false);
+  });
+
+  it('keeps the historical 08:50 open before 14 July 2026', () => {
+    expect(isTradingNow('futures', new Date('2026-07-13T05:49:00.000Z'))).toBe(false);
+    expect(isTradingNow('futures', new Date('2026-07-13T05:50:00.000Z'))).toBe(true);
   });
 
   it('crypto is always trading', () => {

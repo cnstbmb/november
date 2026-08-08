@@ -232,11 +232,14 @@ describe('DerivedEngine', () => {
     expect(quoteOf('eurusd')?.status).toBe('live');
   });
 
-  it('статус stale, если наихудший вход устарел', () => {
+  it('статус stale, если источник одного из входов перестал отвечать', () => {
     applyAll([
       { instrumentId: 'usdrub', value: 80, systime: new Date('2026-07-28T11:00:00+03:00') },
       { instrumentId: 'eurrub', value: 88 },
     ]);
+    expect(quoteOf('eurusd')?.status).toBe('live');
+
+    store.refreshStatuses(new Date(NOW.getTime() + 10 * 60_000 + 1));
     expect(quoteOf('eurusd')?.status).toBe('stale');
   });
 

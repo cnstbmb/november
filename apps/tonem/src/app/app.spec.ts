@@ -214,4 +214,23 @@ describe('App', () => {
     expect(settings.hero().pinnedId).toBe('eurrub');
     expect(fixture.nativeElement.querySelector('.hero-instrument')?.textContent).toContain('EUR/RUB');
   });
+
+  it('settlement показывается как расчётная цена, а не задержка данных', async () => {
+    const fixture = TestBed.createComponent(App);
+    TestBed.inject(RatesStore).apply(
+      [raw({
+        instrumentId: 'ai95',
+        value: 77_040,
+        systime: new Date('2026-07-28T10:00:00+03:00'),
+        priceType: 'settlement',
+      })],
+      'moex',
+      new Date('2026-07-28T12:00:10+03:00'),
+    );
+    TestBed.inject(ViewSettingsStore).pinInstrument('ai95');
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('.hero-status')?.textContent?.trim())
+      .toBe('расчётная цена');
+  });
 });

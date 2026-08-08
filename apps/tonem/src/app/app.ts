@@ -78,6 +78,9 @@ export class App {
       return time ? `офлайн · последние данные в ${time}` : 'офлайн · последние данные';
     }
     if (!quote) return '';
+    if (quote.status === 'live' && quote.priceType === 'settlement') {
+      return 'расчётная цена';
+    }
     switch (quote.status) {
       case 'closed': {
         if (this.viewSettings.zen().hideClock) return 'торги закрыты';

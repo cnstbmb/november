@@ -33,9 +33,15 @@ describe('isTradingNow', () => {
     expect(isTradingNow('index', at('19:00'))).toBe(false);
   });
 
-  it('futures: основная сессия начинается в 08:50', () => {
-    expect(isTradingNow('futures', at('08:49'))).toBe(false);
-    expect(isTradingNow('futures', at('08:50'))).toBe(true);
+  it('futures: будняя сессия начинается в 06:50', () => {
+    expect(isTradingNow('futures', at('06:49'))).toBe(false);
+    expect(isTradingNow('futures', at('06:50'))).toBe(true);
+  });
+
+  it('futures: до 14 июля 2026 сохраняет историческое открытие 08:50', () => {
+    const beforeChange = (hhmm: string) => new Date(`2026-07-13T${hhmm}:00+03:00`);
+    expect(isTradingNow('futures', beforeChange('08:49'))).toBe(false);
+    expect(isTradingNow('futures', beforeChange('08:50'))).toBe(true);
   });
 
   it('futures: выходная сессия работает с 10:00 до 19:00', () => {
@@ -55,31 +61,31 @@ describe('isTradingNow', () => {
 describe('deriveStatus', () => {
   it('unavailable, если нет цены', () => {
     expect(
-      deriveStatus({ value: null, systime: at('12:00'), market: 'fx', now: at('12:00') }),
+      deriveStatus({ value: null, receivedAt: at('12:00'), market: 'fx', now: at('12:00') }),
     ).toBe('unavailable');
   });
 
   it('closed вне торгового окна, даже со свежей ценой', () => {
     expect(
-      deriveStatus({ value: 78.5, systime: at('23:50'), market: 'fx', now: at('00:45') }),
+      deriveStatus({ value: 78.5, receivedAt: at('23:50'), market: 'fx', now: at('00:45') }),
     ).toBe('closed');
   });
 
-  it('live внутри окна при свежем systime', () => {
+  it('live внутри окна при свежем ответе', () => {
     expect(
-      deriveStatus({ value: 78.5, systime: at('11:59'), market: 'fx', now: at('12:00') }),
+      deriveStatus({ value: 78.5, receivedAt: at('11:59'), market: 'fx', now: at('12:00') }),
     ).toBe('live');
   });
 
-  it('stale внутри окна, если фид молчит >10 минут', () => {
+  it('stale внутри окна, если источник не отвечал >10 минут', () => {
     expect(
-      deriveStatus({ value: 78.5, systime: at('11:30'), market: 'fx', now: at('12:00') }),
+      deriveStatus({ value: 78.5, receivedAt: at('11:30'), market: 'fx', now: at('12:00') }),
     ).toBe('stale');
   });
 
   it('closed после 19:00 для последней котировки CNY, а не stale', () => {
     expect(
-      deriveStatus({ value: 12.081, systime: at('19:15'), market: 'fx', now: at('22:39') }),
+      deriveStatus({ value: 12.081, receivedAt: at('19:15'), market: 'fx', now: at('22:39') }),
     ).toBe('closed');
   });
 });

@@ -132,6 +132,35 @@ describe('parseFuturesBatch', () => {
     };
     const ticks = parseFuturesBatch(json, [{ id: 'sugar', assetCode: 'SUGAR' }], today, TS);
     expect(ticks[0].value).toBe(71_000);
+    expect(ticks[0].meta).toMatchObject({ priceType: 'settlement' });
+  });
+
+  it('prefers a traded contract over a nearer settlement-only contract', () => {
+    const json = {
+      securities: {
+        columns: ['SECID', 'ASSETCODE', 'LASTTRADEDATE'],
+        data: [
+          ['95-near', 'AI95', '2026-08-01'],
+          ['95-next', 'AI95', '2026-09-01'],
+        ],
+      },
+      marketdata: {
+        columns: ['SECID', 'LAST', 'SETTLEPRICE'],
+        data: [
+          ['95-near', 0, 71_000],
+          ['95-next', 72_500, 72_000],
+        ],
+      },
+    };
+
+    const [tick] = parseFuturesBatch(
+      json,
+      [{ id: 'ai95', assetCode: 'AI95' }],
+      today,
+      TS,
+    );
+    expect(tick.value).toBe(72_500);
+    expect(tick.meta).toMatchObject({ secid: '95-next', priceType: 'last' });
   });
 
   it('normalizes Si/Eu contract prices to one unit of currency', () => {

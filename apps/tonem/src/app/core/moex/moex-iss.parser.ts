@@ -104,12 +104,13 @@ export function parseFuturesBatch(
         settle: positiveNum(md.get(String(row[colSecid]))?.get('SETTLEPRICE')),
       }));
 
-    // Ближайшая экспирация не раньше сегодня; контракт без положительной
-    // LAST/SETTLEPRICE пропускаем, чтобы ролловер не показывал ложный ноль.
+    // Сначала берём ближайший проторгованный контракт. Settlement-only нужен
+    // лишь как честно помеченный fallback, когда LAST нет ни у одного контракта.
     const tradable = candidates.filter((c) => c.expiry >= todayYmd);
     const pool = tradable.length > 0 ? tradable : candidates;
     const sorted = [...pool].sort((a, b) => a.expiry.localeCompare(b.expiry));
-    const chosen = sorted.find((candidate) => candidate.last !== null || candidate.settle !== null);
+    const chosen = sorted.find((candidate) => candidate.last !== null)
+      ?? sorted.find((candidate) => candidate.settle !== null);
 
     if (!chosen) {
       return { instrumentId: id, value: null, time: null, systime: null };
@@ -121,6 +122,7 @@ export function parseFuturesBatch(
       value: rawPrice === null ? null : rawPrice * priceMultiplier,
       time,
       systime,
+      priceType: chosen.last !== null ? 'last' : 'settlement',
     };
   });
 }

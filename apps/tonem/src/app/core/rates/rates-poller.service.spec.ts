@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { LatestQuotesCacheService } from '../offline/latest-quotes-cache.service';
-import { RatesPoller } from './rates-poller.service';
+import { POLL_REQUEST_TIMEOUT_MS, RatesPoller } from './rates-poller.service';
 import { RatesStore } from './rates.store';
 import currencyBatch from '../moex/__fixtures__/currency-batch.json';
 import imoexJson from '../moex/__fixtures__/imoex.json';
@@ -159,5 +159,25 @@ describe('RatesPoller', () => {
     http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
     http.expectOne((r) => r.url === 'https://api.tonem.ru/latest').flush(backendLatest);
     expect(store.quoteOf('usdrub')?.source).toBe('moex');
+  });
+
+  it('таймаут одного источника не останавливает применение остальных ответов', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-28T12:00:00+03:00'));
+    try {
+      poller.start();
+      http.expectOne((r) => r.url.includes('/engines/currency/')).flush(currencyBatch);
+      http.expectOne((r) => r.url.includes('/engines/stock/')).flush(imoexJson);
+      http.expectOne((r) => r.url.includes('/engines/futures/')).flush(fortsWithFx);
+      const hangingBackend = http.expectOne((r) => r.url === 'https://api.tonem.ru/latest');
+
+      vi.advanceTimersByTime(POLL_REQUEST_TIMEOUT_MS);
+
+      expect(hangingBackend.cancelled).toBe(true);
+      expect(store.hero().quote.value).toBeCloseTo(82.278, 3);
+      expect(store.hero().quote.status).toBe('live');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -70,6 +70,7 @@ describe('LatestQuotesCacheService', () => {
       value: 79,
       time: '2026-07-28T08:59:55.000Z',
       systime: '2026-07-28T09:00:00.000Z',
+      receivedAt: '2026-07-28T09:00:00.000Z',
       source: 'moex',
     });
     expect(payload.quotes.usdrub.instrumentId).toBeUndefined();
@@ -97,10 +98,10 @@ describe('LatestQuotesCacheService', () => {
     expect(service.load()['usdrub']?.value).toBe(80);
   });
 
-  it('revives dates and recalculates status instead of trusting persisted status', () => {
+  it('revives legacy cache and uses savedAt as the last successful response', () => {
     storage.setItem(LATEST_QUOTES_CACHE_KEY, JSON.stringify({
       version: LATEST_QUOTES_CACHE_VERSION,
-      savedAt: '2026-07-28T09:00:00.000Z',
+      savedAt: '2026-07-28T08:00:00.000Z',
       quotes: {
         btc: {
           value: 65_000,
@@ -115,6 +116,7 @@ describe('LatestQuotesCacheService', () => {
     const loaded = service.load(new Date('2026-07-28T09:00:10.000Z'));
     expect(loaded['btc']?.time).toBeInstanceOf(Date);
     expect(loaded['btc']?.systime?.toISOString()).toBe('2026-07-28T08:00:00.000Z');
+    expect(loaded['btc']?.receivedAt?.toISOString()).toBe('2026-07-28T08:00:00.000Z');
     expect(loaded['btc']?.status).toBe('stale');
   });
 

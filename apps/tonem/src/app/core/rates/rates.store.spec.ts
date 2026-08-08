@@ -45,6 +45,27 @@ describe('RatesStore', () => {
     expect(store.hero().quote.status).toBe('live');
   });
 
+  it('свежий ответ остаётся live, даже если биржевая строка давно не менялась', () => {
+    store.apply(
+      [raw({ systime: new Date('2026-07-28T10:00:00+03:00') })],
+      'moex',
+      now,
+    );
+
+    expect(store.hero().quote.status).toBe('live');
+    expect(store.hero().quote.receivedAt).toEqual(now);
+  });
+
+  it('помечает источник stale только после 10 минут без новых ответов', () => {
+    store.apply([raw({})], 'moex', now);
+
+    store.refreshStatuses(new Date(now.getTime() + 10 * 60_000));
+    expect(store.hero().quote.status).toBe('live');
+
+    store.refreshStatuses(new Date(now.getTime() + 10 * 60_000 + 1));
+    expect(store.hero().quote.status).toBe('stale');
+  });
+
   it('ночью статус closed', () => {
     const night = new Date('2026-07-28T00:45:00+03:00');
     store.apply([raw({ systime: new Date('2026-07-27T23:54:00+03:00') })], 'moex', night);

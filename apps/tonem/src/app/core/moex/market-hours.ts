@@ -8,7 +8,7 @@ const WINDOWS: Record<MarketKind, { open: number; close: number } | null> = {
   // MOEX CETS system session used by MoexIssService. The 23:50 close applies
   // to negotiated trading modes, whose quotes this application does not read.
   fx: { open: 10 * 60, close: 19 * 60 }, // 10:00–19:00
-  futures: { open: 8 * 60 + 50, close: 23 * 60 + 50 }, // 08:50–23:50
+  futures: { open: 8 * 60 + 50, close: 23 * 60 + 50 }, // historical default
   index: { open: 9 * 60 + 50, close: 19 * 60 }, // IMOEX: 09:50–19:00
   crypto: null, // торгуется круглосуточно, без выходных
 };
@@ -22,9 +22,14 @@ const mskClock = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
   hour12: false,
   weekday: 'short',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
 });
 
-function mskParts(now: Date): { minutes: number; weekend: boolean } {
+const FUTURES_EARLY_OPEN_FROM = '2026-07-14';
+
+function mskParts(now: Date): { minutes: number; weekend: boolean; date: string } {
   const parts = mskClock.formatToParts(now);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   const hh = get('hour') === '24' ? 0 : Number(get('hour'));
@@ -32,39 +37,41 @@ function mskParts(now: Date): { minutes: number; weekend: boolean } {
   return {
     minutes: hh * 60 + Number(get('minute')),
     weekend: weekday === 'Sat' || weekday === 'Sun',
+    date: `${get('year')}-${get('month')}-${get('day')}`,
   };
 }
 
 export function isTradingNow(kind: MarketKind, now: Date): boolean {
   const w = WINDOWS[kind];
   if (w === null) return true; // crypto: всегда открыто
-  const { minutes, weekend } = mskParts(now);
+  const { minutes, weekend, date } = mskParts(now);
   // The derivatives weekend session is shorter than the weekday session.
   if (weekend) return kind === 'futures' && minutes >= 10 * 60 && minutes < 19 * 60;
-  return minutes >= w.open && minutes < w.close;
+  const open = kind === 'futures' && date >= FUTURES_EARLY_OPEN_FROM
+    ? 6 * 60 + 50
+    : w.open;
+  return minutes >= open && minutes < w.close;
 }
 
 export function deriveStatus(args: {
   value: number | null;
-  systime: Date | null;
+  receivedAt: Date | null;
   market: MarketKind;
   now: Date;
 }): QuoteStatus {
-  const { value, systime, market, now } = args;
+  const { value, receivedAt, market, now } = args;
   if (value === null) return 'unavailable';
-  // Закрытие — по стенным часам (окну). В биржевые праздники внутри окна
-  // фид молчит → получим stale ("данные задерживаются"), а не closed.
-  // Известное упрощение T02; если понадобится точный календарь —
-  // MOEX ISS отдаёт его отдельным endpoint'ом.
+  // Закрытие пока определяется по стенным часам. Точный праздничный календарь
+  // остаётся отдельным ограничением: доступный ISS внутри окна считается live.
   if (!isTradingNow(market, now)) return 'closed';
-  const age = systime ? now.getTime() - systime.getTime() : Infinity;
+  const age = receivedAt ? now.getTime() - receivedAt.getTime() : Infinity;
   return age > STALE_AFTER_MS ? 'stale' : 'live';
 }
 
 export const POLL_ACTIVE_MS = 10_000;
 export const POLL_CLOSED_MS = 300_000;
 
-/** Каденс опроса: быстрый, пока хоть один рынок жив */
+/** Каденс опроса: быстрый, пока хоть один рынок жив или источник отстаёт. */
 export function pollDelayMs(statuses: readonly QuoteStatus[]): number {
   return statuses.some((s) => s === 'live' || s === 'stale')
     ? POLL_ACTIVE_MS

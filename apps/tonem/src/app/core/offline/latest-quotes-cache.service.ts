@@ -1,7 +1,7 @@
 import { DestroyRef, Injectable, InjectionToken, inject } from '@angular/core';
 import { instrumentById } from '../instruments/instrument.registry';
 import { deriveStatus } from '../moex/market-hours';
-import { Quote, QuoteSource } from '../rates/quote.model';
+import { Quote, QuotePriceType, QuoteSource } from '../rates/quote.model';
 
 export const LATEST_QUOTES_CACHE_KEY = 'tonem.latest-quotes';
 export const LATEST_QUOTES_CACHE_VERSION = 1;
@@ -19,7 +19,9 @@ interface StoredQuote {
   readonly value: number | null;
   readonly time: string | null;
   readonly systime: string | null;
+  readonly receivedAt?: string | null;
   readonly source: QuoteSource;
+  readonly priceType?: QuotePriceType;
 }
 
 interface LatestQuotesPayload {
@@ -66,10 +68,12 @@ export class LatestQuotesCacheService {
 
     if (!isPayload(candidate)) return {};
 
+    const savedAt = new Date(candidate.savedAt);
+
     const quotes: Record<string, Quote> = {};
     for (const [instrumentId, stored] of Object.entries(candidate.quotes)) {
       const instrument = instrumentById(instrumentId);
-      const quote = reviveStoredQuote(stored);
+      const quote = reviveStoredQuote(stored, savedAt);
       if (!instrument || instrument.placement !== 'live' || quote === null || quote.value === null) continue;
 
       this.lastKnown = { ...this.lastKnown, [instrumentId]: stored };
@@ -78,7 +82,7 @@ export class LatestQuotesCacheService {
         ...quote,
         status: deriveStatus({
           value: quote.value,
-          systime: quote.systime,
+          receivedAt: quote.receivedAt ?? null,
           market: instrument.market,
           now,
         }),
@@ -156,15 +160,18 @@ function normalizeQuotes(input: LatestQuotesInput): Readonly<Record<string, Stor
     const instrument = instrumentById(quote.instrumentId);
     const time = serializeDate(quote.time);
     const systime = serializeDate(quote.systime);
+    const receivedAt = serializeDate(quote.receivedAt ?? quote.systime);
     if (!instrument || instrument.placement !== 'live' || quote.value === null) continue;
-    if (time === undefined || systime === undefined) continue;
+    if (time === undefined || systime === undefined || receivedAt === undefined) continue;
     if (!isQuoteValue(quote.value) || !isQuoteSource(quote.source)) continue;
 
     normalized[quote.instrumentId] = {
       value: quote.value,
       time,
       systime,
+      receivedAt,
       source: quote.source,
+      ...(quote.priceType ? { priceType: quote.priceType } : {}),
     };
   }
   return normalized;
@@ -184,20 +191,30 @@ function isPayload(value: unknown): value is LatestQuotesPayload {
   return isRecord(value['quotes']);
 }
 
-function reviveStoredQuote(value: unknown): Omit<Quote, 'instrumentId' | 'status'> | null {
+function reviveStoredQuote(
+  value: unknown,
+  fallbackReceivedAt: Date,
+): Omit<Quote, 'instrumentId' | 'status'> | null {
   if (!isRecord(value) || !isQuoteValue(value['value']) || !isQuoteSource(value['source'])) {
     return null;
   }
 
   const time = reviveDate(value['time']);
   const systime = reviveDate(value['systime']);
-  if (time === undefined || systime === undefined) return null;
+  const receivedAt = value['receivedAt'] === undefined
+    ? new Date(fallbackReceivedAt)
+    : reviveDate(value['receivedAt']);
+  const priceType = value['priceType'];
+  if (time === undefined || systime === undefined || receivedAt === undefined) return null;
+  if (priceType !== undefined && !isQuotePriceType(priceType)) return null;
 
   return {
     value: value['value'],
     time,
     systime,
+    receivedAt,
     source: value['source'],
+    ...(priceType ? { priceType } : {}),
   };
 }
 
@@ -217,6 +234,10 @@ function isQuoteValue(value: unknown): value is number | null {
 
 function isQuoteSource(value: unknown): value is QuoteSource {
   return value === 'moex' || value === 'binance' || value === 'kraken';
+}
+
+function isQuotePriceType(value: unknown): value is QuotePriceType {
+  return value === 'last' || value === 'settlement';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

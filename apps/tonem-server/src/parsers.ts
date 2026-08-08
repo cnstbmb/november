@@ -143,12 +143,13 @@ export function parseFuturesBatch(
         settle: positiveNum(md.get(String(row[colSecid]))?.get('SETTLEPRICE')),
       }));
 
-    // Nearest priced contract not before today. A newly listed front contract
-    // may have LAST=0 before its first trade, which must never become a quote.
+    // Prefer the nearest actually traded contract. Settlement-only is retained
+    // as an explicitly tagged fallback when no contract has a positive LAST.
     const tradable = candidates.filter((c) => c.expiry >= todayYmd);
     const pool = tradable.length > 0 ? tradable : candidates;
     const sorted = [...pool].sort((a, b) => a.expiry.localeCompare(b.expiry));
-    const chosen = sorted.find((candidate) => candidate.last !== null || candidate.settle !== null);
+    const chosen = sorted.find((candidate) => candidate.last !== null)
+      ?? sorted.find((candidate) => candidate.settle !== null);
 
     if (!chosen) continue;
     const { systime } = timesFrom(md.get(chosen.secid));

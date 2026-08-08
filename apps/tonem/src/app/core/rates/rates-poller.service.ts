@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
-import { Subscription, catchError, forkJoin, of } from 'rxjs';
+import { Subscription, catchError, forkJoin, of, timeout } from 'rxjs';
 import { BackendLatestService } from '../backend/backend-latest.service';
 import { INSTRUMENTS, currencySecids } from '../instruments/instrument.registry';
 import { moexAssetCode, moexSecid } from '../instruments/instrument.model';
@@ -14,6 +14,7 @@ import { RawQuote } from './quote.model';
 import { RatesStore } from './rates.store';
 
 const FX_SECIDS = currencySecids();
+export const POLL_REQUEST_TIMEOUT_MS = 8_000;
 
 function currencyMapping(): { id: string; secid: string }[] {
   return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').flatMap((i) => {
@@ -79,12 +80,19 @@ export class RatesPoller {
 
   private cycle(generation: number): void {
     this.request = forkJoin({
-      currency: this.moex.fetchCurrencyBatch(FX_SECIDS).pipe(catchError(() => of(null))),
+      currency: this.moex.fetchCurrencyBatch(FX_SECIDS).pipe(
+        timeout(POLL_REQUEST_TIMEOUT_MS),
+        catchError(() => of(null)),
+      ),
       index: this.moex
         .fetchIndex(indexInstrument()?.secid ?? 'IMOEX')
-        .pipe(catchError(() => of(null))),
-      futures: this.moex.fetchFuturesBoard().pipe(catchError(() => of(null))),
+        .pipe(timeout(POLL_REQUEST_TIMEOUT_MS), catchError(() => of(null))),
+      futures: this.moex.fetchFuturesBoard().pipe(
+        timeout(POLL_REQUEST_TIMEOUT_MS),
+        catchError(() => of(null)),
+      ),
       backend: this.backend.fetchFallbackQuotes().pipe(
+        timeout(POLL_REQUEST_TIMEOUT_MS),
         catchError(() => of({ kraken: [] })),
       ),
     }).subscribe(({ currency, index, futures, backend }) => {
@@ -118,7 +126,11 @@ export class RatesPoller {
         return current.status === 'unavailable' || current.status === 'stale'
           || fallbackTime > currentTime;
       });
-      if (fallback.length > 0) this.store.apply(fallback, 'kraken', now);
+      if (fallback.length > 0) {
+        this.store.apply(fallback, 'kraken', now, 'source-timestamp');
+      }
+
+      this.store.refreshStatuses(now);
 
       if (this.running && generation === this.generation) {
         this.timer = setTimeout(

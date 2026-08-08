@@ -196,6 +196,10 @@
   &:hover::after {
     opacity: 0.3;
   }
+
+  &:focus-within .marquee-ribbon {
+    animation-play-state: paused;
+  }
 }
 
 .marquee-ribbon {
@@ -380,6 +384,65 @@
   font-size: 0.9rem;
   font-weight: 450;
   color: var(--ink);
+}
+
+/* ── Desktop dock ──────────────────────────────────────────────────── */
+
+@media (min-width: 40.0625rem) {
+  .hero {
+    flex: 1;
+    min-height: 0;
+    padding-bottom: clamp(2.5rem, 7vh, 5rem);
+  }
+
+  .market-dock {
+    margin-top: auto;
+    padding-top: 0.45rem;
+    padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+    background:
+      linear-gradient(
+        to right,
+        transparent,
+        var(--border-strong) 18%,
+        var(--border-strong) 82%,
+        transparent
+      ) center top / calc(100% - 2.5rem) 1px no-repeat,
+      linear-gradient(to bottom, transparent, hsl(240 6% 5% / 0.58) 42%);
+  }
+
+  .marquee-ribbon {
+    padding-block: 0.6rem 0.35rem;
+  }
+
+  .marquee-group {
+    gap: clamp(0.75rem, 1.5vw, 1.75rem);
+    padding-inline: 0.75rem;
+  }
+
+  .marquee-chip {
+    flex-direction: row;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+    opacity: 0.55;
+
+    &.favorited .chip-label {
+      color: var(--ink-accent);
+    }
+  }
+
+  .chip-label {
+    font-size: 0.65rem;
+  }
+
+  .chip-value {
+    color: var(--ink);
+    font-size: 0.78rem;
+  }
+
+  .favorites-row {
+    padding-top: 0.4rem;
+    padding-bottom: 0;
+  }
 }
 
 /* ── Mobile ────────────────────────────────────────────────────────── */

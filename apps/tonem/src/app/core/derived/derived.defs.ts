@@ -148,7 +148,7 @@ export const DERIVED_DEFS: readonly DerivedDef[] = [
 /**
  * Закрытый или устаревший базовый рынок наследуется производной напрямую.
  * Для полностью живого или исторического набора дополнительно проверяем
- * торговое окно самой производной и самый старый systime.
+ * торговое окно самой производной.
  *
  * Так производная честно отражает состояние своих компонентов:
  * если хоть один вход устарел (stale) или рынок закрыт (closed), это видно.
@@ -163,19 +163,7 @@ export function deriveDerivedStatus(args: {
   const statuses = inputs.map((quote) => quote?.status).filter(Boolean);
   if (statuses.includes('closed')) return 'closed';
   if (statuses.includes('stale')) return 'stale';
-  // наименее свежий systime = самый старый из входов
-  let worstSystime: Date | null = null;
-  for (const q of inputs) {
-    const s = q?.systime ?? null;
-    if (s === null) {
-      worstSystime = null; // нет systime → считаем хуже любого
-      break;
-    }
-    if (worstSystime === null || s.getTime() < worstSystime.getTime()) {
-      worstSystime = s;
-    }
-  }
-  return deriveStatus({ value: 1, systime: worstSystime, market, now });
+  return deriveStatus({ value: 1, receivedAt: now, market, now });
 }
 
 // ── Сборка производной котировки ──────────────────────────────────────────
@@ -208,5 +196,6 @@ export function buildDerivedQuote(
     systime: null,
     source: 'moex', // производная — не из коннектора; ставим moex как нейтральный источник
     status,
+    receivedAt: null,
   };
 }

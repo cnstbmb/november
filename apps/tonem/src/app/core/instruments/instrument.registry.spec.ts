@@ -3,6 +3,29 @@ import { instrumentById } from './instrument.registry';
 import { moexAssetCode } from './instrument.model';
 
 describe('MOEX futures registry', () => {
+  it('keeps Si/Eu futures and adds separate official CBR instruments', () => {
+    expect(instrumentById('usdrub')).toMatchObject({
+      label: 'USD/RUB · фьючерс',
+      market: 'futures',
+      moex: { kind: 'futures', assetCode: 'Si' },
+    });
+    expect(instrumentById('eurrub')).toMatchObject({
+      label: 'EUR/RUB · фьючерс',
+      market: 'futures',
+      moex: { kind: 'futures', assetCode: 'Eu' },
+    });
+    expect(instrumentById('usdrub_cbr')).toMatchObject({
+      label: 'USD/RUB · ЦБ РФ',
+      market: 'fx',
+      cbrCode: 'USD',
+    });
+    expect(instrumentById('eurrub_cbr')).toMatchObject({
+      label: 'EUR/RUB · ЦБ РФ',
+      market: 'fx',
+      cbrCode: 'EUR',
+    });
+  });
+
   it('uses ISS ASSETCODE values rather than SECID prefixes', () => {
     const expected = {
       brent: 'BR',

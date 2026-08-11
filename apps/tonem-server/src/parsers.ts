@@ -73,8 +73,48 @@ function makeTick(
   };
 }
 
+function xmlTag(block: string, tag: string): string | null {
+  const match = block.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, 'i'));
+  return match?.[1]?.trim() ?? null;
+}
+
+function xmlNumber(value: string | null): number | null {
+  if (value === null) return null;
+  const parsed = Number(value.replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Official Bank of Russia XML_daily response -> normalized daily FX ticks. */
+export function parseCbrDailyXml(
+  xml: unknown,
+  mapping: readonly { id: string; cbrCode: string }[],
+  ts: Date,
+): TickInput[] {
+  if (typeof xml !== 'string') return [];
+  const dateMatch = xml.match(/<ValCurs\b[^>]*\bDate="(\d{2})\.(\d{2})\.(\d{4})"/i);
+  if (!dateMatch) return [];
+  const effectiveDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+  const byCode = new Map<string, number>();
+  for (const match of xml.matchAll(/<Valute\b[^>]*>([\s\S]*?)<\/Valute>/gi)) {
+    const block = match[1];
+    const code = xmlTag(block, 'CharCode');
+    const nominal = xmlNumber(xmlTag(block, 'Nominal'));
+    const rawValue = xmlNumber(xmlTag(block, 'Value'));
+    if (code && nominal !== null && nominal > 0 && rawValue !== null && rawValue > 0) {
+      byCode.set(code, rawValue / nominal);
+    }
+  }
+  return mapping.flatMap(({ id, cbrCode }) => {
+    const tick = makeTick(id, byCode.get(cbrCode) ?? null, ts, 'cbr', {
+      cbrCode,
+      effectiveDate,
+    });
+    return tick ? [tick] : [];
+  });
+}
+
 /**
- * MOEX currency spot (CNY and gold): LAST with MARKETPRICE fallback.
+ * MOEX currency spot (currently CNY and gold): LAST with MARKETPRICE fallback.
  * Produces one tick per mapped instrument, timestamped at the collection minute.
  */
 export function parseCurrencyBatch(

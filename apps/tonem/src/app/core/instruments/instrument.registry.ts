@@ -4,11 +4,11 @@ import { Instrument, moexSecid } from './instrument.model';
  * Реестр инструментов — единый источник правды для фронта и коллектора tonem-server.
  * Порядок = порядок в тикере по умолчанию.
  *
- * live    — сырой тик из коннектора (MOEX / Binance / Kraken).
+ * live    — сырой тик из коннектора (MOEX / ЦБ / Binance / Kraken).
  * derived — производная, считается на лету из живых (DerivedEngine), не хранится в БД.
  */
 export const INSTRUMENTS: readonly Instrument[] = [
-  // ── FX (USD/EUR — ближайшие MOEX-фьючерсы; CNY/золото — MOEX CETS) ────────
+  // ── FX (Si/Eu фьючерсы + официальные курсы ЦБ; CNY/золото — MOEX CETS) ───
   {
     id: 'usdrub',
     label: 'USD/RUB · фьючерс',
@@ -28,6 +28,30 @@ export const INSTRUMENTS: readonly Instrument[] = [
     market: 'futures',
     placement: 'live',
     moex: { kind: 'futures', assetCode: 'Eu', priceMultiplier: 0.001 },
+  },
+  {
+    id: 'usdrub_cbr',
+    label: 'USD/RUB · ЦБ РФ',
+    heroLabel: 'официальный курс: рублей за доллар',
+    unit: '₽',
+    decimals: 2,
+    market: 'fx',
+    placement: 'live',
+    // MOEX secid retained for historical candles before spot trading was suspended.
+    moex: { kind: 'currency', secid: 'USD000UTSTOM' },
+    cbrCode: 'USD',
+  },
+  {
+    id: 'eurrub_cbr',
+    label: 'EUR/RUB · ЦБ РФ',
+    heroLabel: 'официальный курс: рублей за евро',
+    unit: '₽',
+    decimals: 2,
+    market: 'fx',
+    placement: 'live',
+    // MOEX secid retained for historical candles before spot trading was suspended.
+    moex: { kind: 'currency', secid: 'EUR_RUB__TOM' },
+    cbrCode: 'EUR',
   },
   {
     id: 'cnyrub',
@@ -230,7 +254,7 @@ export function liveInstruments(): readonly Instrument[] {
 
 /** secid'ы валютного батча MOEX — одним запросом забираем все currency-инструменты */
 export function currencySecids(): string[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency')
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode)
     .map((i) => moexSecid(i.moex!))
     .filter((s): s is string => s !== null);
 }

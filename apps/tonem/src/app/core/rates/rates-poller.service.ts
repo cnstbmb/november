@@ -17,7 +17,7 @@ const FX_SECIDS = currencySecids();
 export const POLL_REQUEST_TIMEOUT_MS = 8_000;
 
 function currencyMapping(): { id: string; secid: string }[] {
-  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency').flatMap((i) => {
+  return INSTRUMENTS.filter((i) => i.moex?.kind === 'currency' && !i.cbrCode).flatMap((i) => {
     const secid = moexSecid(i.moex!);
     return secid ? [{ id: i.id, secid }] : [];
   });
@@ -41,7 +41,8 @@ function indexInstrument(): { id: string; secid: string } | null {
 /**
  * Цикл опроса MOEX с каденсом из pollDelayMs:
  * быстро, пока рынки живы; раз в 5 минут, когда всё закрыто.
- * USD/EUR приходят из ближайших Si/Eu фьючерсов MOEX;
+ * USD/EUR фьючерсы приходят из ближайших Si/Eu контрактов MOEX;
+ * официальные USD/EUR — из ЦБ через tonem-server;
  * CNY и золото — из валютного спота MOEX.
  */
 @Injectable({ providedIn: 'root' })
@@ -93,7 +94,7 @@ export class RatesPoller {
       ),
       backend: this.backend.fetchFallbackQuotes().pipe(
         timeout(POLL_REQUEST_TIMEOUT_MS),
-        catchError(() => of({ kraken: [] })),
+        catchError(() => of({ kraken: [], cbr: [] })),
       ),
     }).subscribe(({ currency, index, futures, backend }) => {
       this.request = null;
@@ -106,6 +107,10 @@ export class RatesPoller {
         : [];
       if (currencyQuotes.length > 0) {
         this.store.apply(currencyQuotes, 'moex', now);
+      }
+
+      if (backend.cbr.length > 0) {
+        this.store.apply(backend.cbr, 'cbr', now);
       }
 
       const idx = indexInstrument();

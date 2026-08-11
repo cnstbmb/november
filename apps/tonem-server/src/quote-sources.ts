@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 const ISS_BASE = 'https://iss.moex.com/iss';
 const BINANCE_TICKER = 'https://api.binance.com/api/v3/ticker/price';
 const KRAKEN_BASE = 'https://api.kraken.com/0/public';
+const CBR_DAILY = 'https://www.cbr.ru/scripts/XML_daily.asp';
 
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -27,6 +28,21 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
+async function getText(url: string): Promise<string> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { accept: 'application/xml' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function qs(params: Record<string, string>): string {
   return Object.entries(params)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
@@ -35,6 +51,17 @@ function qs(params: Record<string, string>): string {
 
 @Injectable()
 export class QuoteSourcesService {
+  private cbrCache: { body: string; expiresAt: number } | null = null;
+
+  /** Official daily rates, cached to avoid polling the CBR endpoint every minute. */
+  async fetchCbrDailyXml(): Promise<string> {
+    const now = Date.now();
+    if (this.cbrCache && this.cbrCache.expiresAt > now) return this.cbrCache.body;
+    const body = await getText(CBR_DAILY);
+    this.cbrCache = { body, expiresAt: now + 15 * 60_000 };
+    return body;
+  }
+
   /** One batched request for all currency secids. */
   async fetchCurrencyBatch(secids: readonly string[]): Promise<unknown> {
     const url = `${ISS_BASE}/engines/currency/markets/selt/boards/CETS/securities.json?${qs({

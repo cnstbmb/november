@@ -8,8 +8,14 @@ const MOEX_OPEN = new Date('2026-07-28T09:00:00.000Z'); // 12:00 MSK
 // A weekend — MOEX closed, crypto still 24/7. 2026-08-01 is a Saturday.
 const WEEKEND = new Date('2026-08-01T17:00:00.000Z'); // 20:00 MSK Saturday
 
+const CBR_XML = `<ValCurs Date="29.07.2026">
+  <Valute><CharCode>USD</CharCode><Nominal>1</Nominal><Value>78,6980</Value></Valute>
+  <Valute><CharCode>EUR</CharCode><Nominal>1</Nominal><Value>89,6292</Value></Valute>
+</ValCurs>`;
+
 function makeSources(): QuoteSourcesService {
   return {
+    fetchCbrDailyXml: vi.fn().mockResolvedValue(CBR_XML),
     fetchCurrencyBatch: vi.fn().mockResolvedValue({
       marketdata: {
         columns: ['SECID', 'LAST', 'MARKETPRICE'],
@@ -78,6 +84,7 @@ describe('CollectorService', () => {
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('BTCUSD');
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('ETHUSD');
     expect(sources.fetchKrakenTicker).toHaveBeenCalledWith('TONUSD');
+    expect(sources.fetchCbrDailyXml).toHaveBeenCalled();
     expect(sources.fetchCurrencyBatch).toHaveBeenCalledWith(['CNYRUB_TOM', 'GLDRUB_TOM']);
     expect(sources.fetchIndex).toHaveBeenCalledWith('IMOEX');
     expect(sources.fetchFuturesBoard).toHaveBeenCalled();
@@ -93,6 +100,8 @@ describe('CollectorService', () => {
     expect(instruments).toContain('ton');
     expect(instruments).toContain('usdrub');
     expect(instruments).toContain('eurrub');
+    expect(instruments).toContain('usdrub_cbr');
+    expect(instruments).toContain('eurrub_cbr');
     expect(instruments).toContain('imoex');
     expect(instruments).toContain('brent');
     expect(ticks.find((tick) => tick.instrument === 'usdrub')).toMatchObject({
@@ -103,6 +112,10 @@ describe('CollectorService', () => {
       value: 94.658,
       meta: { source: 'moex-futures', assetCode: 'Eu', secid: 'EuU6' },
     });
+    expect(ticks.find((tick) => tick.instrument === 'usdrub_cbr')).toMatchObject({
+      value: 78.698,
+      meta: { source: 'cbr', cbrCode: 'USD', effectiveDate: '2026-07-29' },
+    });
     // every tick ts is truncated to the minute
     for (const t of ticks) {
       expect(t.ts.getSeconds()).toBe(0);
@@ -110,7 +123,7 @@ describe('CollectorService', () => {
     }
   });
 
-  it('collects only 24/7 crypto when MOEX is closed after the weekend session', async () => {
+  it('collects official rates + 24/7 crypto when MOEX is closed', async () => {
     const sources = makeSources();
     const store = makeStore();
     const svc = new CollectorService(sources, store);
@@ -119,12 +132,19 @@ describe('CollectorService', () => {
 
     expect(sources.fetchBinancePrices).not.toHaveBeenCalled();
     expect(sources.fetchKrakenTicker).toHaveBeenCalled();
+    expect(sources.fetchCbrDailyXml).toHaveBeenCalled();
     expect(sources.fetchCurrencyBatch).not.toHaveBeenCalled();
     expect(sources.fetchIndex).not.toHaveBeenCalled();
     expect(sources.fetchFuturesBoard).not.toHaveBeenCalled();
 
     const ticks = store.saveTicks.mock.calls[0][0] as { instrument: string }[];
-    expect(ticks.every((t) => ['usdrub', 'eurrub', 'btc', 'eth', 'ton'].includes(t.instrument))).toBe(true);
+    expect(ticks.every((t) => [
+      'usdrub_cbr',
+      'eurrub_cbr',
+      'btc',
+      'eth',
+      'ton',
+    ].includes(t.instrument))).toBe(true);
   });
 
   it('survives a source failure and still writes the others', async () => {

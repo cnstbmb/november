@@ -98,6 +98,20 @@ describe('LatestQuotesCacheService', () => {
     expect(service.load()['usdrub']?.value).toBe(80);
   });
 
+  it('persists the CBR provenance of official-rate instruments', () => {
+    service.save([{
+      ...quote(80.25),
+      instrumentId: 'usdrub_cbr',
+      source: 'cbr',
+    }]);
+    vi.advanceTimersByTime(LATEST_QUOTES_SAVE_DELAY_MS);
+
+    expect(service.load()['usdrub_cbr']).toMatchObject({
+      value: 80.25,
+      source: 'cbr',
+    });
+  });
+
   it('revives legacy cache and uses savedAt as the last successful response', () => {
     storage.setItem(LATEST_QUOTES_CACHE_KEY, JSON.stringify({
       version: LATEST_QUOTES_CACHE_VERSION,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseBinancePrices,
+  parseCbrDailyXml,
   parseCurrencyBatch,
   parseFuturesBatch,
   parseIndexQuote,
@@ -8,6 +9,41 @@ import {
 } from '../src/parsers';
 
 const TS = new Date('2026-07-28T19:15:00.000Z');
+
+describe('parseCbrDailyXml', () => {
+  it('normalizes official rates by nominal under the additional instrument ids', () => {
+    const xml = `<?xml version="1.0" encoding="windows-1251"?>
+      <ValCurs Date="29.07.2026" name="Foreign Currency Market">
+        <Valute><CharCode>USD</CharCode><Nominal>1</Nominal><Value>78,6980</Value></Valute>
+        <Valute><CharCode>EUR</CharCode><Nominal>1</Nominal><Value>89,6292</Value></Valute>
+        <Valute><CharCode>CNY</CharCode><Nominal>10</Nominal><Value>115,9110</Value></Valute>
+      </ValCurs>`;
+
+    const ticks = parseCbrDailyXml(xml, [
+      { id: 'usdrub_cbr', cbrCode: 'USD' },
+      { id: 'eurrub_cbr', cbrCode: 'EUR' },
+    ], TS);
+
+    expect(ticks.map((tick) => [tick.instrument, tick.value])).toEqual([
+      ['usdrub_cbr', 78.698],
+      ['eurrub_cbr', 89.6292],
+    ]);
+    expect(ticks[0].meta).toMatchObject({
+      source: 'cbr',
+      cbrCode: 'USD',
+      effectiveDate: '2026-07-29',
+    });
+  });
+
+  it('rejects malformed payloads and missing currencies', () => {
+    expect(parseCbrDailyXml('<html>oops</html>', [
+      { id: 'usdrub_cbr', cbrCode: 'USD' },
+    ], TS)).toEqual([]);
+    expect(parseCbrDailyXml('<ValCurs Date="29.07.2026"></ValCurs>', [
+      { id: 'usdrub_cbr', cbrCode: 'USD' },
+    ], TS)).toEqual([]);
+  });
+});
 
 describe('parseCurrencyBatch', () => {
   const mapping = [

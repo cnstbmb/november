@@ -60,6 +60,8 @@ export interface Instrument {
   readonly binance?: BinanceRef;
   /** Active Kraken USD source; Binance may remain as a historical candle source. */
   readonly kraken?: KrakenRef;
+  /** Код официального курса ЦБ; live-значение приходит через tonem-server. */
+  readonly cbrCode?: string;
   /** размещение: live (сырой тик) или derived (производная) */
   readonly placement: Placement;
 }

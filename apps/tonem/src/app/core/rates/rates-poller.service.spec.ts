@@ -9,13 +9,23 @@ import imoexJson from '../moex/__fixtures__/imoex.json';
 import fortsBatch from '../moex/__fixtures__/forts-batch.json';
 
 const backendLatest = {
-  // Legacy rows may still exist in the database; live FX must ignore them.
+  // Legacy rows may still exist in the database; futures must ignore them.
   usdrub: {
     ts: '2026-08-06T18:58:00.000Z',
     value: 80.25,
     meta: { source: 'cbr', cbrCode: 'USD' },
   },
   eurrub: {
+    ts: '2026-08-06T18:58:00.000Z',
+    value: 92.5,
+    meta: { source: 'cbr', cbrCode: 'EUR' },
+  },
+  usdrub_cbr: {
+    ts: '2026-08-06T18:58:00.000Z',
+    value: 80.25,
+    meta: { source: 'cbr', cbrCode: 'USD' },
+  },
+  eurrub_cbr: {
     ts: '2026-08-06T18:58:00.000Z',
     value: 92.5,
     meta: { source: 'cbr', cbrCode: 'EUR' },
@@ -124,7 +134,7 @@ describe('RatesPoller', () => {
     expect(store.quoteOf('ton')?.systime).toEqual(websocketTs);
   });
 
-  it('USD/EUR приходят из ближайших MOEX-фьючерсов и игнорируют legacy CBR backend', async () => {
+  it('добавляет официальные USD/EUR, не заменяя ближайшие MOEX-фьючерсы', async () => {
     poller.start();
     const currency = http.expectOne((r) => r.url.includes('/engines/currency/'));
     expect(currency.request.params.get('securities')).toBe('CNYRUB_TOM,GLDRUB_TOM');
@@ -135,6 +145,8 @@ describe('RatesPoller', () => {
 
     expect(store.quoteOf('usdrub')).toMatchObject({ source: 'moex', value: 82.278 });
     expect(store.quoteOf('eurrub')).toMatchObject({ source: 'moex', value: 94.658 });
+    expect(store.quoteOf('usdrub_cbr')).toMatchObject({ source: 'cbr', value: 80.25 });
+    expect(store.quoteOf('eurrub_cbr')).toMatchObject({ source: 'cbr', value: 92.5 });
   });
 
   it('пустой валютный спот не мешает получить USD/EUR из фьючерсов', () => {
@@ -150,7 +162,7 @@ describe('RatesPoller', () => {
     expect(store.hero().quote.value).toBeCloseTo(82.278, 3);
   });
 
-  it('не запрашивает приостановленные USD/EUR spot-инструменты у MOEX', () => {
+  it('не запрашивает исторические USD/EUR secid официальных курсов у MOEX', () => {
     poller.start();
     const currency = http.expectOne((r) => r.url.includes('/engines/currency/'));
     expect(currency.request.params.get('securities')).toBe('CNYRUB_TOM,GLDRUB_TOM');

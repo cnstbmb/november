@@ -126,3 +126,6 @@ PROXYAI.md
 
 # environment variables files
 *.env
+/.continue
+/.qwen
+/skills-lock.json

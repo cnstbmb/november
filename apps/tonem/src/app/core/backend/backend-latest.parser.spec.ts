@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseBackendFallbackQuotes, parseBackendKrakenQuotes } from './backend-latest.parser';
+import {
+  parseBackendCbrQuotes,
+  parseBackendFallbackQuotes,
+  parseBackendKrakenQuotes,
+} from './backend-latest.parser';
 
 describe('parseBackendKrakenQuotes', () => {
   it('accepts only Kraken-backed TON with a valid timestamp', () => {
@@ -38,7 +42,7 @@ describe('parseBackendKrakenQuotes', () => {
     ).toEqual([]);
   });
 
-  it('keeps Kraken fallback quotes and ignores legacy CBR rows', () => {
+  it('keeps Kraken and official-rate fallback quotes while ignoring legacy CBR rows', () => {
     expect(parseBackendFallbackQuotes({
       usdrub: {
         ts: '2026-08-06T18:58:00.000Z',
@@ -49,6 +53,11 @@ describe('parseBackendKrakenQuotes', () => {
         ts: '2026-08-06T18:58:25.000Z',
         value: 64_000,
         meta: { source: 'kraken', pair: 'BTCUSD' },
+      },
+      usdrub_cbr: {
+        ts: '2026-08-06T18:58:00.000Z',
+        value: 80.25,
+        meta: { source: 'cbr', cbrCode: 'USD' },
       },
       injected: {
         ts: '2026-08-06T18:58:25.000Z',
@@ -62,6 +71,39 @@ describe('parseBackendKrakenQuotes', () => {
         time: new Date('2026-08-06T18:58:25.000Z'),
         systime: new Date('2026-08-06T18:58:25.000Z'),
       }],
+      cbr: [{
+        instrumentId: 'usdrub_cbr',
+        value: 80.25,
+        time: new Date('2026-08-06T18:58:00.000Z'),
+        systime: new Date('2026-08-06T18:58:00.000Z'),
+      }],
     });
+  });
+});
+
+describe('parseBackendCbrQuotes', () => {
+  it('requires an official-rate instrument and matching currency code', () => {
+    expect(parseBackendCbrQuotes({
+      usdrub_cbr: {
+        ts: '2026-08-06T18:58:00.000Z',
+        value: 80.25,
+        meta: { source: 'cbr', cbrCode: 'USD' },
+      },
+      eurrub_cbr: {
+        ts: '2026-08-06T18:58:00.000Z',
+        value: 92.5,
+        meta: { source: 'cbr', cbrCode: 'USD' },
+      },
+      usdrub: {
+        ts: '2026-08-06T18:58:00.000Z',
+        value: 81,
+        meta: { source: 'cbr', cbrCode: 'USD' },
+      },
+    })).toEqual([{
+      instrumentId: 'usdrub_cbr',
+      value: 80.25,
+      time: new Date('2026-08-06T18:58:00.000Z'),
+      systime: new Date('2026-08-06T18:58:00.000Z'),
+    }]);
   });
 });

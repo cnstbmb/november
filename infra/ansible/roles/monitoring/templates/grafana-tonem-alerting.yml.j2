@@ -1,0 +1,513 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: tonem-production
+    folder: Tonem
+    interval: 1m
+    rules:
+      - uid: tonem-api-scrape-down
+        title: Tonem API metrics недоступны
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(up{job="tonem_server"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Prometheus не получает метрики Tonem API.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: critical, service: tonem-api}
+        isPaused: false
+        notification_settings: &tonem_critical_notification_settings
+          receiver: monitoring-critical
+          group_by: [alertname, grafana_folder, service, source, instrument]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 1h
+
+      - uid: tonem-collector-stale
+        title: Tonem collector не завершает цикл
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'time() - max(tonem_collector_last_completed_timestamp_seconds or tonem_process_start_time_seconds)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [180], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 0s
+        keepFiringFor: 1m
+        annotations: {summary: 'Collector не завершал успешный цикл более 3 минут.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: critical, service: tonem-collector}
+        isPaused: false
+        notification_settings: *tonem_critical_notification_settings
+
+      - uid: tonem-public-health-down
+        title: Tonem public health недоступен
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'min(probe_success{job="public_http_services",service="tonem_api_health"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Публичный /health сообщает о деградации collector или группы котировок.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: critical, service: tonem-api}
+        isPaused: false
+        notification_settings: *tonem_critical_notification_settings
+
+      - uid: tonem-source-failures
+        title: Ошибки источника котировок Tonem
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'sum by (source) (increase(tonem_quote_source_requests_total{result="failure"}[5m]))', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [B]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [B]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        keepFiringFor: 1m
+        annotations: {summary: 'Отдельный источник котировок возвращает ошибки.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-quotes}
+        isPaused: false
+        notification_settings: &tonem_warning_notification_settings
+          receiver: monitoring-warning
+          group_by: [alertname, grafana_folder, service, source, instrument]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 1h
+
+      - uid: tonem-instrument-stale
+        title: Отдельный инструмент Tonem устарел
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model:
+              editorMode: code
+              expr: '(((time() - tonem_quote_last_update_timestamp_seconds{market="crypto"}) / 300) or ((time() - tonem_quote_last_update_timestamp_seconds{market=~"fx|futures|index"}) / 600)) and on (market) tonem_market_open == 1'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: gt}
+                  operator: {type: and}
+                  query: {params: [B]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: gt}
+                  operator: {type: and}
+                  query: {params: [B]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        keepFiringFor: 1m
+        annotations: {summary: 'Один инструмент не обновляется в открытой торговой группе.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-quotes}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+      - uid: tonem-backup-old-warning
+        title: Резервная копия Tonem старше 26 часов
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: '((time() - max(tonem_backup_last_success_timestamp_seconds or node_boot_time_seconds{role="master"})) > bool 93600) * ((time() - max(tonem_backup_last_success_timestamp_seconds or node_boot_time_seconds{role="master"})) <= bool 172800)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        keepFiringFor: 1m
+        annotations: {summary: 'Последний успешный master backup Tonem старше 26 часов.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-backup}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+      - uid: tonem-backup-old-critical
+        title: Резервная копия Tonem старше 48 часов
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'time() - max(tonem_backup_last_success_timestamp_seconds or node_boot_time_seconds{role="master"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [172800], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 5m
+        keepFiringFor: 1m
+        annotations: {summary: 'Последний успешный master backup Tonem старше 48 часов.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: critical, service: tonem-backup}
+        isPaused: false
+        notification_settings: *tonem_critical_notification_settings
+
+      - uid: tonem-restore-check-failed
+        title: Проверка восстановления Tonem не прошла
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'min(tonem_restore_check_last_run_status)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        keepFiringFor: 1m
+        annotations: {summary: 'Ежемесячный restore-check в отдельной временной БД завершился ошибкой.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-backup}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+      - uid: tonem-frontend-errors
+        title: Повторяющиеся ошибки Tonem frontend
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'sum(increase(tonem_frontend_errors_total[5m])) or vector(0)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [5], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        keepFiringFor: 1m
+        annotations: {summary: 'Privacy-safe категории browser errors повторяются чаще стартового порога.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-frontend}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+{% if monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
+      - uid: tonem-postgres-exporter-down
+        title: Tonem Postgres exporter недоступен
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(up{job="tonem_postgres"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Внутренний read-only postgres_exporter не отвечает; SLO Tonem не меняется.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-postgres-monitoring}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+{% endif %}
+
+{% if monitoring_tonem_analytics_enabled | default(false) | bool %}
+      - uid: tonem-analytics-down
+        title: Аналитика Tonem недоступна
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(probe_success{job="tonem_internal_services",service="tonem_analytics"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Umami недоступна; приложение остаётся fail-open, SLO Tonem не затронут.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-analytics}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+      - uid: tonem-analytics-backup-old
+        title: Резервная копия аналитики Tonem устарела
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'time() - max(tonem_analytics_backup_last_success_timestamp_seconds or node_boot_time_seconds{role="master"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [93600], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        keepFiringFor: 1m
+        annotations: {summary: 'Отдельный backup namespace Umami не обновлялся более 26 часов; это warning, не SLO Tonem.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-analytics-backup}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+
+      - uid: tonem-analytics-restore-check-failed
+        title: Проверка восстановления аналитики Tonem не прошла
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'min(tonem_analytics_restore_check_last_run_status)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        keepFiringFor: 1m
+        annotations: {summary: 'Ежемесячный restore-check Umami в отдельной временной БД завершился ошибкой.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-analytics-backup}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings
+{% endif %}
+
+      - uid: tonem-monitoring-disk-low
+        title: Мало свободного места для мониторинга Tonem
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model:
+              editorMode: code
+              expr: '(min((node_filesystem_avail_bytes{role="master",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{role="master",mountpoint="/",fstype!~"tmpfs|overlay"}) * 100) < bool {{ monitoring_disk_free_warning_percent }}) + (min(node_filesystem_avail_bytes{role="master",mountpoint="/",fstype!~"tmpfs|overlay"}) < bool {{ monitoring_disk_free_warning_bytes }})'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        keepFiringFor: 1m
+        annotations: {summary: 'На корневом разделе master осталось меньше {{ monitoring_disk_free_warning_percent }}% или 10 GiB свободного места.', dashboard_url: '{{ monitoring_tonem_dashboard_url }}'}
+        labels: {severity: warning, service: tonem-monitoring-storage}
+        isPaused: false
+        notification_settings: *tonem_warning_notification_settings

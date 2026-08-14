@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { TimeMachineService } from '../../core/time-machine/time-machine.service';
+import { AnalyticsService } from '../../core/analytics/analytics.service';
 
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_HOURS_AGO = 24 * 365;
@@ -27,6 +28,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
 })
 export class TimeScrubberComponent {
   protected readonly timeMachine = inject(TimeMachineService);
+  private readonly analytics = inject(AnalyticsService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly rangeHours = signal(24);
   protected readonly arbitraryValue = signal('');
@@ -76,6 +78,7 @@ export class TimeScrubberComponent {
 
   protected commitRange(): void {
     this.timeMachine.setTarget(new Date(Date.now() - this.rangeHours() * HOUR_MS));
+    this.analytics.track('time_machine_use');
   }
 
   protected updateArbitrary(event: Event): void {
@@ -84,11 +87,15 @@ export class TimeScrubberComponent {
 
   protected commitArbitrary(): void {
     const target = parseLocalDateTime(this.arbitraryValue());
-    if (target && target.getTime() <= Date.now()) this.timeMachine.setTarget(target);
+    if (target && target.getTime() <= Date.now()) {
+      this.timeMachine.setTarget(target);
+      this.analytics.track('time_machine_use');
+    }
   }
 
   protected usePreset(unit: 'day' | 'week' | 'month'): void {
     this.timeMachine.stepBack(unit);
+    this.analytics.track('time_machine_use');
   }
 
   protected returnToPresent(): void {

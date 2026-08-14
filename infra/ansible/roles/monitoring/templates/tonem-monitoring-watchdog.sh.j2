@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR=/var/lib/tonem-monitoring-watchdog
+STATE_FILE="${STATE_DIR}/state"
+mkdir -p "${STATE_DIR}"
+
+failures=0
+alerting=0
+last_notified=0
+if [[ -r "${STATE_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${STATE_FILE}"
+fi
+
+failed_services=()
+check_endpoint() {
+  local name="$1"
+  local url="$2"
+  if ! curl --fail --silent --show-error --max-time 5 --output /dev/null "${url}"; then
+    failed_services+=("${name}")
+  fi
+}
+
+check_endpoint Grafana "${WATCHDOG_GRAFANA_URL}"
+check_endpoint Prometheus "${WATCHDOG_PROMETHEUS_URL}"
+check_endpoint Loki "${WATCHDOG_LOKI_URL}"
+
+now_epoch="$(date +%s)"
+utc_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+msk_time="$(TZ=Europe/Moscow date '+%Y-%m-%d %H:%M:%S MSK')"
+
+notify() {
+  local text="$1"
+  local proxy_args=()
+  if [[ -n "${TELEGRAM_PROXY_URL:-}" ]]; then
+    proxy_args=(--proxy "${TELEGRAM_PROXY_URL}")
+  fi
+  curl --fail --silent --show-error --max-time 10 \
+    "${proxy_args[@]}" \
+    --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+    --data-urlencode "text=${text}" \
+    --data-urlencode "disable_web_page_preview=true" \
+    --output /dev/null
+}
+
+{% raw %}if ((${#failed_services[@]} > 0)); then{% endraw %}
+  failures=$((failures + 1))
+  if ((failures >= WATCHDOG_FAILURE_THRESHOLD)) && ((alerting == 0 || now_epoch - last_notified >= WATCHDOG_REPEAT_SECONDS)); then
+    joined="$(IFS=', '; printf '%s' "${failed_services[*]}")"
+    notify "🟠 WARNING · monitoring-stack
+Недоступны: ${joined}
+MSK: ${msk_time}
+UTC: ${utc_time}
+Dashboard: ${WATCHDOG_DASHBOARD_URL}"
+    alerting=1
+    last_notified="${now_epoch}"
+  fi
+else
+  failures=0
+  if ((alerting == 1)); then
+    notify "✅ RECOVERY · monitoring-stack
+Grafana, Prometheus и Loki снова доступны.
+MSK: ${msk_time}
+UTC: ${utc_time}
+Dashboard: ${WATCHDOG_DASHBOARD_URL}"
+  fi
+  alerting=0
+fi
+
+umask 077
+printf 'failures=%s\nalerting=%s\nlast_notified=%s\n' "${failures}" "${alerting}" "${last_notified}" > "${STATE_FILE}"

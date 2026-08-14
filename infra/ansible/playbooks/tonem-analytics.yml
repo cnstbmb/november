@@ -1,0 +1,6 @@
+- name: Deploy privacy-safe Tonem analytics stack
+  hosts: master
+  become: true
+  roles:
+    - role: tonem_analytics
+      when: tonem_analytics_enabled | default(false) | bool

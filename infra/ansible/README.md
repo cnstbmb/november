@@ -214,6 +214,32 @@ If `enable_monitoring: true`, a small monitoring stack is deployed in the `monit
 
 By default, UFW does not open these ports. Access via SSH tunnel or update firewall rules.
 
+### Tonem observability and analytics
+
+Tonem reuses the shared Prometheus, Loki and Grafana stack. Its health, metrics,
+private dashboard and Telegram alerting are provisioned through the existing
+`monitoring` and `tonem` roles. Privacy-safe Umami analytics uses a separate
+Compose project and PostgreSQL database on the same master.
+
+Keep every token, database password, SMTP credential and recipient in Ansible
+Vault/private inventory. The complete variable list, endpoint contract, alert
+policy, retention rules and operator checklist are documented in
+`deployments/tonem/OBSERVABILITY.md`.
+
+Run local syntax checks and production check mode before requesting approval:
+
+```bash
+ansible-playbook --syntax-check infra/ansible/playbooks/monitoring.yml
+ansible-playbook --syntax-check infra/ansible/playbooks/tonem.yml
+ansible-playbook --syntax-check infra/ansible/playbooks/tonem-analytics.yml
+npm run ansible:tonem-analytics:check
+```
+
+Do not run production apply until private values are present and the operator has
+explicitly approved it. SMTP2GO account/domain setup and HetrixTools monitors are
+the only intentionally manual integrations; Umami's first admin password and
+website creation are also completed through its private UI.
+
 ## 8) Backups (optional)
 
 If `enable_backups: true`, the `backups` role installs `restic`, writes a backup script,
@@ -241,6 +267,18 @@ The `backups` role also stages a PostgreSQL logical dump for the Remnawave panel
 
 This is generated before each `restic backup`, so panel state is restorable even though
 PostgreSQL itself lives in a Docker volume.
+
+When `monitoring_tonem_enabled: true`, the same master snapshot also contains:
+
+- `/var/backups/tonem/tonem-postgres.dump` — custom-format Tonem PostgreSQL dump;
+- `/var/backups/monitoring/prometheus` — a consistent paused-container copy;
+- `/var/backups/monitoring/loki` — a consistent paused-container copy;
+- `/var/backups/monitoring/grafana` — Grafana data and SQLite state.
+
+Prometheus, Loki and Grafana are paused one at a time only for the duration of
+their local copy and are always unpaused by the failure trap. Monthly isolated
+restore checks validate both the Tonem and Umami logical dumps without connecting
+the temporary PostgreSQL containers to any network.
 
 ### Remnawave Restore
 

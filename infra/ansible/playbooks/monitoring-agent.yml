@@ -1,0 +1,6 @@
+- name: Configure production monitoring agent only
+  hosts: master
+  become: true
+  roles:
+    - role: monitoring_agent
+      when: enable_monitoring | bool

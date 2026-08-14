@@ -1,0 +1,141 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Deployments & alerts", "type": "dashboard"}]},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}, "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(up{job=\"tonem_server\"})", "range": false, "refId": "A"}],
+      "title": "Tonem API scrape", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0}, "id": 2,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(probe_success{job=\"public_http_services\",service=\"tonem_frontend\"})", "range": false, "refId": "A"}],
+      "title": "tonem.ru", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "UNHEALTHY"}, "1": {"text": "HEALTHY"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0}, "id": 3,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(probe_success{job=\"public_http_services\",service=\"tonem_api_health\"})", "range": false, "refId": "A"}],
+      "title": "api.tonem.ru/health", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "orange", "value": 120}, {"color": "red", "value": 180}]}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0}, "id": 4,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "time() - max(tonem_collector_last_completed_timestamp_seconds)", "range": false, "refId": "A"}],
+      "title": "Collector age", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}, "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "histogram_quantile(0.95, sum by (le, route) (rate(tonem_http_request_duration_seconds_bucket[5m]))) * 1000", "range": true, "refId": "A"}],
+      "title": "API p95 by route", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}, "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"editorMode": "code", "expr": "sum(rate(tonem_http_requests_total[5m]))", "legendFormat": "all", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "sum(rate(tonem_http_requests_total{status_code=~\"5..\"}[5m]))", "legendFormat": "5xx", "range": true, "refId": "B"}
+      ],
+      "title": "HTTP rate and errors", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 13}, "id": 7,
+      "options": {"legend": {"displayMode": "table", "placement": "right"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "time() - tonem_quote_last_update_timestamp_seconds", "range": true, "refId": "A"}],
+      "title": "Quote freshness by instrument", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 13}, "id": 8,
+      "options": {"legend": {"displayMode": "table", "placement": "right"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (source) (increase(tonem_quote_source_requests_total{result=\"failure\"}[15m]))", "range": true, "refId": "A"}],
+      "title": "Quote source failures", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "NOT READY"}, "1": {"text": "READY"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 22}, "id": 9,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "tonem_db_ready", "range": false, "refId": "A"}],
+      "title": "Postgres readiness", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 22}, "id": 11,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(up{job=\"tonem_postgres\"})", "range": false, "refId": "A"}],
+      "title": "Postgres exporter", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "orange", "value": 93600}, {"color": "red", "value": 172800}]}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 22}, "id": 12,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "time() - max(tonem_backup_last_success_timestamp_seconds)", "range": false, "refId": "A"}],
+      "title": "Backup age", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "orange", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 22}, "id": 13,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(probe_success{job=\"tonem_internal_services\",service=\"tonem_analytics\"})", "range": false, "refId": "A"}],
+      "title": "Umami (не SLO)", "type": "stat"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 27}, "id": 10,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"editorMode": "code", "expr": "{compose_service=\"tonem-server\"} | json", "queryType": "range", "refId": "A"}],
+      "title": "Tonem server JSON logs", "type": "logs"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 37}, "id": 14,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (source, error_type, frontend_version, device_type) (increase(tonem_frontend_errors_total[15m]))", "range": true, "refId": "A"}],
+      "title": "Frontend error categories", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 37}, "id": 15,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "tonem_analytics_unique_visitors", "range": true, "refId": "A"}],
+      "title": "Аудитория: уникальные за день/месяц", "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["tonem", "production"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Tonem",
+  "uid": "tonem-operations",
+  "version": 1
+}

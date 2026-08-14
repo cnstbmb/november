@@ -1,0 +1,6 @@
+- name: Configure production backups only
+  hosts: master
+  become: true
+  roles:
+    - role: backups
+      when: enable_backups | bool

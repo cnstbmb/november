@@ -2,7 +2,9 @@
   hosts: workers
   become: true
   roles:
-    - stubby
+    - role: stubby
+      tags:
+        - stubby
     - certbot
     - role: worker_landing
       when: enable_worker_landing | default(false) | bool

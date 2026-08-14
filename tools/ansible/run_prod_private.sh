@@ -12,6 +12,7 @@ CHECK_MODE=false
 MENU_MODE=false
 ASK_BECOME_PASS=false
 LIMIT_TARGET=""
+TAGS_TARGET=""
 
 detect_pkcs11_provider() {
   if [ -n "${ANSIBLE_PKCS11_PROVIDER:-}" ]; then
@@ -75,10 +76,11 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
-  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | remnawave-panel | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | monitoring-agent | backups | tonem-analytics | remnawave-panel | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
+  --tags <pattern>       Ограничить запуск Ansible tags
   -h, --help             Показать помощь
 EOF
 }
@@ -93,6 +95,9 @@ resolve_playbook() {
     workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
     stremio) echo "${ROOT_DIR}/infra/ansible/playbooks/stremio.yml" ;;
     monitoring) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring.yml" ;;
+    monitoring-agent) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring-agent.yml" ;;
+    backups) echo "${ROOT_DIR}/infra/ansible/playbooks/backups.yml" ;;
+    tonem-analytics) echo "${ROOT_DIR}/infra/ansible/playbooks/tonem-analytics.yml" ;;
     remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
     remnashop) echo "${ROOT_DIR}/infra/ansible/playbooks/remnashop.yml" ;;
     adguard-home) echo "${ROOT_DIR}/infra/ansible/playbooks/adguard-home.yml" ;;
@@ -146,6 +151,14 @@ while [ "$#" -gt 0 ]; do
         exit 1
       fi
       LIMIT_TARGET="$2"
+      shift 2
+      ;;
+    --tags)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for --tags"
+        exit 1
+      fi
+      TAGS_TARGET="$2"
       shift 2
       ;;
     --playbook)
@@ -227,6 +240,10 @@ fi
 
 if [ -n "${LIMIT_TARGET}" ]; then
   cmd+=(--limit "${LIMIT_TARGET}")
+fi
+
+if [ -n "${TAGS_TARGET}" ]; then
+  cmd+=(--tags "${TAGS_TARGET}")
 fi
 
 if [ "${ASK_BECOME_PASS}" = "true" ]; then

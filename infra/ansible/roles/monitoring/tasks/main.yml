@@ -5,6 +5,43 @@
     mode: "0755"
   when: not ansible_check_mode
 
+- name: Validate shared Telegram alerting secrets
+  ansible.builtin.assert:
+    that:
+      - monitoring_alerting_telegram_bot_token | default('') | length > 0
+      - monitoring_alerting_telegram_chat_id | default('') | string | length > 0
+    fail_msg: "Set the monitoring Telegram bot token and private chat ID in private Ansible vars."
+  when: monitoring_alerting_enabled | default(false) | bool
+  no_log: true
+  tags: [monitoring_alerting, monitoring_telegram_credentials]
+
+- name: Validate Tonem alerting dashboard
+  ansible.builtin.assert:
+    that:
+      - monitoring_tonem_dashboard_url | default('') | length > 0
+    fail_msg: "Set the Tonem dashboard URL in private Ansible vars."
+  when: monitoring_tonem_alerting_enabled | default(false) | bool
+  tags: [monitoring_alerting]
+
+- name: Validate home-node alerting integration
+  ansible.builtin.assert:
+    that:
+      - monitoring_home_node_name | default('') | length > 0
+      - monitoring_home_node_enabled | default(false) | bool
+    fail_msg: "Home-node alerts require an inventory-backed node name."
+  when: monitoring_home_node_alerting_enabled | default(false) | bool
+  tags: [monitoring_alerting, monitoring_home_node]
+
+- name: Validate Tonem Postgres exporter credentials
+  ansible.builtin.assert:
+    that:
+      - monitoring_tonem_postgres_monitor_user is match('^[a-z_][a-z0-9_]{0,62}$')
+      - monitoring_tonem_postgres_monitor_password | length >= 20
+    fail_msg: "Set the dedicated read-only Tonem Postgres monitoring password in private Ansible vars."
+  when: monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+  no_log: true
+  tags: [monitoring_postgres_exporter]
+
 - name: Ensure Grafana provisioning directories exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -15,14 +52,39 @@
     - "{{ monitoring_dir }}/grafana/provisioning"
     - "{{ monitoring_dir }}/grafana/provisioning/datasources"
     - "{{ monitoring_dir }}/grafana/provisioning/dashboards"
+    - "{{ monitoring_dir }}/grafana/provisioning/alerting"
+    - "{{ monitoring_dir }}/grafana/provisioning/plugins"
     - "{{ monitoring_dir }}/grafana/dashboards"
     - "{{ monitoring_dir }}/grafana-public"
     - "{{ monitoring_dir }}/grafana-public/provisioning"
     - "{{ monitoring_dir }}/grafana-public/provisioning/datasources"
     - "{{ monitoring_dir }}/grafana-public/provisioning/dashboards"
+    - "{{ monitoring_dir }}/grafana-public/provisioning/alerting"
+    - "{{ monitoring_dir }}/grafana-public/provisioning/plugins"
     - "{{ monitoring_dir }}/grafana-public/dashboards"
     - "{{ monitoring_dir }}/remnawave-status-exporter"
-  when: not ansible_check_mode
+    - "{{ monitoring_dir }}/secrets"
+  tags: [monitoring_public_grafana_dirs]
+
+- name: Render Tonem Postgres exporter connection files
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/secrets/{{ item.name }}"
+    content: "{{ item.value }}"
+    owner: "65534"
+    group: "65534"
+    mode: "0400"
+  loop:
+    - name: tonem-postgres-uri
+      value: "tonem-postgres:5432/tonem?sslmode=disable"
+    - name: tonem-postgres-user
+      value: "{{ monitoring_tonem_postgres_monitor_user }}"
+    - name: tonem-postgres-password
+      value: "{{ monitoring_tonem_postgres_monitor_password }}"
+  register: monitoring_tonem_postgres_secret_files
+  when:
+    - monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+    - not ansible_check_mode
+  no_log: true
 
 - name: Copy Remnawave status exporter
   ansible.builtin.copy:
@@ -92,6 +154,8 @@
       dest: "{{ monitoring_dir }}/grafana/dashboards/logs-overview.json"
     - src: dashboard-service-health.json.j2
       dest: "{{ monitoring_dir }}/grafana/dashboards/service-health.json"
+    - src: dashboard-tonem.json.j2
+      dest: "{{ monitoring_dir }}/grafana/dashboards/tonem.json"
     - src: grafana-public-datasources.yml.j2
       dest: "{{ monitoring_dir }}/grafana-public/provisioning/datasources/datasources.yml"
     - src: grafana-dashboardproviders.yml.j2
@@ -101,6 +165,206 @@
   register: monitoring_grafana_templates
   when: not ansible_check_mode
 
+- name: Render home-node Grafana dashboard
+  ansible.builtin.template:
+    src: dashboard-home-node.json.j2
+    dest: "{{ monitoring_dir }}/grafana/dashboards/home-node.json"
+    mode: "0644"
+  register: monitoring_home_node_dashboard_template
+  when:
+    - monitoring_home_node_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_home_node]
+
+- name: Remove disabled home-node Grafana dashboard
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/dashboards/home-node.json"
+    state: absent
+  register: monitoring_home_node_dashboard_cleanup
+  when:
+    - not (monitoring_home_node_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_home_node]
+
+- name: Render Tonem Grafana managed alerting
+  ansible.builtin.template:
+    src: grafana-tonem-alerting.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/alerting/tonem.yml"
+    owner: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    group: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    mode: "0400"
+  register: monitoring_tonem_alerting_template
+  when:
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_tonem_alerting_enabled | default(false) | bool
+  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Render shared Grafana Telegram contact points
+  ansible.builtin.template:
+    src: grafana-telegram-contact-points.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/alerting/telegram.yml"
+    owner: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    group: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    mode: "0400"
+  register: monitoring_telegram_alerting_template
+  when:
+    - monitoring_alerting_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_telegram_credentials]
+
+- name: Render home-node Grafana managed alerting
+  ansible.builtin.template:
+    src: grafana-home-node-alerting.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/alerting/home-node.yml"
+    owner: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    group: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    mode: "0400"
+  register: monitoring_home_node_alerting_template
+  when:
+    - monitoring_home_node_alerting_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_home_node]
+
+- name: Remove disabled home-node Grafana managed alerting
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/provisioning/alerting/home-node.yml"
+    state: absent
+  register: monitoring_home_node_alerting_cleanup
+  when:
+    - not (monitoring_home_node_alerting_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_home_node]
+
+- name: Find stale Ansible backups in Grafana alerting provisioning
+  ansible.builtin.find:
+    paths: "{{ monitoring_dir }}/grafana/provisioning/alerting"
+    patterns: "tonem.yml.*~"
+    file_type: file
+  register: monitoring_tonem_alerting_stale_backups
+  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Remove stale Ansible backups from Grafana alerting provisioning
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ monitoring_tonem_alerting_stale_backups.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Render Grafana Telegram alerting environment
+  ansible.builtin.copy:
+    dest: "{{ monitoring_dir }}/grafana-alerting.env"
+    mode: "0600"
+    content: |
+      GRAFANA_TELEGRAM_BOT_TOKEN={{ monitoring_alerting_telegram_bot_token }}
+      GF_SMTP_ENABLED=false
+  register: monitoring_alerting_env
+  when: monitoring_alerting_enabled | default(false) | bool
+  no_log: true
+  tags: [monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Inspect Tonem email report timer units before disabling them
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ item }}"
+  loop:
+    - tonem-slo-report-weekly.timer
+    - tonem-slo-report-monthly.timer
+  register: monitoring_tonem_email_timer_units
+  tags: [monitoring_email_disabled]
+
+- name: Stop and disable Tonem email report timers
+  ansible.builtin.systemd_service:
+    name: "{{ item.item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ monitoring_tonem_email_timer_units.results }}"
+  when: item.stat.exists
+  tags: [monitoring_email_disabled]
+
+- name: Remove disabled Tonem email report artifacts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/tonem-slo-report@.service
+    - /etc/systemd/system/tonem-slo-report-weekly.timer
+    - /etc/systemd/system/tonem-slo-report-monthly.timer
+    - /usr/local/bin/tonem-slo-report
+    - /etc/tonem-slo-report-curl.conf
+  register: monitoring_tonem_email_cleanup
+  tags: [monitoring_email_disabled]
+
+- name: Reload systemd after removing Tonem email report units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - monitoring_tonem_email_cleanup is defined
+    - monitoring_tonem_email_cleanup.changed
+    - not ansible_check_mode
+  tags: [monitoring_email_disabled]
+
+- name: Install Tonem monitoring watchdog
+  ansible.builtin.template:
+    src: tonem-monitoring-watchdog.sh.j2
+    dest: /usr/local/bin/tonem-monitoring-watchdog
+    mode: "0755"
+  register: monitoring_tonem_watchdog_script
+  when:
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_tonem_alerting_enabled | default(false) | bool
+    - monitoring_tonem_watchdog_enabled | default(true) | bool
+  tags: [monitoring_telegram_proxy, monitoring_telegram_credentials]
+
+- name: Render Tonem monitoring watchdog environment
+  ansible.builtin.copy:
+    dest: /etc/tonem-monitoring-watchdog.env
+    mode: "0600"
+    content: |
+      TELEGRAM_BOT_TOKEN={{ monitoring_alerting_telegram_bot_token }}
+      TELEGRAM_CHAT_ID={{ monitoring_alerting_telegram_chat_id }}
+      TELEGRAM_PROXY_URL={{ monitoring_alerting_telegram_proxy_url }}
+      WATCHDOG_GRAFANA_URL={{ monitoring_tonem_watchdog_grafana_url }}
+      WATCHDOG_PROMETHEUS_URL={{ monitoring_tonem_watchdog_prometheus_url }}
+      WATCHDOG_LOKI_URL={{ monitoring_tonem_watchdog_loki_url }}
+      WATCHDOG_DASHBOARD_URL={{ monitoring_tonem_dashboard_url }}
+      WATCHDOG_FAILURE_THRESHOLD={{ monitoring_tonem_watchdog_failure_threshold }}
+      WATCHDOG_REPEAT_SECONDS={{ monitoring_tonem_watchdog_repeat_seconds }}
+  register: monitoring_tonem_watchdog_env
+  when:
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_tonem_alerting_enabled | default(false) | bool
+    - monitoring_tonem_watchdog_enabled | default(true) | bool
+  no_log: true
+  tags: [monitoring_telegram_proxy, monitoring_telegram_credentials]
+
+- name: Render Tonem monitoring watchdog systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - tonem-monitoring-watchdog.service
+    - tonem-monitoring-watchdog.timer
+  register: monitoring_tonem_watchdog_units
+  when:
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_tonem_alerting_enabled | default(false) | bool
+    - monitoring_tonem_watchdog_enabled | default(true) | bool
+    - not ansible_check_mode
+
+- name: Enable Tonem monitoring watchdog timer
+  ansible.builtin.systemd_service:
+    name: tonem-monitoring-watchdog.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_tonem_alerting_enabled | default(false) | bool
+    - monitoring_tonem_watchdog_enabled | default(true) | bool
+    - not ansible_check_mode
+
 - name: Remove legacy public Grafana status dashboard file
   ansible.builtin.file:
     path: "{{ monitoring_dir }}/grafana-public/dashboards/public-vpn-status.json"
@@ -108,13 +372,163 @@
   register: monitoring_legacy_public_dashboard
   when: not ansible_check_mode
 
+- name: Install nginx for restricted Loki ingestion
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+  tags: [monitoring_port_hardening]
+
+- name: Disable nginx default HTTP site for dedicated Loki ingress
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx for Loki ingress
+  tags: [monitoring_port_hardening]
+
+- name: Render restricted Loki ingestion proxy
+  ansible.builtin.template:
+    src: nginx-loki-ingest.conf.j2
+    dest: /etc/nginx/sites-available/monitoring-loki-ingest.conf
+    mode: "0644"
+  register: monitoring_loki_ingress_proxy
+  notify: Reload nginx for Loki ingress
+  tags: [monitoring_port_hardening]
+
+- name: Enable restricted Loki ingestion proxy
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/monitoring-loki-ingest.conf
+    dest: /etc/nginx/sites-enabled/monitoring-loki-ingest.conf
+    state: link
+    force: true
+  register: monitoring_loki_ingress_proxy_link
+  notify: Reload nginx for Loki ingress
+  tags: [monitoring_port_hardening]
+
+- name: Allow local Docker networks to push logs through nginx
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ monitoring_loki_port | string }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+  loop: "{{ monitoring_loki_ingress_local_cidrs }}"
+  tags: [monitoring_port_hardening]
+
+- name: Allow active workers to push logs through nginx
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ monitoring_loki_port | string }}"
+    proto: tcp
+    from_ip: "{{ hostvars[item].ansible_host | default(item) }}"
+  loop: "{{ groups['workers'] | default([]) }}"
+  tags: [monitoring_port_hardening]
+
+- name: Deny all other direct Loki ingress
+  ansible.builtin.ufw:
+    rule: deny
+    port: "{{ monitoring_loki_port | string }}"
+    proto: tcp
+  tags: [monitoring_port_hardening]
+
 - name: Render monitoring compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_dir }}/docker-compose.yml"
     mode: "0644"
   register: monitoring_compose_template
-  when: not ansible_check_mode
+  tags: [monitoring_postgres_exporter, monitoring_telegram_proxy, monitoring_port_hardening]
+
+- name: Recreate only Prometheus and Loki with private host bindings
+  ansible.builtin.command: docker compose up -d --no-deps prometheus loki
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - monitoring_compose_template is changed
+    - not ansible_check_mode
+  tags: [monitoring_port_hardening]
+
+- name: Validate nginx after Loki releases the public port
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - >
+      (monitoring_loki_ingress_proxy is changed)
+      or (monitoring_loki_ingress_proxy_link is changed)
+      or (monitoring_compose_template is changed)
+  tags: [monitoring_port_hardening]
+
+- name: Pull fixed Tonem Postgres exporter image
+  ansible.builtin.command: docker compose pull tonem-postgres-exporter
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+    - monitoring_compose_template is changed
+    - not ansible_check_mode
+  tags: [monitoring_postgres_exporter]
+
+- name: Recreate only Tonem Postgres exporter
+  ansible.builtin.command: docker compose up -d --no-deps tonem-postgres-exporter
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+    - monitoring_compose_template is changed
+    - not ansible_check_mode
+  tags: [monitoring_postgres_exporter]
+
+- name: Recreate only Grafana for Telegram proxy
+  ansible.builtin.command: docker compose up -d --no-deps grafana
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - monitoring_alerting_telegram_proxy_url | default('') | length > 0
+    - monitoring_compose_template is changed
+    - not ansible_check_mode
+  tags: [monitoring_telegram_proxy]
+
+- name: Recreate only Grafana after Telegram credential rotation
+  ansible.builtin.command: docker compose up -d --no-deps grafana
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - monitoring_alerting_env is changed
+    - not ansible_check_mode
+  tags: [monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Wait for Grafana after Telegram credential rotation
+  ansible.builtin.uri:
+    url: "{{ (monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://127.0.0.1:' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port) }}/api/health"
+    method: GET
+    validate_certs: false
+    status_code: 200
+  register: monitoring_grafana_health_after_alerting_restart
+  until: monitoring_grafana_health_after_alerting_restart.status | default(0) == 200
+  retries: 15
+  delay: 2
+  when:
+    - monitoring_alerting_env is changed
+    - not ansible_check_mode
+  no_log: true
+  tags: [monitoring_telegram_credentials, monitoring_email_disabled]
+
+- name: Reload Grafana alerting provisioning
+  ansible.builtin.uri:
+    url: "{{ (monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://127.0.0.1:' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port) }}/api/admin/provisioning/alerting/reload"
+    method: POST
+    url_username: "{{ monitoring_grafana_admin_user }}"
+    url_password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  when:
+    - not ansible_check_mode
+    - >-
+      monitoring_alerting_enabled | default(false) | bool
+      or
+      (monitoring_home_node_alerting_cleanup is defined and monitoring_home_node_alerting_cleanup.changed)
+  no_log: true
+  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled, monitoring_home_node]
 
 - name: Recreate monitoring stack when config changed
   ansible.builtin.command: docker compose up -d --remove-orphans --force-recreate
@@ -127,6 +541,8 @@
       (monitoring_config_templates is defined and (monitoring_config_templates.results | selectattr('changed') | list | length > 0))
       or
       (monitoring_grafana_templates is defined and (monitoring_grafana_templates.results | selectattr('changed') | list | length > 0))
+      or
+      (monitoring_tonem_postgres_secret_files is defined and (monitoring_tonem_postgres_secret_files.results | selectattr('changed') | list | length > 0))
       or
       (monitoring_legacy_public_dashboard is defined and monitoring_legacy_public_dashboard.changed)
       or

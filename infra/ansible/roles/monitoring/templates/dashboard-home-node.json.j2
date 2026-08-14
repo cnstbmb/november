@@ -1,0 +1,115 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "description": "Maximum temperature across SoC, CPU, DDR, NPU and GPU sensors.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": {{ monitoring_home_node_temperature_warning_celsius }}}, {"color": "red", "value": {{ monitoring_home_node_temperature_critical_celsius }} }]}, "unit": "celsius"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "value", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "max(node_hwmon_temp_celsius{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",sensor=\"temp1\"})", "range": false, "refId": "A"}],
+      "title": "Maximum Temperature",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 1, "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 80}, {"color": "red", "value": 95}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "value", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",mode=\"idle\"}[5m])) * 100)", "range": false, "refId": "A"}],
+      "title": "CPU Usage",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 536870912}, {"color": "green", "value": 1073741824}]}, "unit": "bytes"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "value", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "node_memory_MemAvailable_bytes{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\"}", "range": false, "refId": "A"}],
+      "title": "Memory Available",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 2, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": {{ monitoring_home_node_disk_free_critical_bytes }}}, {"color": "green", "value": {{ monitoring_home_node_disk_free_warning_bytes }} }]}, "unit": "bytes"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showPercentChange": false, "textMode": "value", "wideLayout": true},
+      "targets": [{"editorMode": "code", "expr": "node_filesystem_avail_bytes{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}", "range": false, "refId": "A"}],
+      "title": "Root Filesystem Available",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "showPoints": "never", "spanNulls": false}, "decimals": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": {{ monitoring_home_node_temperature_warning_celsius }}}, {"color": "red", "value": {{ monitoring_home_node_temperature_critical_celsius }} }]}, "unit": "celsius"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
+      "id": 5,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "node_hwmon_temp_celsius{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",sensor=\"temp1\"} * on(host,instance,chip) group_left(chip_name) node_hwmon_chip_names{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\"}", "legendFormat": "{{ '{{chip_name}}' }}", "range": true, "refId": "A"}],
+      "title": "Temperature by Sensor",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "decimals": 1, "max": 100, "min": 0, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
+      "id": 6,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"editorMode": "code", "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",mode=\"idle\"}[5m])) * 100)", "legendFormat": "CPU", "range": true, "refId": "A"}],
+      "title": "CPU Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "decimals": 1, "max": 100, "min": 0, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 14},
+      "id": 7,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"editorMode": "code", "expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\"} / node_memory_MemTotal_bytes{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\"}))", "legendFormat": "Memory used", "range": true, "refId": "A"}],
+      "title": "Memory Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "decimals": 2, "unit": "bytes"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 14},
+      "id": 8,
+      "options": {"legend": {"calcs": ["lastNotNull", "min"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"editorMode": "code", "expr": "node_filesystem_avail_bytes{job=\"nodes\",host=\"{{ monitoring_home_node_name }}\",mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}", "legendFormat": "Free on /", "range": true, "refId": "A"}],
+      "title": "Root Filesystem Available",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["november", "home", "hardware"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "title": "Home Node",
+  "uid": "november-home-node",
+  "version": 1,
+  "weekStart": ""
+}

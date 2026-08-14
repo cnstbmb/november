@@ -7,7 +7,7 @@ export RESTIC_PASSWORD_FILE=/etc/restic/credentials
 export {{ env_name }}={{ env_value | quote }}
 {% endfor %}
 
-backup_paths="{{ ((backup_paths | default([])) + (backup_additional_paths | default([]))) | unique | join(' ') }}"
+backup_paths="{{ ((backup_paths | default([])) + (backup_additional_paths | default([])) + ([backup_tonem_prepare_dir] if backup_tonem_pg_dump_enabled | bool else []) + ([backup_monitoring_prepare_dir] if backup_monitoring_snapshot_enabled | bool else [])) | unique | join(' ') }}"
 
 if [ -x /usr/local/bin/restic-backup-prepare.sh ]; then
   /usr/local/bin/restic-backup-prepare.sh
@@ -25,3 +25,18 @@ restic forget --prune \
   --keep-daily {{ backup_keep_daily }} \
   --keep-weekly {{ backup_keep_weekly }} \
   --keep-monthly {{ backup_keep_monthly }}
+
+{% if backup_tonem_pg_dump_enabled | bool %}
+metric_dir={{ backup_tonem_textfile_dir | quote }}
+mkdir -p "${metric_dir}"
+metric_tmp="${metric_dir}/tonem-backup.prom.tmp"
+printf 'tonem_backup_last_success_timestamp_seconds %s\n' "$(date +%s)" > "${metric_tmp}"
+mv "${metric_tmp}" "${metric_dir}/tonem-backup.prom"
+{% endif %}
+{% if backup_monitoring_snapshot_enabled | bool %}
+metric_dir={{ backup_tonem_textfile_dir | quote }}
+mkdir -p "${metric_dir}"
+metric_tmp="${metric_dir}/tonem-monitoring-backup.prom.tmp"
+printf 'tonem_monitoring_backup_last_success_timestamp_seconds %s\n' "$(date +%s)" > "${metric_tmp}"
+mv "${metric_tmp}" "${metric_dir}/tonem-monitoring-backup.prom"
+{% endif %}

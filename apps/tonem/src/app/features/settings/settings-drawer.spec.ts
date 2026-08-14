@@ -66,6 +66,8 @@ describe('SettingsDrawerComponent', () => {
     expect(element.textContent).toContain('рынок задаёт настроение');
     expect(element.querySelectorAll("input[type='range']").length).toBe(4);
     expect(element.querySelector('fieldset[disabled]')).toBeNull();
+    expect(element.textContent).toContain('Без cookies и межсессионного профиля');
+    expect(element.textContent).toContain('Сырые события удаляются через 90 дней');
   });
 
   it('emits close from the close button', async () => {

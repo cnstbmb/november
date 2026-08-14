@@ -38,6 +38,9 @@
       - stubby_master_host_effective | length > 0
       - stubby_upstream_address_effective | length > 0
       - stubby_tls_auth_name_effective | length > 0
+      - stubby_upstream_address_effective != ansible_host
+      - stubby_upstream_address_effective != inventory_hostname
+      - stubby_upstream_address_effective != (ansible_default_ipv4.address | default(''))
     fail_msg: >-
       Stubby requires a master host and a TLS name for upstream DoT.
       Ensure inventory has a master host and host_vars/<master>/certbot.yml defines certbot_domains.
@@ -64,6 +67,7 @@
     src: stubby.yml.j2
     dest: "{{ stubby_config_path }}"
     mode: "0644"
+    backup: true
   register: stubby_config_template
   when: stubby_manage_config | bool
 

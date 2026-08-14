@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+sql_file="{{ tonem_analytics_dir }}/tonem-analytics-retention.sql"
+metric_dir="{{ tonem_analytics_textfile_dir }}"
+tmp_metric="${metric_dir}/tonem-analytics-retention.prom.tmp"
+final_metric="${metric_dir}/tonem-analytics-retention.prom"
+
+docker exec -i tonem-umami-postgres psql -v ON_ERROR_STOP=1 -U umami -d umami < "${sql_file}"
+daily_visitors="$(docker exec tonem-umami-postgres psql -U umami -d umami -Atc \
+  "select count(distinct session_id) from session where created_at >= date_trunc('day', now());")"
+monthly_visitors="$(docker exec tonem-umami-postgres psql -U umami -d umami -Atc \
+  "select count(distinct session_id) from session where created_at >= date_trunc('month', now());")"
+mkdir -p "${metric_dir}"
+{
+  printf 'tonem_analytics_retention_last_success_timestamp_seconds %s\n' "$(date +%s)"
+  printf 'tonem_analytics_unique_visitors{period="day"} %s\n' "${daily_visitors}"
+  printf 'tonem_analytics_unique_visitors{period="month"} %s\n' "${monthly_visitors}"
+} > "${tmp_metric}"
+mv "${tmp_metric}" "${final_metric}"

@@ -1,0 +1,35 @@
+server {
+  listen {{ monitoring_loki_port }};
+  server_name _;
+
+  client_max_body_size 16m;
+
+  location = /loki/api/v1/push {
+{% for cidr in monitoring_loki_ingress_local_cidrs %}
+    allow {{ cidr }};
+{% endfor %}
+{% for worker in groups['workers'] | default([]) %}
+    allow {{ hostvars[worker].ansible_host | default(worker) }};
+{% endfor %}
+    deny all;
+
+    proxy_pass http://127.0.0.1:{{ monitoring_loki_loopback_port }};
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+  }
+
+  location = /ready {
+{% for cidr in monitoring_loki_ingress_local_cidrs %}
+    allow {{ cidr }};
+{% endfor %}
+    deny all;
+
+    proxy_pass http://127.0.0.1:{{ monitoring_loki_loopback_port }};
+  }
+
+  location / {
+    return 404;
+  }
+}

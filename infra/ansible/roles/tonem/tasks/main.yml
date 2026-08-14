@@ -13,6 +13,7 @@
     tonem_dir_effective: "{{ tonem_dir | default('/opt/tonem') }}"
     remnawave_panel_dir_effective: "{{ remnawave_panel_dir | default('/opt/remnawave-panel') }}"
     remnawave_panel_nginx_conf_effective: "{{ remnawave_panel_nginx_conf_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/nginx.conf') }}"
+    tonem_grafana_api_url_effective: "{{ monitoring_tonem_grafana_api_url | default((monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ (monitoring_grafana_tls_domain | default('localhost')) ~ ':' ~ (monitoring_grafana_port | default(3000)), 'http://127.0.0.1:' ~ (monitoring_grafana_port | default(3000)))) }}"
 
 - name: Validate required variables
   ansible.builtin.assert:
@@ -71,6 +72,13 @@
     mode: "0644"
   register: tonem_compose_copy
 
+- name: Install disabled analytics runtime config unless analytics is already provisioned
+  ansible.builtin.copy:
+    src: "{{ repo_root }}/deployments/tonem/analytics-config.js"
+    dest: "{{ tonem_dir_effective }}/analytics-config.js"
+    mode: "0644"
+    force: false
+
 - name: Copy tonem .env
   ansible.builtin.copy:
     src: "{{ repo_root }}/deployments/tonem/.env"
@@ -99,14 +107,37 @@
   delegate_to: localhost
   become: false
 
-- name: Ensure tonem server blocks in nginx.conf
-  ansible.builtin.blockinfile:
-    path: "{{ remnawave_panel_nginx_conf_effective }}"
-    block: "{{ tonem_server_blocks_content }}"
-    marker: "# {mark} TONEM SERVER BLOCKS"
-    insertafter: EOF
-    backup: true
-  register: nginx_conf_updated
+- name: Update and validate Tonem nginx configuration
+  block:
+    - name: Ensure tonem server blocks in nginx.conf
+      ansible.builtin.blockinfile:
+        path: "{{ remnawave_panel_nginx_conf_effective }}"
+        block: "{{ tonem_server_blocks_content }}"
+        marker: "# {mark} TONEM SERVER BLOCKS"
+        insertafter: EOF
+        backup: true
+      register: nginx_conf_updated
+
+    - name: Validate updated Tonem nginx configuration before proxy recreate
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -t
+        chdir: "{{ remnawave_panel_dir_effective }}"
+      changed_when: false
+      when:
+        - nginx_conf_updated.changed
+        - not ansible_check_mode
+  rescue:
+    - name: Restore previous nginx configuration after validation failure
+      ansible.builtin.copy:
+        src: "{{ nginx_conf_updated.backup_file }}"
+        dest: "{{ remnawave_panel_nginx_conf_effective }}"
+        remote_src: true
+        mode: preserve
+      when: nginx_conf_updated.backup_file | default('') | length > 0
+
+    - name: Stop Tonem deployment after nginx validation failure
+      ansible.builtin.fail:
+        msg: "Tonem nginx configuration failed validation; the previous file was restored and the running proxy was not recreated."
 
 - name: Reload remnawave-proxy with updated nginx config
   ansible.builtin.command:
@@ -132,6 +163,68 @@
   delay: 10
   when: not ansible_check_mode
 
+- name: Verify Tonem aggregate health after deployment
+  ansible.builtin.command:
+    cmd: docker exec tonem-server wget -qO- http://127.0.0.1:3200/health
+  register: tonem_aggregate_health
+  changed_when: false
+  retries: 18
+  delay: 10
+  until: tonem_aggregate_health.rc == 0
+  when: not ansible_check_mode
+
+- name: Validate Tonem Postgres monitoring role credentials
+  ansible.builtin.assert:
+    that:
+      - monitoring_tonem_postgres_monitor_user | default('') is match('^[a-z_][a-z0-9_]{0,62}$')
+      - monitoring_tonem_postgres_monitor_password | default('') | length >= 20
+  when: monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+  no_log: true
+
+- name: Create or rotate the read-only Tonem Postgres monitoring role
+  ansible.builtin.shell:
+    cmd: docker exec -i tonem-postgres psql -v ON_ERROR_STOP=1 -U tonem -d tonem
+    stdin: |
+      SELECT format('CREATE ROLE %I LOGIN', '{{ monitoring_tonem_postgres_monitor_user }}')
+      WHERE NOT EXISTS (
+        SELECT 1 FROM pg_roles WHERE rolname = '{{ monitoring_tonem_postgres_monitor_user }}'
+      ) \gexec
+      SELECT format(
+        'ALTER ROLE %I PASSWORD %L',
+        '{{ monitoring_tonem_postgres_monitor_user }}',
+        '{{ monitoring_tonem_postgres_monitor_password | replace("'", "''") }}'
+      ) \gexec
+      GRANT CONNECT ON DATABASE tonem TO {{ monitoring_tonem_postgres_monitor_user }};
+      GRANT pg_monitor TO {{ monitoring_tonem_postgres_monitor_user }};
+      GRANT USAGE ON SCHEMA public TO {{ monitoring_tonem_postgres_monitor_user }};
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO {{ monitoring_tonem_postgres_monitor_user }};
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {{ monitoring_tonem_postgres_monitor_user }};
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - monitoring_tonem_postgres_exporter_enabled | default(false) | bool
+  no_log: true
+
+- name: Record successful Tonem deployment annotation in Grafana
+  ansible.builtin.uri:
+    url: "{{ tonem_grafana_api_url_effective }}/api/annotations"
+    method: POST
+    url_username: "{{ monitoring_grafana_admin_user }}"
+    url_password: "{{ monitoring_grafana_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      dashboardUID: tonem-operations
+      tags: [deployment, tonem]
+      text: "Tonem deployment completed after successful container health check"
+    status_code: 200
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - monitoring_tonem_enabled | default(false) | bool
+    - monitoring_grafana_admin_user | default('') | length > 0
+    - monitoring_grafana_admin_password | default('') | length > 0
+
 # ── Backup ────────────────────────────────────────────────────────────────
 
 - name: Install tonem pg_dump backup script
@@ -155,6 +248,7 @@
       cd "${BACKUP_DIR}"
       ls -t tonem-db-weekly-*.sql.gz 2>/dev/null | tail -n +5 | xargs -r rm -f
     mode: "0750"
+  when: not (backup_tonem_pg_dump_enabled | default(monitoring_tonem_enabled | default(false)) | bool)
 
 - name: Schedule tonem backup cron (daily at 01:30, before restic at 02:00)
   ansible.builtin.cron:
@@ -162,3 +256,4 @@
     minute: "30"
     hour: "1"
     job: "/usr/local/bin/tonem-backup.sh"
+  when: not (backup_tonem_pg_dump_enabled | default(monitoring_tonem_enabled | default(false)) | bool)

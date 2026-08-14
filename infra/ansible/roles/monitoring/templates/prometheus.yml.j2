@@ -72,6 +72,51 @@ scrape_configs:
           service: "vpn"
 {% endif %}
 
+{% if monitoring_tonem_enabled | default(false) | bool %}
+  - job_name: tonem_server
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "{{ monitoring_tonem_server_target }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "tonem_api"
+{% endif %}
+
+{% if monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
+  - job_name: tonem_postgres
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "{{ monitoring_tonem_postgres_exporter_target }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "tonem_postgres"
+{% endif %}
+
+{% if monitoring_tonem_analytics_enabled | default(false) | bool and monitoring_blackbox_enabled | default(true) | bool %}
+  - job_name: tonem_internal_services
+    metrics_path: /probe
+    params:
+      module: [http_public_2xx]
+    static_configs:
+      - targets:
+          - "{{ monitoring_tonem_analytics_health_url }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "tonem_analytics"
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "monitoring-blackbox-exporter:{{ monitoring_blackbox_port }}"
+{% endif %}
+
 {% if monitoring_blackbox_enabled | default(true) | bool %}
 {% set public_http_probes = [] %}
 {% if remnawave_panel_domain | default('', true) | length > 0 %}
@@ -87,6 +132,10 @@ scrape_configs:
 {% endif %}
 {% if enable_remnashop | default(false) | bool and remnashop_domain | default('', true) | length > 0 %}
 {% set _ = public_http_probes.append({'name': 'bot', 'url': 'https://' ~ remnashop_domain}) %}
+{% endif %}
+{% if monitoring_tonem_enabled | default(false) | bool %}
+{% set _ = public_http_probes.append({'name': 'tonem_frontend', 'url': monitoring_tonem_frontend_url}) %}
+{% set _ = public_http_probes.append({'name': 'tonem_api_health', 'url': monitoring_tonem_api_health_url}) %}
 {% endif %}
 {% if public_http_probes | length > 0 %}
   - job_name: public_http_services

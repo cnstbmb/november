@@ -1,0 +1,9 @@
+[Unit]
+Description=Verify the latest Tonem Umami dump in an isolated PostgreSQL container
+After=docker.service tonem-analytics-backup.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tonem-analytics-restore-check
+Nice=10

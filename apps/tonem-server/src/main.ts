@@ -1,11 +1,12 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { JsonLogger } from './observability/json-logger';
 
 const ALLOWED_ORIGINS = ['https://tonem.ru', 'https://www.tonem.ru'];
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { logger: new JsonLogger() });
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -13,10 +14,10 @@ async function bootstrap(): Promise<void> {
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`), false);
+        callback(new Error('CORS blocked'), false);
       }
     },
-    methods: ['GET'],
+    methods: ['GET', 'POST'],
     credentials: false,
   });
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Tonem monitoring stack watchdog
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/tonem-monitoring-watchdog.env
+ExecStart=/usr/local/bin/tonem-monitoring-watchdog
+DynamicUser=yes
+StateDirectory=tonem-monitoring-watchdog
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict

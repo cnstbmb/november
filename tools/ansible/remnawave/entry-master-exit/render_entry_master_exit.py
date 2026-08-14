@@ -61,12 +61,12 @@ def display_path(path: Path) -> str:
         return str(path)
 
 
-def dns_config():
+def dns_config(address="127.0.0.1"):
     return {
         "servers": [
             {
                 "port": 53,
-                "address": "127.0.0.1",
+                "address": address,
                 "skipFallback": True,
                 "queryStrategy": "UseIPv4",
             }
@@ -1067,7 +1067,7 @@ def build_home_exit_profile(home_exit):
 
     return {
         "log": base_log(),
-        "dns": dns_config(),
+        "dns": dns_config("127.0.0.53"),
         "inbounds": inbounds,
         "outbounds": [
             {
@@ -1102,7 +1102,7 @@ def build_home_exit_profile(home_exit):
             {
                 "tag": "DNS_OUT",
                 "protocol": "freedom",
-                "settings": {"redirect": "127.0.0.1:53"},
+                "settings": {"redirect": "127.0.0.53:53"},
             },
         ],
         "routing": {

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Tonem Umami backup daily
+
+[Timer]
+OnCalendar=*-*-* {{ '%02d' | format(tonem_analytics_backup_hour | int) }}:{{ '%02d' | format(tonem_analytics_backup_minute | int) }}:00
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,50 @@
+apiVersion: 1
+
+deleteContactPoints:
+  - orgId: 1
+    uid: tonem-critical-email
+  - orgId: 1
+    uid: tonem-warning-telegram
+  - orgId: 1
+    uid: tonem-critical-telegram
+
+contactPoints:
+  - orgId: 1
+    name: monitoring-warning
+    receivers:
+      - uid: monitoring-warning-telegram
+        type: telegram
+        disableResolveMessage: false
+        settings:
+          bottoken: $GRAFANA_TELEGRAM_BOT_TOKEN
+          chatid: {{ monitoring_alerting_telegram_chat_id | string | to_json }}
+          disable_web_page_preview: true
+          parse_mode: HTML
+          message: '{% raw %}{{ template "monitoring.telegram" . }}{% endraw %}'
+  - orgId: 1
+    name: monitoring-critical
+    receivers:
+      - uid: monitoring-critical-telegram
+        type: telegram
+        disableResolveMessage: false
+        settings:
+          bottoken: $GRAFANA_TELEGRAM_BOT_TOKEN
+          chatid: {{ monitoring_alerting_telegram_chat_id | string | to_json }}
+          disable_web_page_preview: true
+          parse_mode: HTML
+          message: '{% raw %}{{ template "monitoring.telegram" . }}{% endraw %}'
+
+templates:
+  - orgId: 1
+    name: monitoring-telegram-template
+    template: |
+      {% raw %}{{ define "monitoring.telegram" }}
+      {{ if eq .Status "resolved" }}✅ RECOVERY{{ else if eq .CommonLabels.severity "critical" }}🔴 CRITICAL{{ else }}🟠 WARNING{{ end }} · {{ .CommonLabels.service }}
+      {{ range .Alerts }}
+      {{ .Annotations.summary }}
+      {{ with .Labels.source }}Источник: {{ . }}{{ end }}{{ with .Labels.instrument }}Инструмент: {{ . }}{{ end }}
+      MSK: {{ .StartsAt | tz "Europe/Moscow" | date "2006-01-02 15:04:05 MST" }}
+      UTC: {{ .StartsAt | tz "UTC" | date "2006-01-02T15:04:05Z07:00" }}
+      {{ if .DashboardURL }}Dashboard: {{ .DashboardURL }}{{ else if .Annotations.dashboard_url }}Dashboard: {{ .Annotations.dashboard_url }}{{ end }}
+      {{ end }}
+      {{ end }}{% endraw %}

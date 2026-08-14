@@ -1,0 +1,62 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS tonem_monthly_analytics (
+  month date NOT NULL,
+  website_id uuid NOT NULL,
+  event_name varchar(50) NOT NULL,
+  instrument_id varchar(40) NOT NULL DEFAULT '',
+  enabled varchar(5) NOT NULL DEFAULT '',
+  country char(2) NOT NULL DEFAULT '',
+  device varchar(20) NOT NULL DEFAULT '',
+  event_count bigint NOT NULL,
+  unique_sessions bigint NOT NULL,
+  PRIMARY KEY (month, website_id, event_name, instrument_id, enabled, country, device)
+);
+
+DELETE FROM tonem_monthly_analytics
+WHERE month >= date_trunc('month', now() - interval '1 month')::date;
+
+INSERT INTO tonem_monthly_analytics (
+  month, website_id, event_name, instrument_id, enabled, country, device,
+  event_count, unique_sessions
+)
+SELECT
+  date_trunc('month', event.created_at)::date,
+  event.website_id,
+  COALESCE(event.event_name, 'pageview'),
+  COALESCE(instrument.string_value, ''),
+  COALESCE(enabled.string_value, enabled.number_value::text, ''),
+  COALESCE(session.country, ''),
+  COALESCE(session.device, ''),
+  count(*),
+  count(DISTINCT event.session_id)
+FROM website_event event
+JOIN session ON session.session_id = event.session_id
+LEFT JOIN event_data instrument
+  ON instrument.website_event_id = event.event_id
+  AND instrument.data_key = 'instrument_id'
+LEFT JOIN event_data enabled
+  ON enabled.website_event_id = event.event_id
+  AND enabled.data_key = 'enabled'
+WHERE event.created_at >= date_trunc('month', now() - interval '1 month')
+GROUP BY 1, 2, 3, 4, 5, 6, 7;
+
+DELETE FROM event_data
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days';
+DELETE FROM session_data
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days';
+DELETE FROM session_replay
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days';
+DELETE FROM heatmap_event
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days';
+DELETE FROM website_event
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days';
+DELETE FROM session
+WHERE created_at < now() - interval '{{ tonem_analytics_raw_retention_days }} days'
+  AND NOT EXISTS (
+    SELECT 1 FROM website_event WHERE website_event.session_id = session.session_id
+  );
+DELETE FROM tonem_monthly_analytics
+WHERE month < date_trunc('month', now() - interval '{{ tonem_analytics_aggregate_retention_months }} months')::date;
+
+COMMIT;

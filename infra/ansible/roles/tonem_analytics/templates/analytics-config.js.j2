@@ -1,0 +1,9 @@
+window.__TONEM_ANALYTICS__ = {
+  enabled: {{ ((tonem_analytics_website_id | length) > 0) | ternary('true', 'false') }},
+  websiteId: {{ tonem_analytics_website_id | to_json }},
+  scriptUrl: "/analytics/script.js",
+  hostUrl: "/analytics",
+  domains: "tonem.ru,www.tonem.ru",
+  frontendVersion: {{ tonem_analytics_frontend_version | to_json }},
+  telemetryEndpoint: "/client-telemetry"
+};

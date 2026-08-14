@@ -18,14 +18,13 @@
     path: /etc/restic
     state: directory
     mode: "0700"
-  when: not ansible_check_mode
 
 - name: Write restic credentials
   ansible.builtin.copy:
     dest: /etc/restic/credentials
     content: "{{ backup_password }}"
     mode: "0600"
-  when: not ansible_check_mode
+  no_log: true
 
 - name: Check restic repository config
   ansible.builtin.command: restic cat config
@@ -101,7 +100,6 @@
     src: restic-backup.sh.j2
     dest: /usr/local/bin/restic-backup.sh
     mode: "0750"
-  when: not ansible_check_mode
 
 - name: Ensure backup prepare directory exists
   ansible.builtin.file:
@@ -109,15 +107,32 @@
     state: directory
     mode: "0700"
   when:
-    - not ansible_check_mode
     - backup_remnawave_pg_dump_enabled | bool
+
+- name: Ensure Tonem backup and metrics directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ backup_tonem_prepare_dir }}"
+    - "{{ backup_tonem_textfile_dir }}"
+  when:
+    - backup_tonem_pg_dump_enabled | bool
+
+- name: Ensure monitoring snapshot directory exists
+  ansible.builtin.file:
+    path: "{{ backup_monitoring_prepare_dir }}"
+    state: directory
+    mode: "0700"
+  when:
+    - backup_monitoring_snapshot_enabled | bool
 
 - name: Install backup prepare script
   ansible.builtin.template:
     src: restic-backup-prepare.sh.j2
     dest: /usr/local/bin/restic-backup-prepare.sh
     mode: "0750"
-  when: not ansible_check_mode
 
 - name: Schedule backup cron
   ansible.builtin.cron:
@@ -128,4 +143,39 @@
     month: "{{ backup_cron_month }}"
     weekday: "{{ backup_cron_weekday }}"
     job: "/usr/local/bin/restic-backup.sh"
-  when: not ansible_check_mode
+
+- name: Remove legacy standalone Tonem backup cron after master backup integration
+  ansible.builtin.cron:
+    name: "tonem-backup"
+    state: absent
+  when:
+    - backup_tonem_pg_dump_enabled | bool
+
+- name: Install Tonem isolated restore-check script
+  ansible.builtin.template:
+    src: tonem-restore-check.sh.j2
+    dest: /usr/local/bin/tonem-restore-check
+    mode: "0750"
+  when:
+    - backup_tonem_restore_check_enabled | bool
+
+- name: Install Tonem restore-check systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - tonem-restore-check.service
+    - tonem-restore-check.timer
+  when:
+    - backup_tonem_restore_check_enabled | bool
+
+- name: Enable monthly Tonem restore-check timer
+  ansible.builtin.systemd_service:
+    name: tonem-restore-check.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - backup_tonem_restore_check_enabled | bool

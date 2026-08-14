@@ -3,7 +3,12 @@
     path: "{{ monitoring_agent_dir }}"
     state: directory
     mode: "0755"
-  when: not ansible_check_mode
+
+- name: Ensure node exporter textfile collector directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_node_exporter_textfile_dir }}"
+    state: directory
+    mode: "0755"
 
 - name: Render monitoring agent configs
   ansible.builtin.template:
@@ -17,7 +22,6 @@
       dest: "{{ monitoring_agent_dir }}/promtail-config.yml"
     - src: alloy-config.alloy.j2
       dest: "{{ monitoring_agent_dir }}/alloy-config.alloy"
-  when: not ansible_check_mode
 
 - name: Validate Grafana Alloy configuration
   ansible.builtin.command:

@@ -1,0 +1,9 @@
+[Unit]
+Description=Tonem Umami privacy retention and monthly aggregation
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tonem-analytics-retention
+Nice=10

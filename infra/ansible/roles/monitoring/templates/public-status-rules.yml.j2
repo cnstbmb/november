@@ -27,7 +27,7 @@ groups:
       - record: public_channel_status
         labels:
           area: local
-        expr: max(xray_proxy_status{name="MOSCOW HOME WIFI"})
+        expr: max(xray_proxy_status{name="HOME"}) or vector(0)
 
       - record: public_site_status
         labels:

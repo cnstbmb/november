@@ -6,3 +6,25 @@ backup_remnawave_pg_dump_container_name: "remnawave-db"
 backup_remnawave_pg_dump_filename: "remnawave-postgres.sql.gz"
 backup_additional_paths: []
 backup_initialize_repository: true
+backup_tonem_pg_dump_enabled: "{{ monitoring_tonem_enabled | default(false) | bool }}"
+backup_tonem_pg_dump_container_name: "tonem-postgres"
+backup_tonem_pg_dump_user: "tonem"
+backup_tonem_pg_dump_database: "tonem"
+backup_tonem_prepare_dir: "/var/backups/tonem"
+backup_tonem_pg_dump_filename: "tonem-postgres.dump"
+backup_tonem_textfile_dir: "/var/lib/node_exporter/textfile_collector"
+backup_tonem_restore_check_enabled: "{{ backup_tonem_pg_dump_enabled }}"
+backup_tonem_restore_check_image: "postgres:17-alpine"
+backup_tonem_restore_check_calendar: "monthly"
+backup_monitoring_snapshot_enabled: "{{ monitoring_tonem_enabled | default(false) | bool }}"
+backup_monitoring_prepare_dir: "/var/backups/monitoring"
+backup_monitoring_containers:
+  prometheus:
+    container: "monitoring-prometheus"
+    path: "/prometheus"
+  loki:
+    container: "monitoring-loki"
+    path: "/loki"
+  grafana:
+    container: "monitoring-grafana"
+    path: "/var/lib/grafana"

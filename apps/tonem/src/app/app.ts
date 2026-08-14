@@ -10,6 +10,8 @@ import {
 import { MarketViewStore } from './core/market-view/market-view.store';
 import { ConnectivityService } from './core/offline/connectivity.service';
 import { RecordedMusicPlayer } from './core/music/recorded-music-player';
+import { AnalyticsService } from './core/analytics/analytics.service';
+import { OperationalTelemetryService } from './core/analytics/operational-telemetry.service';
 
 import { formatTime } from './core/rates/value.format';
 import { TimeMachineService } from './core/time-machine/time-machine.service';
@@ -37,6 +39,8 @@ export class App {
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly timeMachine = inject(TimeMachineService);
   protected readonly musicPlayer = inject(RecordedMusicPlayer);
+  private readonly analytics = inject(AnalyticsService);
+  private readonly operationalTelemetry = inject(OperationalTelemetryService);
 
   protected readonly settingsOpen = signal(false);
   protected readonly marqueePaused = signal(false);
@@ -53,8 +57,17 @@ export class App {
       void this.timeMachine.active();
     });
 
+    let wasOnline = true;
+    effect(() => {
+      const online = this.connectivity.online();
+      if (wasOnline && !online) this.analytics.track('offline_enter');
+      wasOnline = online;
+    });
+
     // Preload the audio track eagerly so it's ready when user enables music.
     afterNextRender(() => {
+      this.analytics.initialize();
+      this.operationalTelemetry.start();
       this.musicPlayer.preload();
     });
   }
@@ -101,11 +114,14 @@ export class App {
   }
 
   protected toggleFavorite(id: string): void {
-    this.viewSettings.setFavorite(id, !this.isFavorite(id));
+    const enabled = !this.isFavorite(id);
+    this.viewSettings.setFavorite(id, enabled);
+    this.analytics.track('favorite_toggle', { instrument_id: id, enabled });
   }
 
   protected pinFavorite(id: string): void {
     this.viewSettings.pinInstrument(id);
+    this.analytics.track('hero_pin', { instrument_id: id });
   }
 
   protected readonly favoriteEntries = computed(() => {
@@ -119,6 +135,7 @@ export class App {
     const store = this.viewSettings;
     const enteringZen = !this.zenMode();
     store.setZenMode(enteringZen);
+    this.analytics.track('zen_toggle', { enabled: enteringZen });
     this.marketView.resetRotation();
     if (enteringZen) {
       void this.musicPlayer.enableFromGesture();
@@ -128,11 +145,14 @@ export class App {
   protected toggleMusic(): void {
     if (this.musicPlayer.status() === 'playing' || this.musicPlayer.status() === 'loading') {
       this.musicPlayer.disable();
+      this.analytics.track('music_toggle', { enabled: false });
     } else if (this.viewSettings.sound().enabled) {
       void this.musicPlayer.enableFromGesture();
+      this.analytics.track('music_toggle', { enabled: true });
     } else {
       this.viewSettings.setSound('enabled', true);
       void this.musicPlayer.enableFromGesture();
+      this.analytics.track('music_toggle', { enabled: true });
     }
   }
 

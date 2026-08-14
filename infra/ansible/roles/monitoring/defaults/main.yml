@@ -1,6 +1,13 @@
 monitoring_prometheus_retention: "7d"
+monitoring_prometheus_retention_size: "4GB"
 monitoring_loki_retention: "168h"
+monitoring_disk_free_warning_percent: 15
+monitoring_disk_free_warning_bytes: 10737418240
 monitoring_loki_image: "grafana/loki:2.9.10"
+monitoring_loki_loopback_port: 3101
+monitoring_loki_ingress_local_cidrs:
+  - "127.0.0.1/32"
+  - "172.16.0.0/12"
 monitoring_blackbox_image: "prom/blackbox-exporter:v0.26.0"
 monitoring_blackbox_enabled: true
 monitoring_blackbox_port: 9115
@@ -44,3 +51,51 @@ monitoring_remnawave_panel_dir: "{{ remnawave_panel_dir | default('/opt/remnawav
 monitoring_remnawave_proxy_service_name: "remnawave-proxy"
 monitoring_grafana_prometheus_uid: "prometheus"
 monitoring_grafana_loki_uid: "loki"
+
+# Shared private Telegram delivery. Legacy Tonem variables remain as fallbacks
+# so existing private inventories can migrate without exposing their values.
+monitoring_alerting_telegram_bot_token: "{{ monitoring_tonem_telegram_bot_token | default('') }}"
+monitoring_alerting_telegram_chat_id: "{{ monitoring_tonem_telegram_chat_id | default('') }}"
+monitoring_alerting_telegram_proxy_url: "{{ monitoring_tonem_telegram_proxy_url | default('') }}"
+monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(false) | bool) or (monitoring_home_node_alerting_enabled | default(false) | bool) }}"
+
+# Dedicated home-node dashboard and resource alerts. Production topology is
+# supplied only through private inventory variables.
+monitoring_home_node_name: ""
+monitoring_home_node_enabled: "{{ (monitoring_home_node_name | length > 0) and (monitoring_home_node_name in hostvars) }}"
+monitoring_home_node_alerting_enabled: false
+monitoring_home_node_temperature_warning_celsius: 70
+monitoring_home_node_temperature_critical_celsius: 80
+monitoring_home_node_memory_warning_percent: 85
+monitoring_home_node_memory_critical_percent: 95
+monitoring_home_node_disk_free_warning_percent: 15
+monitoring_home_node_disk_free_critical_percent: 7
+monitoring_home_node_disk_free_warning_bytes: 10737418240
+monitoring_home_node_disk_free_critical_bytes: 5368709120
+monitoring_home_node_dashboard_url: "{{ ((monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ monitoring_grafana_tls_domain ~ ':' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port)) ~ '/d/november-home-node/home-node?orgId=1' }}"
+
+# Tonem observability is opt-in so the shared monitoring role remains usable on
+# hosts where the Tonem compose stack is absent. Secrets belong in private vars.
+monitoring_tonem_enabled: false
+monitoring_tonem_server_target: "tonem-server:3200"
+monitoring_tonem_frontend_url: "https://tonem.ru"
+monitoring_tonem_api_health_url: "https://api.tonem.ru/health"
+monitoring_tonem_dashboard_url: ""
+monitoring_tonem_alerting_enabled: false
+monitoring_tonem_telegram_bot_token: ""
+monitoring_tonem_telegram_chat_id: ""
+monitoring_tonem_telegram_proxy_url: ""
+monitoring_tonem_watchdog_enabled: true
+monitoring_tonem_watchdog_failure_threshold: 3
+monitoring_tonem_watchdog_repeat_seconds: 3600
+monitoring_tonem_watchdog_grafana_url: "{{ (monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ monitoring_grafana_tls_domain ~ ':' ~ monitoring_grafana_port ~ '/api/health', 'http://127.0.0.1:' ~ monitoring_grafana_port ~ '/api/health') }}"
+monitoring_tonem_watchdog_prometheus_url: "http://127.0.0.1:{{ monitoring_prometheus_port }}/-/ready"
+monitoring_tonem_watchdog_loki_url: "http://127.0.0.1:{{ monitoring_loki_port }}/ready"
+monitoring_tonem_postgres_exporter_enabled: false
+monitoring_tonem_postgres_exporter_image: "quay.io/prometheuscommunity/postgres-exporter:v0.20.1"
+monitoring_tonem_postgres_exporter_target: "tonem-postgres-exporter:9187"
+monitoring_tonem_postgres_monitor_user: "tonem_monitor"
+monitoring_tonem_postgres_monitor_password: ""
+monitoring_tonem_network_name: "tonem-network"
+monitoring_tonem_analytics_enabled: false
+monitoring_tonem_analytics_health_url: "http://tonem-umami:3000/api/heartbeat"

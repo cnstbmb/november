@@ -43,7 +43,7 @@ services:
       tonem-postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3200/latest || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3200/live || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -56,6 +56,8 @@ services:
     restart: always
     networks:
       - remnawave-network
+    volumes:
+      - ./analytics-config.js:/usr/share/nginx/html/analytics-config.js:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
       interval: 30s
@@ -66,6 +68,7 @@ services:
 networks:
   tonem-network:
     driver: bridge
+    name: tonem-network
   remnawave-network:
     external: true
     name: remnawave-network

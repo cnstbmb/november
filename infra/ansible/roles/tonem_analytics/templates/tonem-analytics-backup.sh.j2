@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+backup_root="{{ tonem_analytics_backup_root }}"
+metric_dir="{{ tonem_analytics_textfile_dir }}"
+today="$(date +%Y-%m-%d)"
+daily_dir="${backup_root}/daily"
+weekly_dir="${backup_root}/weekly"
+monthly_dir="${backup_root}/monthly"
+tmp="${daily_dir}/umami-${today}.dump.tmp"
+daily="${daily_dir}/umami-${today}.dump"
+
+mkdir -p "${daily_dir}" "${weekly_dir}" "${monthly_dir}" "${metric_dir}"
+docker exec tonem-umami-postgres pg_dump -U umami -d umami -Fc > "${tmp}"
+test -s "${tmp}"
+mv "${tmp}" "${daily}"
+
+if [ "$(date +%u)" -eq 7 ]; then
+  cp "${daily}" "${weekly_dir}/umami-${today}.dump"
+fi
+if [ "$(date +%d)" -eq 01 ]; then
+  cp "${daily}" "${monthly_dir}/umami-${today}.dump"
+fi
+
+find "${daily_dir}" -type f -name 'umami-*.dump' -printf '%T@ %p\n' | sort -rn | sed -n '8,$p' | cut -d' ' -f2- | xargs -r rm -f
+find "${weekly_dir}" -type f -name 'umami-*.dump' -printf '%T@ %p\n' | sort -rn | sed -n '5,$p' | cut -d' ' -f2- | xargs -r rm -f
+find "${monthly_dir}" -type f -name 'umami-*.dump' -printf '%T@ %p\n' | sort -rn | sed -n '13,$p' | cut -d' ' -f2- | xargs -r rm -f
+
+{% if tonem_analytics_restic_enabled | bool %}
+export RESTIC_REPOSITORY={{ backup_target | quote }}
+export RESTIC_PASSWORD_FILE=/etc/restic/credentials
+{% for env_name, env_value in (backup_env | default({})).items() %}
+export {{ env_name }}={{ env_value | quote }}
+{% endfor %}
+restic backup --host {{ (inventory_hostname ~ '-umami') | quote }} --tag umami "${backup_root}"
+restic forget --prune --host {{ (inventory_hostname ~ '-umami') | quote }} --tag umami \
+  --keep-daily 7 --keep-weekly 4 --keep-monthly 12
+{% endif %}
+
+tmp_metric="${metric_dir}/tonem-analytics-backup.prom.tmp"
+printf 'tonem_analytics_backup_last_success_timestamp_seconds %s\n' "$(date +%s)" > "${tmp_metric}"
+mv "${tmp_metric}" "${metric_dir}/tonem-analytics-backup.prom"

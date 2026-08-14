@@ -13,6 +13,61 @@ docker exec {{ backup_remnawave_pg_dump_container_name }} \
   | gzip -9 > "${tmp_file}"
 
 mv "${tmp_file}" "${final_file}"
-{% else %}
-exit 0
+{% endif %}
+
+{% if backup_tonem_pg_dump_enabled | bool %}
+tonem_prepare_dir="{{ backup_tonem_prepare_dir }}"
+tonem_tmp_file="${tonem_prepare_dir}/{{ backup_tonem_pg_dump_filename }}.tmp"
+tonem_final_file="${tonem_prepare_dir}/{{ backup_tonem_pg_dump_filename }}"
+
+mkdir -p "${tonem_prepare_dir}"
+docker exec {{ backup_tonem_pg_dump_container_name }} \
+  pg_dump -U {{ backup_tonem_pg_dump_user | quote }} \
+  -d {{ backup_tonem_pg_dump_database | quote }} -Fc > "${tonem_tmp_file}"
+test -s "${tonem_tmp_file}"
+mv "${tonem_tmp_file}" "${tonem_final_file}"
+{% endif %}
+
+{% if backup_monitoring_snapshot_enabled | bool %}
+monitoring_final_dir={{ backup_monitoring_prepare_dir | quote }}
+monitoring_tmp_dir="${monitoring_final_dir}.tmp"
+monitoring_previous_dir="${monitoring_final_dir}.previous"
+paused_container=""
+
+resume_paused_container() {
+  if [ -n "${paused_container}" ]; then
+    docker unpause "${paused_container}" >/dev/null 2>&1 || true
+    paused_container=""
+  fi
+}
+
+snapshot_container() {
+  snapshot_name="$1"
+  container_name="$2"
+  source_path="$3"
+  destination="${monitoring_tmp_dir}/${snapshot_name}"
+
+  docker inspect "${container_name}" >/dev/null
+  mkdir -p "${destination}"
+  docker pause "${container_name}" >/dev/null
+  paused_container="${container_name}"
+  docker cp "${container_name}:${source_path}/." "${destination}/"
+  docker unpause "${container_name}" >/dev/null
+  paused_container=""
+}
+
+trap resume_paused_container EXIT INT TERM
+rm -rf "${monitoring_tmp_dir}"
+mkdir -p "${monitoring_tmp_dir}"
+{% for snapshot_name, snapshot in backup_monitoring_containers.items() %}
+snapshot_container {{ snapshot_name | quote }} {{ snapshot.container | quote }} {{ snapshot.path | quote }}
+{% endfor %}
+
+rm -rf "${monitoring_previous_dir}"
+if [ -d "${monitoring_final_dir}" ]; then
+  mv "${monitoring_final_dir}" "${monitoring_previous_dir}"
+fi
+mv "${monitoring_tmp_dir}" "${monitoring_final_dir}"
+rm -rf "${monitoring_previous_dir}"
+trap - EXIT INT TERM
 {% endif %}

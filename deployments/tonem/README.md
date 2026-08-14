@@ -7,7 +7,7 @@ Self-contained Docker Compose stack for [tonem.ru](https://tonem.ru):
 - **tonem-web** — nginx serving the Angular SPA for tonem.ru / www.tonem.ru
 
 All three services live in `deployments/tonem/docker-compose.yml`. The stack is
-independent of the prod compose **except** for one shared network (`app-network`)
+independent of the prod compose **except** for one shared network (`remnawave-network`)
 that lets the prod nginx proxy to `tonem-web` and `tonem-server` by container name.
 
 ---
@@ -23,7 +23,7 @@ that lets the prod nginx proxy to `tonem-web` and `tonem-server` by container na
 │  └─────────────────┘    └────────┬─────────┘        │
 │                                  │                   │
 ├──────────────────────────────────┼───────────────────┤
-│ app-network (external, shared w/ prod)               │
+│ remnawave-network (external, shared w/ proxy)        │
 │                                  │                   │
 │  ┌─────────────────┐    ┌───────▼──────────┐        │
 │  │  tonem-web      │    │  tonem-server    │        │
@@ -134,6 +134,11 @@ The dev server proxies `/api` to `http://localhost:3200` (the local tonem-server
 | `GET /latest` | Most recent tick per instrument |
 | `GET /at?ts=<iso>[&instrument=<id>]` | Nearest tick ≤ timestamp |
 | `GET /range?from=<iso>&to=<iso>&instrument=<id>` | Ticks in range |
+| `GET /live` | Process liveness only |
+| `GET /ready` | Postgres readiness, without dependency details |
+| `GET /health` | Public aggregate collector and quote freshness status |
+| `GET /metrics` | Prometheus metrics; private monitoring network only in production |
+| `POST /client-telemetry` | Strictly bounded aggregate frontend error categories |
 
 Production base URL: `https://api.tonem.ru`
 
@@ -148,5 +153,7 @@ Production base URL: `https://api.tonem.ru`
 | `nginx/tonem.conf` | SPA nginx config (fallback + cache + gzip) |
 | `.env` | Secrets — **git-ignored** |
 | `README.md` | This file |
+| `OBSERVABILITY.md` | Monitoring, Telegram alerts, backups, Umami privacy and rollout runbook |
+| `analytics-config.js` | Fail-open disabled runtime config; Ansible overrides it in production |
 
 Server Dockerfile: `apps/tonem-server/Dockerfile` (multi-stage: build → Prisma migrate + start)

@@ -29,6 +29,7 @@ remnashop_wait_timeout: 120 # seconds to wait for remnashop services and HTTP pr
 # remnashop_env_src: "########" # local private path on controller, e.g. /Users/you/november/.private/ansible/prod/remnashop/.env
 # remnashop_env_dest: "/opt/remnashop/.env"
 monitoring_prometheus_retention: "7d"
+monitoring_prometheus_retention_size: "4GB"
 monitoring_loki_retention: "168h"
 backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:https://endpoint/bucket
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=Tonem Umami separate logical backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tonem-analytics-backup
+Nice=10

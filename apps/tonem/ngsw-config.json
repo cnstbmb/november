@@ -12,6 +12,7 @@
           "/index.html",
           "/manifest.webmanifest",
           "/*.css",
+          "!/analytics-config.js",
           "/*.js"
         ]
       }

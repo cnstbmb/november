@@ -1,4 +1,5 @@
-{% set monitoring_attach_remnawave_network = (enable_remnawave_panel | default(false) | bool) or (enable_remnashop | default(false) | bool) %}
+{% set monitoring_attach_remnawave_network = (enable_remnawave_panel | default(false) | bool) or (enable_remnashop | default(false) | bool) or (monitoring_tonem_enabled | default(false) | bool) %}
+{% set monitoring_attach_tonem_network = monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -10,8 +11,11 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time={{ monitoring_prometheus_retention }}"
+{% if monitoring_prometheus_retention_size | default('') | length > 0 %}
+      - "--storage.tsdb.retention.size={{ monitoring_prometheus_retention_size }}"
+{% endif %}
     ports:
-      - "{{ monitoring_prometheus_port }}:9090"
+      - "127.0.0.1:{{ monitoring_prometheus_port }}:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./public-status-rules.yml:/etc/prometheus/public-status-rules.yml:ro
@@ -20,6 +24,25 @@ services:
     networks:
       - default
       - remnawave-network
+{% endif %}
+
+{% if monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
+  tonem-postgres-exporter:
+    image: {{ monitoring_tonem_postgres_exporter_image }}
+    container_name: tonem-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI_FILE: /run/tonem-secrets/uri
+      DATA_SOURCE_USER_FILE: /run/tonem-secrets/user
+      DATA_SOURCE_PASS_FILE: /run/tonem-secrets/password
+      PG_EXPORTER_COLLECTION_TIMEOUT: 10s
+    volumes:
+      - ./secrets/tonem-postgres-uri:/run/tonem-secrets/uri:ro
+      - ./secrets/tonem-postgres-user:/run/tonem-secrets/user:ro
+      - ./secrets/tonem-postgres-password:/run/tonem-secrets/password:ro
+    networks:
+      - default
+      - tonem-network
 {% endif %}
 
   blackbox-exporter:
@@ -100,6 +123,13 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+{% if monitoring_alerting_telegram_proxy_url | default('') | length > 0 %}
+      - HTTPS_PROXY={{ monitoring_alerting_telegram_proxy_url }}
+{% endif %}
+{% if monitoring_alerting_enabled | default(false) | bool %}
+    env_file:
+      - ./grafana-alerting.env
+{% endif %}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -157,7 +187,7 @@ services:
     container_name: monitoring-loki
     restart: unless-stopped
     ports:
-      - "{{ monitoring_loki_port }}:3100"
+      - "127.0.0.1:{{ monitoring_loki_loopback_port }}:3100"
     command: -config.file=/etc/loki/config.yml
     volumes:
       - ./loki-config.yml:/etc/loki/config.yml:ro
@@ -170,9 +200,16 @@ volumes:
   grafana-public-data:
   loki-data:
 
-{% if monitoring_attach_remnawave_network %}
+{% if monitoring_attach_remnawave_network or monitoring_attach_tonem_network %}
 networks:
+{% if monitoring_attach_remnawave_network %}
   remnawave-network:
     name: "{{ remnawave_network_name | default('remnawave-network') }}"
     external: true
+{% endif %}
+{% if monitoring_attach_tonem_network %}
+  tonem-network:
+    name: "{{ monitoring_tonem_network_name }}"
+    external: true
+{% endif %}
 {% endif %}

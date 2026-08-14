@@ -18,6 +18,7 @@ import {
   ZenSettingKey,
 } from '../../core/view-settings/view-settings.model';
 import { ViewSettingsStore } from '../../core/view-settings/view-settings.store';
+import { AnalyticsService } from '../../core/analytics/analytics.service';
 
 @Component({
   selector: 'app-settings-drawer',
@@ -32,6 +33,7 @@ export class SettingsDrawerComponent {
 
   protected readonly store = inject(ViewSettingsStore);
   protected readonly audio = inject(RecordedMusicPlayer);
+  private readonly analytics = inject(AnalyticsService);
   protected readonly settings = this.store.settings;
   protected readonly shareState = signal<'idle' | 'copied' | 'failed'>('idle');
   protected readonly instruments = computed<readonly Instrument[]>(() =>
@@ -84,11 +86,15 @@ export class SettingsDrawerComponent {
   }
 
   protected setPinned(event: Event): void {
-    this.store.setPinnedInstrument(this.input(event).value);
+    const instrumentId = this.input(event).value;
+    this.store.setPinnedInstrument(instrumentId);
+    this.analytics.track('instrument_select', { instrument_id: instrumentId });
   }
 
   protected setFavorite(id: string, event: Event): void {
-    this.store.setFavorite(id, this.input(event).checked);
+    const enabled = this.input(event).checked;
+    this.store.setFavorite(id, enabled);
+    this.analytics.track('favorite_toggle', { instrument_id: id, enabled });
   }
 
   protected setHidden(id: string, event: Event): void {
@@ -115,8 +121,10 @@ export class SettingsDrawerComponent {
   }
 
   protected setSoundEnabled(event: Event): void {
-    if (this.input(event).checked) void this.audio.enableFromGesture();
+    const enabled = this.input(event).checked;
+    if (enabled) void this.audio.enableFromGesture();
     else this.audio.disable();
+    this.analytics.track('music_toggle', { enabled });
   }
 
   protected setVolume(event: Event): void {

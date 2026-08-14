@@ -1,0 +1,10 @@
+[Unit]
+Description=Verify Tonem Umami backup restore monthly
+
+[Timer]
+OnCalendar={{ tonem_analytics_restore_check_calendar }}
+Persistent=true
+RandomizedDelaySec=2h
+
+[Install]
+WantedBy=timers.target

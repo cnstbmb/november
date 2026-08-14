@@ -19,10 +19,12 @@ services:
       - "--path.rootfs=/rootfs"
       - "--path.sysfs=/host/sys"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|run|snap)($|/)"
+      - "--collector.textfile.directory=/textfile"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro,rslave
+      - {{ monitoring_node_exporter_textfile_dir }}:/textfile:ro
 
 {% if monitoring_log_collector == 'alloy' %}
   alloy:

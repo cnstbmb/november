@@ -1,0 +1,349 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: home-node-health
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      - uid: home-node-down
+        title: Домашняя нода недоступна
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(up{job="nodes",host="{{ monitoring_home_node_name }}"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Prometheus не получает метрики от {{ monitoring_home_node_name }}.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: critical, service: home-node}
+        isPaused: false
+        notification_settings: &home_critical_notification_settings
+          receiver: monitoring-critical
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 1h
+
+      - uid: home-node-temperature-missing
+        title: Пропали температурные метрики домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'absent(node_hwmon_temp_celsius{job="nodes",host="{{ monitoring_home_node_name }}",sensor="temp1"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        keepFiringFor: 1m
+        annotations: {summary: 'node_exporter не отдаёт hwmon-температуру {{ monitoring_home_node_name }}.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: warning, service: home-node}
+        isPaused: false
+        notification_settings: &home_warning_notification_settings
+          receiver: monitoring-warning
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 1m
+          group_interval: 10m
+          repeat_interval: 4h
+
+      - uid: home-node-temperature-warning
+        title: Домашняя нода нагревается
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(node_hwmon_temp_celsius{job="nodes",host="{{ monitoring_home_node_name }}",sensor="temp1"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_home_node_temperature_warning_celsius }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        keepFiringFor: 2m
+        annotations: {summary: 'Температура {{ monitoring_home_node_name }} выше {{ monitoring_home_node_temperature_warning_celsius }} °C больше 5 минут.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: warning, service: home-node}
+        isPaused: false
+        notification_settings: *home_warning_notification_settings
+
+      - uid: home-node-temperature-critical
+        title: Критическая температура домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(node_hwmon_temp_celsius{job="nodes",host="{{ monitoring_home_node_name }}",sensor="temp1"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_home_node_temperature_critical_celsius }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 2m
+        annotations: {summary: 'Температура {{ monitoring_home_node_name }} выше {{ monitoring_home_node_temperature_critical_celsius }} °C.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: critical, service: home-node}
+        isPaused: false
+        notification_settings: *home_critical_notification_settings
+
+      - uid: home-node-cpu-warning
+        title: Высокая загрузка CPU домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: '100 - (avg(rate(node_cpu_seconds_total{job="nodes",host="{{ monitoring_home_node_name }}",mode="idle"}[5m])) * 100)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [90], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        keepFiringFor: 2m
+        annotations: {summary: 'CPU {{ monitoring_home_node_name }} загружен более чем на 90% в течение 10 минут.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: warning, service: home-node}
+        isPaused: false
+        notification_settings: *home_warning_notification_settings
+
+      - uid: home-node-cpu-critical
+        title: Критическая загрузка CPU домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: '100 - (avg(rate(node_cpu_seconds_total{job="nodes",host="{{ monitoring_home_node_name }}",mode="idle"}[5m])) * 100)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [98], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        keepFiringFor: 2m
+        annotations: {summary: 'CPU {{ monitoring_home_node_name }} загружен более чем на 98% в течение 5 минут.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: critical, service: home-node}
+        isPaused: false
+        notification_settings: *home_critical_notification_settings
+
+      - uid: home-node-memory-warning
+        title: Заканчивается оперативная память домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(100 * (1 - (node_memory_MemAvailable_bytes{job="nodes",host="{{ monitoring_home_node_name }}"} / node_memory_MemTotal_bytes{job="nodes",host="{{ monitoring_home_node_name }}"})))', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_home_node_memory_warning_percent }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        keepFiringFor: 2m
+        annotations: {summary: 'Использование RAM {{ monitoring_home_node_name }} выше {{ monitoring_home_node_memory_warning_percent }}% в течение 10 минут.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: warning, service: home-node}
+        isPaused: false
+        notification_settings: *home_warning_notification_settings
+
+      - uid: home-node-memory-critical
+        title: Критически мало оперативной памяти домашней ноды
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(100 * (1 - (node_memory_MemAvailable_bytes{job="nodes",host="{{ monitoring_home_node_name }}"} / node_memory_MemTotal_bytes{job="nodes",host="{{ monitoring_home_node_name }}"})))', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_home_node_memory_critical_percent }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        keepFiringFor: 2m
+        annotations: {summary: 'Использование RAM {{ monitoring_home_node_name }} выше {{ monitoring_home_node_memory_critical_percent }}% в течение 5 минут.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: critical, service: home-node}
+        isPaused: false
+        notification_settings: *home_critical_notification_settings
+
+      - uid: home-node-disk-warning
+        title: Заканчивается место на домашней ноде
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model:
+              editorMode: code
+              expr: '(min((node_filesystem_avail_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"}) * 100) < bool {{ monitoring_home_node_disk_free_warning_percent }}) + (min(node_filesystem_avail_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"}) < bool {{ monitoring_home_node_disk_free_warning_bytes }})'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        keepFiringFor: 2m
+        annotations: {summary: 'На / у {{ monitoring_home_node_name }} осталось меньше {{ monitoring_home_node_disk_free_warning_percent }}% или 10 GiB.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: warning, service: home-node}
+        isPaused: false
+        notification_settings: *home_warning_notification_settings
+
+      - uid: home-node-disk-critical
+        title: Критически мало места на домашней ноде
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model:
+              editorMode: code
+              expr: '(min((node_filesystem_avail_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"}) * 100) < bool {{ monitoring_home_node_disk_free_critical_percent }}) + (min(node_filesystem_avail_bytes{job="nodes",host="{{ monitoring_home_node_name }}",mountpoint="/",fstype!~"tmpfs|overlay"}) < bool {{ monitoring_home_node_disk_free_critical_bytes }})'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        keepFiringFor: 2m
+        annotations: {summary: 'На / у {{ monitoring_home_node_name }} осталось меньше {{ monitoring_home_node_disk_free_critical_percent }}% или 5 GiB.', dashboard_url: '{{ monitoring_home_node_dashboard_url }}'}
+        labels: {severity: critical, service: home-node}
+        isPaused: false
+        notification_settings: *home_critical_notification_settings

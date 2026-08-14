@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CollectorService } from '../src/collector.service';
 import { QuoteSourcesService } from '../src/quote-sources';
 import { TickStore } from '../src/tick-store';
+import { MetricsService } from '../src/observability/metrics.service';
 
 // A weekday during all MOEX trading windows: 2026-07-28 is a Tuesday, 12:00 MSK.
 const MOEX_OPEN = new Date('2026-07-28T09:00:00.000Z'); // 12:00 MSK
@@ -74,7 +75,7 @@ describe('CollectorService', () => {
   it('collects crypto + MOEX during MOEX trading hours and normalizes ts to the minute', async () => {
     const sources = makeSources();
     const store = makeStore();
-    const svc = new CollectorService(sources, store);
+    const svc = new CollectorService(sources, store, new MetricsService());
 
     const now = new Date(MOEX_OPEN);
     now.setSeconds(37, 123); // ensure normalization to minute start
@@ -126,7 +127,7 @@ describe('CollectorService', () => {
   it('collects official rates + 24/7 crypto when MOEX is closed', async () => {
     const sources = makeSources();
     const store = makeStore();
-    const svc = new CollectorService(sources, store);
+    const svc = new CollectorService(sources, store, new MetricsService());
 
     await svc.collectOnce(new Date(WEEKEND));
 
@@ -153,7 +154,7 @@ describe('CollectorService', () => {
       new Error('network down'),
     );
     const store = makeStore();
-    const svc = new CollectorService(sources, store);
+    const svc = new CollectorService(sources, store, new MetricsService());
 
     await expect(svc.collectOnce(new Date(MOEX_OPEN))).resolves.toBeUndefined();
     const ticks = store.saveTicks.mock.calls[0][0] as { instrument: string }[];

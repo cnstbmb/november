@@ -129,3 +129,5 @@ PROXYAI.md
 /.continue
 /.qwen
 /skills-lock.json
+/.planning
+/.tmp

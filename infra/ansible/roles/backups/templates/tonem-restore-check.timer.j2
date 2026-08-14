@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Tonem isolated restore check monthly
+
+[Timer]
+OnCalendar={{ backup_tonem_restore_check_calendar }}
+Persistent=true
+RandomizedDelaySec=2h
+
+[Install]
+WantedBy=timers.target

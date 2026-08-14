@@ -1,0 +1,56 @@
+services:
+  tonem-umami-postgres:
+    image: postgres:17-alpine
+    container_name: tonem-umami-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${TONEM_UMAMI_POSTGRES_PASSWORD}
+      POSTGRES_DB: umami
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - tonem-umami-pg-data:/var/lib/postgresql/data
+    networks:
+      - tonem-analytics-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+  tonem-umami:
+    image: ghcr.io/umami-software/umami:3.2.0
+    container_name: tonem-umami
+    restart: always
+    init: true
+    env_file:
+      - .env
+    environment:
+      DISABLE_TELEMETRY: "1"
+      SALT_ROTATION: month
+      TRACKER_SCRIPT_NAME: script.js
+    ports:
+      - "127.0.0.1:${TONEM_UMAMI_ADMIN_PORT:-3300}:3000"
+    depends_on:
+      tonem-umami-postgres:
+        condition: service_healthy
+    networks:
+      - tonem-analytics-network
+      - remnawave-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/heartbeat >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+networks:
+  tonem-analytics-network:
+    name: tonem-analytics-network
+  remnawave-network:
+    external: true
+    name: remnawave-network
+
+volumes:
+  tonem-umami-pg-data:

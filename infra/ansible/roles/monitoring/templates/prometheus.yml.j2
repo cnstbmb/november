@@ -29,11 +29,20 @@ scrape_configs:
           role: "{{ 'master' if host in (groups['master'] | default([])) else 'worker' }}"
 {% endfor %}
 {% else %}
+{% if monitoring_node_targets | default([]) | length > 0 %}
       - targets:
 {% for target in monitoring_node_targets | default([]) %}
           - "{{ target }}"
 {% endfor %}
 {% endif %}
+{% endif %}
+{% for router in monitoring_router_targets | default([]) %}
+      - targets:
+          - "{{ router.target }}"
+        labels:
+          host: "{{ router.host }}"
+          role: "router"
+{% endfor %}
 
 {% if enable_remnawave_panel | default(false) | bool and monitoring_prometheus_scrape_remnawave_panel_metrics | default(true) | bool and remnawave_panel_metrics_user | default('') | length > 0 and remnawave_panel_metrics_pass | default('') | length > 0 %}
   - job_name: remnawave_panel

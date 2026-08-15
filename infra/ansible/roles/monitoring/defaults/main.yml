@@ -18,6 +18,7 @@ monitoring_prometheus_scrape_interval: "15s"
 monitoring_prometheus_evaluation_interval: "15s"
 monitoring_auto_discover_node_targets: true
 monitoring_node_exporter_port: 9100
+monitoring_router_targets: []
 monitoring_master_local_scrape_cidrs:
   - "172.17.0.0/16"
 monitoring_prometheus_scrape_remnawave_panel_metrics: true
@@ -57,7 +58,7 @@ monitoring_grafana_loki_uid: "loki"
 monitoring_alerting_telegram_bot_token: "{{ monitoring_tonem_telegram_bot_token | default('') }}"
 monitoring_alerting_telegram_chat_id: "{{ monitoring_tonem_telegram_chat_id | default('') }}"
 monitoring_alerting_telegram_proxy_url: "{{ monitoring_tonem_telegram_proxy_url | default('') }}"
-monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(false) | bool) or (monitoring_home_node_alerting_enabled | default(false) | bool) }}"
+monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(false) | bool) or (monitoring_home_node_alerting_enabled | default(false) | bool) or (monitoring_router_alerting_enabled | default(false) | bool) }}"
 
 # Dedicated home-node dashboard and resource alerts. Production topology is
 # supplied only through private inventory variables.
@@ -73,6 +74,21 @@ monitoring_home_node_disk_free_critical_percent: 7
 monitoring_home_node_disk_free_warning_bytes: 10737418240
 monitoring_home_node_disk_free_critical_bytes: 5368709120
 monitoring_home_node_dashboard_url: "{{ ((monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ monitoring_grafana_tls_domain ~ ':' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port)) ~ '/d/november-home-node/home-node?orgId=1' }}"
+
+# OpenWrt router dashboard and Zeroblock-specific alerts. Addressing remains in
+# monitoring_router_targets; the display name is deliberately supplied through
+# private inventory rather than committed defaults.
+monitoring_router_name: ""
+monitoring_router_enabled: "{{ monitoring_router_name | length > 0 }}"
+monitoring_router_alerting_enabled: false
+monitoring_router_route_enabled: false
+monitoring_router_route_interface: ""
+monitoring_router_route_destination: ""
+monitoring_router_temperature_critical_celsius: 85
+monitoring_router_memory_available_critical_bytes: 134217728
+monitoring_router_zeroblock_rss_warning_bytes: 157286400
+monitoring_router_zeroblock_swap_warning_bytes: 16777216
+monitoring_router_dashboard_url: "{{ ((monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ monitoring_grafana_tls_domain ~ ':' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port)) ~ '/d/november-router/router?orgId=1' }}"
 
 # Tonem observability is opt-in so the shared monitoring role remains usable on
 # hosts where the Tonem compose stack is absent. Secrets belong in private vars.

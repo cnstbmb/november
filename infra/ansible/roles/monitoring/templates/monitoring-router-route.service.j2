@@ -1,0 +1,14 @@
+[Unit]
+Description=Host route to monitored router over WireGuard
+After=network-online.target wg-quick@{{ monitoring_router_route_interface }}.service
+Requires=wg-quick@{{ monitoring_router_route_interface }}.service
+PartOf=wg-quick@{{ monitoring_router_route_interface }}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/ip route replace {{ monitoring_router_route_destination }} dev {{ monitoring_router_route_interface }}
+ExecStop=-/usr/sbin/ip route del {{ monitoring_router_route_destination }} dev {{ monitoring_router_route_interface }}
+
+[Install]
+WantedBy=multi-user.target

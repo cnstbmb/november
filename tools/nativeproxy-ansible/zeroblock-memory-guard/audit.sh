@@ -24,6 +24,19 @@ pass() {
 	&& pass 'memory watchdog autostart enabled' \
 	|| fail 'memory watchdog autostart disabled'
 
+/etc/init.d/prometheus-node-exporter-lua enabled \
+	&& pass 'prometheus-node-exporter-lua enabled' \
+	|| fail 'prometheus-node-exporter-lua disabled'
+
+metrics_file=/tmp/prometheus/zeroblock.prom
+if [ -r "$metrics_file" ] \
+	&& grep -q '^zeroblock_rss_bytes [0-9][0-9]*$' "$metrics_file" \
+	&& grep -q '^zeroblock_swap_bytes [0-9][0-9]*$' "$metrics_file"; then
+	pass 'Zeroblock Prometheus metrics available in tmpfs'
+else
+	fail 'Zeroblock Prometheus metrics missing or invalid'
+fi
+
 pid="$(pidof sing-box 2>/dev/null)"
 if [ -z "$pid" ]; then
 	fail 'sing-box is not running'

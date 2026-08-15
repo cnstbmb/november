@@ -45,6 +45,14 @@ monitoring_grafana_admin_password: "########" # Grafana admin password
 monitoring_node_targets:
   - "localhost:9100"
   - "########" # add worker targets like 10.0.0.2:9100
+monitoring_router_targets:
+  - host: "########" # Grafana label, e.g. routerich
+    target: "########:9100" # router WireGuard address only
+monitoring_router_name: "########" # must match monitoring_router_targets[].host
+monitoring_router_alerting_enabled: false
+monitoring_router_route_enabled: false
+monitoring_router_route_interface: "########" # existing WireGuard interface on the monitoring master
+monitoring_router_route_destination: "########/32" # router WireGuard address
 
 backup_target: "########" # e.g. s3://bucket/path or /mnt/backup
 backup_password: "########" # restic password

@@ -32,6 +32,92 @@
   when: monitoring_home_node_alerting_enabled | default(false) | bool
   tags: [monitoring_alerting, monitoring_home_node]
 
+- name: Validate router alerting integration
+  ansible.builtin.assert:
+    that:
+      - monitoring_router_name | default('') | length > 0
+      - monitoring_router_enabled | default(false) | bool
+      - monitoring_router_targets | default([]) | selectattr('host', 'equalto', monitoring_router_name) | list | length == 1
+    fail_msg: "Router alerts require exactly one matching monitoring_router_targets entry."
+  when: monitoring_router_alerting_enabled | default(false) | bool
+  tags: [monitoring_alerting, monitoring_router]
+
+- name: Validate router WireGuard host route
+  ansible.builtin.assert:
+    that:
+      - monitoring_router_enabled | default(false) | bool
+      - monitoring_router_route_interface | default('') is match('^[a-zA-Z0-9_.-]{1,15}$')
+      - monitoring_router_route_destination | default('') is match('^[0-9]{1,3}(\.[0-9]{1,3}){3}/32$')
+      - >-
+        monitoring_router_targets | default([])
+        | selectattr('target', 'match', '^' ~ (monitoring_router_route_destination | regex_replace('/32$', '')) ~ ':')
+        | list | length == 1
+    fail_msg: "Router route requires a safe interface name, a /32 destination, and one matching scrape target."
+  when: monitoring_router_route_enabled | default(false) | bool
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Render router WireGuard host-route service
+  ansible.builtin.template:
+    src: monitoring-router-route.service.j2
+    dest: /etc/systemd/system/monitoring-router-route.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: monitoring_router_route_service_template
+  when:
+    - monitoring_router_route_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Enable router WireGuard host route
+  ansible.builtin.systemd_service:
+    name: monitoring-router-route.service
+    daemon_reload: true
+    enabled: true
+    state: "{{ monitoring_router_route_service_template.changed | ternary('restarted', 'started') }}"
+  when:
+    - monitoring_router_route_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Inspect disabled router WireGuard host-route service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/monitoring-router-route.service
+  register: monitoring_router_route_service_stat
+  when:
+    - not (monitoring_router_route_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Stop disabled router WireGuard host route
+  ansible.builtin.systemd_service:
+    name: monitoring-router-route.service
+    enabled: false
+    state: stopped
+  when:
+    - not (monitoring_router_route_enabled | default(false) | bool)
+    - monitoring_router_route_service_stat.stat.exists | default(false)
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Remove disabled router WireGuard host-route service
+  ansible.builtin.file:
+    path: /etc/systemd/system/monitoring-router-route.service
+    state: absent
+  register: monitoring_router_route_service_cleanup
+  when:
+    - not (monitoring_router_route_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
+- name: Reload systemd after router WireGuard host-route cleanup
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when:
+    - monitoring_router_route_service_cleanup.changed | default(false)
+    - not ansible_check_mode
+  tags: [monitoring_router, monitoring_router_route]
+
 - name: Validate Tonem Postgres exporter credentials
   ansible.builtin.assert:
     that:
@@ -135,6 +221,24 @@
     - blackbox.yml.j2
   register: monitoring_config_templates
   when: not ansible_check_mode
+  tags: [monitoring_router]
+
+- name: Restart Prometheus after router scrape config change
+  ansible.builtin.command: docker compose restart prometheus
+  args:
+    chdir: "{{ monitoring_dir }}"
+  when:
+    - not ansible_check_mode
+    - "'monitoring_router' in ansible_run_tags"
+    - >-
+      monitoring_config_templates is defined
+      and
+      (monitoring_config_templates.results
+      | selectattr('item', 'equalto', 'prometheus.yml.j2')
+      | selectattr('changed')
+      | list
+      | length > 0)
+  tags: [monitoring_router]
 
 - name: Render Grafana provisioning files
   ansible.builtin.template:
@@ -186,6 +290,27 @@
     - not ansible_check_mode
   tags: [monitoring_home_node]
 
+- name: Render router Grafana dashboard
+  ansible.builtin.template:
+    src: dashboard-router.json.j2
+    dest: "{{ monitoring_dir }}/grafana/dashboards/router.json"
+    mode: "0644"
+  register: monitoring_router_dashboard_template
+  when:
+    - monitoring_router_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_router]
+
+- name: Remove disabled router Grafana dashboard
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/dashboards/router.json"
+    state: absent
+  register: monitoring_router_dashboard_cleanup
+  when:
+    - not (monitoring_router_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_router]
+
 - name: Render Tonem Grafana managed alerting
   ansible.builtin.template:
     src: grafana-tonem-alerting.yml.j2
@@ -234,6 +359,29 @@
     - not (monitoring_home_node_alerting_enabled | default(false) | bool)
     - not ansible_check_mode
   tags: [monitoring_alerting, monitoring_home_node]
+
+- name: Render router Grafana managed alerting
+  ansible.builtin.template:
+    src: grafana-router-alerting.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/alerting/router.yml"
+    owner: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    group: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    mode: "0400"
+  register: monitoring_router_alerting_template
+  when:
+    - monitoring_router_alerting_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_router]
+
+- name: Remove disabled router Grafana managed alerting
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/provisioning/alerting/router.yml"
+    state: absent
+  register: monitoring_router_alerting_cleanup
+  when:
+    - not (monitoring_router_alerting_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_router]
 
 - name: Find stale Ansible backups in Grafana alerting provisioning
   ansible.builtin.find:
@@ -527,8 +675,10 @@
       monitoring_alerting_enabled | default(false) | bool
       or
       (monitoring_home_node_alerting_cleanup is defined and monitoring_home_node_alerting_cleanup.changed)
+      or
+      (monitoring_router_alerting_cleanup is defined and monitoring_router_alerting_cleanup.changed)
   no_log: true
-  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled, monitoring_home_node]
+  tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled, monitoring_home_node, monitoring_router]
 
 - name: Recreate monitoring stack when config changed
   ansible.builtin.command: docker compose up -d --remove-orphans --force-recreate

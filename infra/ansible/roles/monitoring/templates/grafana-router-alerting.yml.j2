@@ -1,0 +1,183 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: router-health
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      - uid: router-down
+        title: OpenWrt роутер недоступен
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(up{job="nodes",host="{{ monitoring_router_name }}"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Prometheus не получает метрики от {{ monitoring_router_name }}.', dashboard_url: '{{ monitoring_router_dashboard_url }}'}
+        labels: {severity: critical, service: router}
+        isPaused: false
+        notification_settings: &router_critical_notification_settings
+          receiver: monitoring-critical
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 1h
+
+      - uid: router-temperature-critical
+        title: Критическая температура OpenWrt роутера
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(node_hwmon_temp_celsius{job="nodes",host="{{ monitoring_router_name }}"}) or max(node_thermal_zone_temp{job="nodes",host="{{ monitoring_router_name }}"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_router_temperature_critical_celsius }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 2m
+        annotations: {summary: 'Температура {{ monitoring_router_name }} выше {{ monitoring_router_temperature_critical_celsius }} °C.', dashboard_url: '{{ monitoring_router_dashboard_url }}'}
+        labels: {severity: critical, service: router}
+        isPaused: false
+        notification_settings: *router_critical_notification_settings
+
+      - uid: router-memory-critical
+        title: На OpenWrt роутере заканчивается память
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'min(node_memory_MemAvailable_bytes{job="nodes",host="{{ monitoring_router_name }}"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_router_memory_available_critical_bytes }}], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 2m
+        annotations: {summary: 'Доступная память {{ monitoring_router_name }} ниже порога watchdog.', dashboard_url: '{{ monitoring_router_dashboard_url }}'}
+        labels: {severity: critical, service: router}
+        isPaused: false
+        notification_settings: *router_critical_notification_settings
+
+      - uid: router-zeroblock-down
+        title: Zeroblock остановлен
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'min(zeroblock_up{job="nodes",host="{{ monitoring_router_name }}"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Zeroblock/sing-box не работает на {{ monitoring_router_name }}.', dashboard_url: '{{ monitoring_router_dashboard_url }}'}
+        labels: {severity: critical, service: zeroblock}
+        isPaused: false
+        notification_settings: *router_critical_notification_settings
+
+      - uid: router-zeroblock-pressure
+        title: Watchdog Zeroblock фиксирует давление памяти
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model:
+              editorMode: code
+              expr: 'max(zeroblock_watchdog_pressure_samples{job="nodes",host="{{ monitoring_router_name }}"}) + ((max(zeroblock_rss_bytes{job="nodes",host="{{ monitoring_router_name }}"}) > bool {{ monitoring_router_zeroblock_rss_warning_bytes }}) * 3) + ((max(zeroblock_swap_bytes{job="nodes",host="{{ monitoring_router_name }}"}) > bool {{ monitoring_router_zeroblock_swap_warning_bytes }}) * 3) + (max(zeroblock_watchdog_state{job="nodes",host="{{ monitoring_router_name }}",state=~"paused|blocked"} or vector(0)) * 3)'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 1m
+        keepFiringFor: 2m
+        annotations: {summary: 'Zeroblock близок к рестарту либо watchdog уже остановил сервис.', dashboard_url: '{{ monitoring_router_dashboard_url }}'}
+        labels: {severity: warning, service: zeroblock}
+        isPaused: false
+        notification_settings:
+          receiver: monitoring-warning
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 1m
+          group_interval: 10m
+          repeat_interval: 4h

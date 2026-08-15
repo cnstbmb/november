@@ -526,16 +526,10 @@ if jq -e '
 else
   fail "MASTER Reality private keys: expected two distinct keys"
 fi
-if jq -e '
-  [.outbounds[]
-    | select(.tag=="GRPC_TO_HOME_RU" or .tag=="GRPC_TO_EXIT")
-    | .settings.vnext[0].users[0].id]
-  | length == 2 and (unique | length == 2)
-' "${ROOT_DIR}/.private/configs/MASTER_NODE.json" >/dev/null; then
-  pass "MASTER bridge VLESS UUIDs: present and distinct"
-else
-  fail "MASTER bridge VLESS UUIDs: expected two distinct values"
-fi
+check_json_value "MASTER Amsterdam bridge UUID" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_EXIT") | .settings.vnext[0].users[0].id | length > 0' "true"
+check_json_path_absent "MASTER legacy Home gRPC outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_HOME_RU")'
+check_json_value "MASTER Home kernel-WG protocol" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="WG_TO_HOME_RU") | .protocol' "freedom"
+check_json_value "MASTER Home kernel-WG interface" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="WG_TO_HOME_RU") | .streamSettings.sockopt.interface' "home_exit_wg"
 check_json_path_absent "MASTER DIRECT inbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_DIRECT_MSK")'
 check_json_value "MASTER MOSCOW xhttp network" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.network' "xhttp"
 check_json_value "MASTER MOSCOW xhttp security" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.inbounds[] | select(.tag=="VLESS_XHTTP_MOSCOW") | .streamSettings.security' "none"
@@ -561,10 +555,12 @@ check_json_path_absent "MASTER YouTube Moscow direct override" "${ROOT_DIR}/.pri
 check_json_path_absent "MASTER HYSTERIA2 RU direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.ip? | index("geoip:ru")))'
 check_json_path_absent "MASTER HYSTERIA2 category-ru direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.domain? | index("geosite:category-ru")))'
 check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
-check_json_value "MASTER RU category via Home balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru")) and (.inboundTag? | not)) | .balancerTag' "HOME_OR_MOSCOW"
-check_json_value "MASTER Home fallback to Moscow" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .fallbackTag' "IPv4"
-check_json_value "MASTER Home balancer selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[] | select(.tag=="HOME_OR_MOSCOW") | .selector | join(",")' "GRPC_TO_HOME_RU"
-check_json_value "MASTER Home observatory selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.subjectSelector | join(",")' "GRPC_TO_HOME_RU"
+check_json_value "MASTER Dodo via Home WG" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:dodois.io"))) | .outboundTag' "WG_TO_HOME_RU"
+check_json_value "MASTER Hikari via Home WG" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:hikari-dot-app-dot-doubleb-automation-production.appspot.com"))) | .outboundTag' "WG_TO_HOME_RU"
+check_json_value "MASTER Russian TLDs via Home WG" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:ru")) and (.domain | index("domain:xn--p1ai")) and (.domain | index("domain:su"))) | .outboundTag' "WG_TO_HOME_RU"
+check_json_value "MASTER RU category via Home WG" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:category-ru")) and (.inboundTag? | not)) | .outboundTag' "WG_TO_HOME_RU"
+check_json_path_absent "MASTER Home fallback balancer" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.balancers[]? | select(.tag=="HOME_OR_MOSCOW")'
+check_json_value "MASTER Home observatory selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.subjectSelector | join(",")' "WG_TO_HOME_RU"
 check_json_value "MASTER Home observatory interval" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeInterval' "15s"
 check_json_value "MASTER Home observatory probe URL" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeUrl' "https://ya.ru/"
 if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*port: 10085' "${ROOT_DIR}/.private/ansible/prod/group_vars/master.yml" >/dev/null; then

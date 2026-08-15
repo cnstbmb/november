@@ -351,6 +351,9 @@ def build_entry_profile(entry, master):
 
 
 def build_master_profile(master, exit_node, home_exit=None):
+    home_ru_interface = master.get("home_ru_interface")
+    home_ru_enabled = bool(home_ru_interface or home_exit)
+    home_ru_outbound_tag = "WG_TO_HOME_RU" if home_ru_interface else "GRPC_TO_HOME_RU"
     xhttp_moscow = master.get("xhttp_moscow") if enabled_block(master.get("xhttp_moscow")) else None
     hysteria2_moscow = master.get("hysteria2_moscow") if enabled_block(master.get("hysteria2_moscow")) else None
     direct_msk = master.get("reality_direct_msk") if enabled_block(master.get("reality_direct_msk")) else None
@@ -456,17 +459,58 @@ def build_master_profile(master, exit_node, home_exit=None):
             }
         )
 
+    route_home_tlds = clean_list(master.get("route_home_tlds", []))
+    if route_home_tlds and home_ru_enabled:
+        route_rules.append(
+            {
+                "type": "field",
+                "domain": [f"domain:{value}" for value in route_home_tlds],
+                "inboundTag": moscow_client_inbounds,
+                "outboundTag": home_ru_outbound_tag,
+            }
+        )
+
+    route_home_domains = clean_list(master.get("route_home_domains", []))
+    if route_home_domains and home_ru_enabled:
+        route_rules.append(
+            {
+                "type": "field",
+                "domain": [f"domain:{value}" for value in route_home_domains],
+                "inboundTag": moscow_client_inbounds,
+                "outboundTag": home_ru_outbound_tag,
+            }
+        )
+
+    route_exit_domains = clean_list(master.get("route_exit_domains", []))
+    if route_exit_domains:
+        route_rules.append(
+            {
+                "type": "field",
+                "domain": [f"domain:{value}" for value in route_exit_domains],
+                "inboundTag": moscow_client_inbounds,
+                "outboundTag": "GRPC_TO_EXIT",
+            }
+        )
+
     for cidr in clean_list(master.get("route_home_ip_cidrs", [])):
-        if home_exit:
-            route_rules.append({"ip": [cidr], "type": "field", "balancerTag": "HOME_OR_MOSCOW"})
+        if home_ru_enabled:
+            route_rules.append({"ip": [cidr], "type": "field", "outboundTag": home_ru_outbound_tag})
 
     for code in clean_list(master.get("route_home_geoip", [])):
-        if home_exit:
-            route_rules.append({"ip": [f"geoip:{code}"], "type": "field", "balancerTag": "HOME_OR_MOSCOW"})
+        if home_ru_enabled:
+            route_rules.append(
+                {"ip": [f"geoip:{code}"], "type": "field", "outboundTag": home_ru_outbound_tag}
+            )
 
     for selector in clean_list(master.get("route_home_geosite", [])):
-        if home_exit:
-            route_rules.append({"type": "field", "domain": [f"geosite:{selector}"], "balancerTag": "HOME_OR_MOSCOW"})
+        if home_ru_enabled:
+            route_rules.append(
+                {
+                    "type": "field",
+                    "domain": [f"geosite:{selector}"],
+                    "outboundTag": home_ru_outbound_tag,
+                }
+            )
 
     for cidr in clean_list(master.get("route_ipv4_ip_cidrs", [])):
         route_rules.append({"ip": [cidr], "type": "field", "outboundTag": "IPv4"})
@@ -791,10 +835,25 @@ def build_master_profile(master, exit_node, home_exit=None):
         },
     ]
 
-    if home_exit:
+    if home_ru_interface:
         outbounds.append(
             {
-                "tag": "GRPC_TO_HOME_RU",
+                "tag": home_ru_outbound_tag,
+                "protocol": "freedom",
+                "settings": {
+                    "domainStrategy": "UseIPv4",
+                },
+                "streamSettings": {
+                    "sockopt": {
+                        "interface": home_ru_interface,
+                    }
+                },
+            }
+        )
+    elif home_exit:
+        outbounds.append(
+            {
+                "tag": home_ru_outbound_tag,
                 "protocol": "vless",
                 "settings": {
                     "vnext": [
@@ -872,17 +931,8 @@ def build_master_profile(master, exit_node, home_exit=None):
 
     routing = {
         "rules": route_rules,
-        "domainStrategy": "IPIfNonMatch" if home_exit else "AsIs",
+        "domainStrategy": "IPIfNonMatch" if home_ru_enabled else "AsIs",
     }
-
-    if home_exit:
-        routing["balancers"] = [
-            {
-                "tag": "HOME_OR_MOSCOW",
-                "selector": ["GRPC_TO_HOME_RU"],
-                "fallbackTag": "IPv4",
-            }
-        ]
 
     profile = {
         "log": base_log(),
@@ -892,11 +942,11 @@ def build_master_profile(master, exit_node, home_exit=None):
         "routing": routing,
     }
 
-    if home_exit:
+    if home_ru_enabled:
         profile["observatory"] = {
             "probeUrl": master.get("to_home_ru_probe_url", "https://connectivitycheck.gstatic.com/generate_204"),
             "probeInterval": "15s",
-            "subjectSelector": ["GRPC_TO_HOME_RU"],
+            "subjectSelector": [home_ru_outbound_tag],
             "enableConcurrency": False,
         }
 
@@ -1610,6 +1660,10 @@ def main():
             "advanced_host_overrides": "empty/default",
         },
         "master_routing": {
+            "home_ru_interface": master.get("home_ru_interface"),
+            "route_home_tlds": clean_list(master.get("route_home_tlds", [])),
+            "route_home_domains": clean_list(master.get("route_home_domains", [])),
+            "route_exit_domains": clean_list(master.get("route_exit_domains", [])),
             "route_ipv4_geoip": clean_list(master.get("route_ipv4_geoip", [])),
             "route_ipv4_geosite": clean_list(master.get("route_ipv4_geosite", [])),
             "block_ip_cidrs": clean_list(master.get("block_ip_cidrs", [])),

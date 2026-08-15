@@ -3,215 +3,75 @@ set -euo pipefail
 
 REMOTE="${REMNAWAVE_RENDERER_PATCH_REMOTE:-root@193.124.64.187}"
 CONTAINER="${REMNAWAVE_RENDERER_PATCH_CONTAINER:-remnawave}"
-STAMP="$(date -u +%Y%m%d-%H%M%S)"
-REMOTE_BACKUP_DIR="/root/remnawave-hysteria2-renderers-${STAMP}"
+APPLY="false"
 
-ssh "${REMOTE}" "mkdir -p '${REMOTE_BACKUP_DIR}' && \
-  docker cp '${CONTAINER}:/opt/app/dist/src/modules/subscription-template/generators/xray.generator.service.js' '${REMOTE_BACKUP_DIR}/xray.generator.service.js' && \
-  docker cp '${CONTAINER}:/opt/app/dist/src/modules/subscription-template/generators/singbox.generator.service.js' '${REMOTE_BACKUP_DIR}/singbox.generator.service.js' && \
-  docker cp '${CONTAINER}:/opt/app/dist/src/modules/subscription-template/generators/mihomo.generator.service.js' '${REMOTE_BACKUP_DIR}/mihomo.generator.service.js'"
+if [ "${1:-}" = "--apply" ]; then
+  APPLY="true"
+elif [ -n "${1:-}" ]; then
+  printf 'Unknown argument: %s\n' "$1" >&2
+  exit 2
+fi
 
-ssh "${REMOTE}" "docker exec -i '${CONTAINER}' node" <<'NODE'
+backup_dir=""
+if [ "${APPLY}" = "true" ]; then
+  stamp="$(date -u +%Y%m%d-%H%M%S)"
+  backup_dir="/root/remnawave-hysteria2-renderer-${stamp}"
+  ssh "${REMOTE}" "mkdir -p '${backup_dir}' && docker cp '${CONTAINER}:/opt/app/dist/src/modules/subscription-template/generators/xray.generator.service.js' '${backup_dir}/xray.generator.service.js.before'"
+fi
+
+result="$({
+  ssh "${REMOTE}" "docker exec -e APPLY='${APPLY}' -i '${CONTAINER}' node" <<'NODE'
 const fs = require('fs');
 
-function lines(parts) {
-  return `${parts.join('\n')}\n`;
+const file = '/opt/app/dist/src/modules/subscription-template/generators/xray.generator.service.js';
+const source = fs.readFileSync(file, 'utf8');
+const start = source.indexOf('    buildHysteria2Link(host) {');
+const end = source.indexOf('    applyTransportParams(params, host) {', start);
+if (start < 0 || end < 0) {
+  throw new Error('The Hysteria2 Xray share-link builder was not found');
 }
 
-function patchFile(file, replacements) {
-  let text = fs.readFileSync(file, 'utf8');
-  for (const [needle, replacement] of replacements) {
-    if (!text.includes(needle)) {
-      throw new Error(`${file}: expected snippet not found: ${needle.slice(0, 120)}`);
-    }
-    text = text.replace(needle, replacement);
+const builder = source.slice(start, end);
+const marker = 'params.alpn = host.securityOptions.alpn;';
+const alreadyPatched = builder.includes(marker);
+const apply = process.env.APPLY === 'true';
+
+if (!alreadyPatched && apply) {
+  const needle = [
+    '            if (host.securityOptions.pinnedPeerCertSha256) {',
+    '                params.pinSHA256 = host.securityOptions.pinnedPeerCertSha256;',
+    '            }',
+  ].join('\n');
+  if (!builder.includes(needle)) {
+    throw new Error('Expected pinnedPeerCertSha256 block was not found in Hysteria2 builder');
   }
-  fs.writeFileSync(file, text);
+  const replacement = [
+    '            if (host.securityOptions.alpn) {',
+    '                params.alpn = host.securityOptions.alpn;',
+    '            }',
+    needle,
+  ].join('\n');
+  fs.writeFileSync(file, source.slice(0, start) + builder.replace(needle, replacement) + source.slice(end));
 }
 
-patchFile('/opt/app/dist/src/modules/subscription-template/generators/xray.generator.service.js', [
-  [
-    lines([
-      "            case 'shadowsocks':",
-      '                return this.buildShadowsocksLink(host);',
-      '            default:',
-      '                return null;',
-    ]),
-    lines([
-      "            case 'shadowsocks':",
-      '                return this.buildShadowsocksLink(host);',
-      "            case 'hysteria':",
-      '                return this.buildHysteria2Link(host);',
-      '            default:',
-      '                return null;',
-    ]),
-  ],
-  [
-    lines(['    applyTransportParams(params, host) {']),
-    lines([
-      '    buildHysteria2Link(host) {',
-      '        const params = {};',
-      '        const opts = host.securityOptions || {};',
-      '        if (opts.serverName) {',
-      '            params.sni = opts.serverName;',
-      '        }',
-      '        if (opts.fingerprint) {',
-      '            params.fp = opts.fingerprint;',
-      '        }',
-      '        if (opts.alpn) {',
-      '            params.alpn = opts.alpn;',
-      '        }',
-      '        if (opts.allowInsecure) {',
-      '            params.insecure = 1;',
-      '        }',
-      '        const query = this.buildQueryString(params);',
-      '        const remark = encodeURIComponent(host.finalRemark);',
-      '        const auth = encodeURIComponent(host.transportOptions.auth);',
-      "        return 'hysteria2://' + auth + '@' + host.address + ':' + host.port + '?' + query + '#' + remark;",
-      '    }',
-      '    applyTransportParams(params, host) {',
-    ]),
-  ],
-]);
-
-patchFile('/opt/app/dist/src/modules/subscription-template/generators/singbox.generator.service.js', [
-  [
-    lines([
-      "const UNSUPPORTED_TRANSPORTS = new Set(['hysteria', 'kcp', 'xhttp']);",
-      "const PROXY_PROTOCOL_TYPES = new Set(['hysteria', 'shadowsocks', 'trojan', 'vless']);",
-      "const SELECTOR_TYPES = new Set(['shadowsocks', 'trojan', 'urltest', 'vless']);",
-    ]),
-    lines([
-      "const UNSUPPORTED_TRANSPORTS = new Set(['kcp', 'xhttp']);",
-      "const PROXY_PROTOCOL_TYPES = new Set(['hysteria2', 'shadowsocks', 'trojan', 'vless']);",
-      "const SELECTOR_TYPES = new Set(['hysteria2', 'shadowsocks', 'trojan', 'urltest', 'vless']);",
-    ]),
-  ],
-  [
-    lines([
-      '                type: host.protocol,',
-      '                tag: host.finalRemark,',
-    ]),
-    lines([
-      "                type: host.protocol === 'hysteria' ? 'hysteria2' : host.protocol,",
-      '                tag: host.finalRemark,',
-    ]),
-  ],
-  [
-    lines([
-      "            case 'shadowsocks':",
-      '                config.password = host.protocolOptions.password;',
-      '                config.method = host.protocolOptions.method;',
-      "                config.network = 'tcp';",
-      '                config.udp_over_tcp = {',
-      '                    enabled: host.protocolOptions.uot,',
-      '                    version: host.protocolOptions.uotVersion,',
-      '                };',
-      '                return true;',
-      '            default:',
-      '                return false;',
-    ]),
-    lines([
-      "            case 'shadowsocks':",
-      '                config.password = host.protocolOptions.password;',
-      '                config.method = host.protocolOptions.method;',
-      "                config.network = 'tcp';",
-      '                config.udp_over_tcp = {',
-      '                    enabled: host.protocolOptions.uot,',
-      '                    version: host.protocolOptions.uotVersion,',
-      '                };',
-      '                return true;',
-      "            case 'hysteria':",
-      '                config.password = host.transportOptions.auth;',
-      '                return true;',
-      '            default:',
-      '                return false;',
-    ]),
-  ],
-]);
-
-patchFile('/opt/app/dist/src/modules/subscription-template/generators/mihomo.generator.service.js', [
-  [
-    lines([
-      "const UNSUPPORTED_TRANSPORTS = new Set(['hysteria', 'kcp', 'xhttp']);",
-      "const UNSUPPORTED_PROTOCOLS = new Set(['hysteria']);",
-    ]),
-    lines([
-      "const UNSUPPORTED_TRANSPORTS = new Set(['kcp', 'xhttp']);",
-      'const UNSUPPORTED_PROTOCOLS = new Set([]);',
-    ]),
-  ],
-  [
-    lines([
-      '        this.applyTransportOpts(node, host);',
-      "        node['client-fingerprint'] = this.resolveFingerprint(host);",
-    ]),
-    lines([
-      '        this.applyTransportOpts(node, host);',
-      "        if (host.protocol === 'hysteria') {",
-      '            delete node.network;',
-      '        }',
-      "        node['client-fingerprint'] = this.resolveFingerprint(host);",
-    ]),
-  ],
-  [
-    lines([
-      '    resolveClashType(protocol) {',
-      "        return protocol === 'shadowsocks' ? 'ss' : protocol;",
-      '    }',
-    ]),
-    lines([
-      '    resolveClashType(protocol) {',
-      "        if (protocol === 'shadowsocks') return 'ss';",
-      "        if (protocol === 'hysteria') return 'hysteria2';",
-      '        return protocol;',
-      '    }',
-    ]),
-  ],
-  [
-    lines([
-      "            case 'shadowsocks':",
-      '                node.password = host.protocolOptions.password;',
-      '                node.cipher = host.protocolOptions.method;',
-      "                node['udp-over-tcp'] = host.protocolOptions.uot;",
-      "                node['udp-over-tcp-version'] = host.protocolOptions.uotVersion;",
-      '                return true;',
-      '            default:',
-      '                return false;',
-    ]),
-    lines([
-      "            case 'shadowsocks':",
-      '                node.password = host.protocolOptions.password;',
-      '                node.cipher = host.protocolOptions.method;',
-      "                node['udp-over-tcp'] = host.protocolOptions.uot;",
-      "                node['udp-over-tcp-version'] = host.protocolOptions.uotVersion;",
-      '                return true;',
-      "            case 'hysteria':",
-      '                node.password = host.transportOptions.auth;',
-      '                return true;',
-      '            default:',
-      '                return false;',
-    ]),
-  ],
-  [
-    lines([
-      "                if (node.type === 'trojan') {",
-      "                    node.sni = opts.serverName ?? '';",
-      '                }',
-      '                else {',
-      "                    node.servername = opts.serverName ?? '';",
-      '                }',
-    ]),
-    lines([
-      "                if (node.type === 'trojan' || node.type === 'hysteria2') {",
-      "                    node.sni = opts.serverName ?? '';",
-      '                }',
-      '                else {',
-      "                    node.servername = opts.serverName ?? '';",
-      '                }',
-    ]),
-  ],
-]);
+console.log(JSON.stringify({
+  mode: apply ? 'apply' : 'check',
+  alreadyPatched,
+  patchRequired: !alreadyPatched,
+  target: 'Hysteria2 Xray share-link ALPN',
+}));
 NODE
+} 2>&1)"
 
-ssh "${REMOTE}" "docker restart '${CONTAINER}' >/dev/null && echo '${REMOTE_BACKUP_DIR}'"
+printf '%s\n' "${result}"
+
+if [ "${APPLY}" != "true" ]; then
+  exit 0
+fi
+
+if ! printf '%s' "${result}" | grep -q '"alreadyPatched":true'; then
+  ssh "${REMOTE}" "docker restart '${CONTAINER}' >/dev/null"
+  printf 'Patched renderer; original backup: %s\n' "${backup_dir}"
+else
+  printf 'Renderer already patched; backup: %s\n' "${backup_dir}"
+fi

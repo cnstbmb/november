@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PASSWORD_FILE={{ (secondbrain_backup_config_dir + '/restic-password') | quote }}
+repos=(
+  {{ secondbrain_ssd_backup_repo | quote }}
+  {{ secondbrain_hdd_backup_repo | quote }}
+)
+
+mountpoint -q /mnt/ssd || { echo "/mnt/ssd is not mounted" >&2; exit 1; }
+mountpoint -q /mnt/hdd || { echo "/mnt/hdd is not mounted" >&2; exit 1; }
+
+for repo in "${repos[@]}"; do
+  [[ -f "${repo}/config" ]] || { echo "Restic repository is not initialized: ${repo}" >&2; exit 1; }
+  RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" \
+    restic check --read-data-subset=5%
+done
+
+echo "SecondBrain repository checks completed."
+

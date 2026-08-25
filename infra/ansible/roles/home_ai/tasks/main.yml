@@ -1,0 +1,335 @@
+- name: Validate home AI deployment inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.architecture == "aarch64"
+      - home_ai_model_local_path | length > 0
+      - home_ai_rkllm_archive_local_path | length > 0
+      - home_ai_telegram_bot_token | length > 0
+      - home_ai_pairing_secret | length >= 16
+      - home_ai_brave_api_key | length > 0
+      - home_ai_action_broker_token | length >= 32
+      - home_ai_qbittorrent_username | length > 0
+      - home_ai_qbittorrent_password | length > 0
+    fail_msg: Home AI secrets and the converted RKLLM artifact must be supplied through private inventory.
+  no_log: true
+
+- name: Check RK3576 NPU render device
+  ansible.builtin.stat:
+    path: "{{ home_ai_rknpu_device }}"
+  register: home_ai_rknpu_stat
+
+- name: Require RK3576 NPU render device
+  ansible.builtin.assert:
+    that:
+      - home_ai_rknpu_stat.stat.exists
+      - home_ai_rknpu_stat.stat.ischr
+    fail_msg: "NPU render device {{ home_ai_rknpu_device }} is missing."
+
+- name: Check RK3576 NPU control device
+  ansible.builtin.stat:
+    path: "{{ home_ai_rknpu_control_device }}"
+  register: home_ai_rknpu_control_stat
+
+- name: Require RK3576 NPU control device
+  ansible.builtin.assert:
+    that:
+      - home_ai_rknpu_control_stat.stat.exists
+      - home_ai_rknpu_control_stat.stat.ischr
+    fail_msg: "NPU control device {{ home_ai_rknpu_control_device }} is missing."
+
+- name: Create home AI bot system group
+  ansible.builtin.group:
+    name: "{{ home_ai_bot_group }}"
+    gid: "{{ home_ai_bot_gid }}"
+    system: true
+    state: present
+
+- name: Create home AI directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ home_ai_dir }}", mode: "0755" }
+    - { path: "{{ home_ai_dir }}/bot-src", mode: "0755" }
+    - { path: "{{ home_ai_dir }}/runtime", mode: "0755" }
+    - { path: "{{ home_ai_dir }}/vendor", mode: "0755" }
+    - { path: "{{ home_ai_rkllm_source_dir }}", mode: "0755" }
+    - { path: "{{ home_ai_dir }}/models", mode: "0755" }
+    - { path: "{{ home_ai_dir }}/data", mode: "0700", owner: "{{ home_ai_bot_uid }}", group: "{{ home_ai_bot_group }}" }
+    - { path: "{{ home_ai_dir }}/secrets", mode: "0750", owner: root, group: "{{ home_ai_bot_group }}" }
+  when: not ansible_check_mode
+
+- name: Copy pinned RKLLM model
+  ansible.builtin.copy:
+    src: "{{ home_ai_model_local_path }}"
+    dest: "{{ home_ai_dir }}/models/{{ home_ai_model_filename }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Verify pinned RKLLM model checksum
+  ansible.builtin.stat:
+    path: "{{ home_ai_dir }}/models/{{ home_ai_model_filename }}"
+    checksum_algorithm: sha256
+  register: home_ai_model_stat
+  when: not ansible_check_mode
+
+- name: Require pinned RKLLM model checksum
+  ansible.builtin.assert:
+    that:
+      - home_ai_model_stat.stat.checksum == home_ai_model_sha256
+    fail_msg: Pinned RKLLM model checksum does not match.
+  when: not ansible_check_mode
+
+- name: Copy pinned RKLLM source archive
+  ansible.builtin.copy:
+    src: "{{ home_ai_rkllm_archive_local_path }}"
+    dest: "{{ home_ai_dir }}/vendor/rknn-llm-{{ home_ai_rkllm_commit }}.tar.gz"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Verify pinned RKLLM source archive checksum
+  ansible.builtin.stat:
+    path: "{{ home_ai_dir }}/vendor/rknn-llm-{{ home_ai_rkllm_commit }}.tar.gz"
+    checksum_algorithm: sha256
+  register: home_ai_rkllm_archive_stat
+  when: not ansible_check_mode
+
+- name: Require pinned RKLLM source archive checksum
+  ansible.builtin.assert:
+    that:
+      - home_ai_rkllm_archive_stat.stat.checksum == home_ai_rkllm_archive_sha256
+    fail_msg: Pinned RKLLM source archive checksum does not match.
+  when: not ansible_check_mode
+
+- name: Extract pinned RKLLM runtime source
+  ansible.builtin.unarchive:
+    src: "{{ home_ai_dir }}/vendor/rknn-llm-{{ home_ai_rkllm_commit }}.tar.gz"
+    dest: "{{ home_ai_rkllm_source_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ home_ai_rkllm_source_dir }}/rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so"
+  when: not ansible_check_mode
+
+- name: Copy official RKLLM Flask server
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ home_ai_rkllm_source_dir }}/examples/rkllm_server_demo/rkllm_server/flask_server.py"
+    dest: "{{ home_ai_dir }}/runtime/server.py"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Copy official RKLLM arm64 runtime library
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ home_ai_rkllm_source_dir }}/rkllm-runtime/Linux/librkllm_api/aarch64/librkllmrt.so"
+    dest: "{{ home_ai_dir }}/runtime/librkllmrt.so"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Bound RKLLM server context and output
+  ansible.builtin.replace:
+    path: "{{ home_ai_dir }}/runtime/server.py"
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - { regexp: 'rkllm_param\.max_context_len = 4096', replace: 'rkllm_param.max_context_len = int(os.environ.get("RKLLM_MAX_CONTEXT", "2048"))' }
+    - { regexp: 'rkllm_param\.max_new_tokens = 4096', replace: 'rkllm_param.max_new_tokens = int(os.environ.get("RKLLM_MAX_NEW_TOKENS", "512"))' }
+    - { regexp: 'max_tokens = data\.get\("max_tokens", 4096\)', replace: 'max_tokens = min(int(data.get("max_tokens", 512)), int(os.environ.get("RKLLM_MAX_NEW_TOKENS", "512")))' }
+    - { regexp: 'subprocess\.run\(command, shell=True\)', replace: 'print("Skipping host frequency mutation inside container")' }
+    - { regexp: 'global_text \+= result\.contents\.text\.decode\(''utf-8''\)', replace: 'global_text.append(result.contents.text.decode(''utf-8''))' }
+    - { regexp: '^            time\.sleep\(0\.005\)$', replace: '' }
+  when: not ansible_check_mode
+
+- name: Install pinned RKLLM KV reset patcher
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../tools/home-ai/patch_rkllm_server.py"
+    dest: "{{ home_ai_dir }}/runtime/patch-rkllm-server.py"
+    owner: root
+    group: root
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Apply pinned RKLLM KV reset patch
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ home_ai_dir }}/runtime/patch-rkllm-server.py"
+      - "{{ home_ai_dir }}/runtime/server.py"
+  register: home_ai_rkllm_server_patch
+  changed_when: "'patched' in home_ai_rkllm_server_patch.stdout"
+  when: not ansible_check_mode
+
+- name: Copy home AI bot source
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../apps/home-ai-bot/"
+    dest: "{{ home_ai_dir }}/bot-src/"
+    owner: root
+    group: root
+    mode: preserve
+  when: not ansible_check_mode
+
+- name: Install allowlisted home AI action broker
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../tools/home-ai/action_broker.py"
+    dest: "{{ home_ai_dir }}/action-broker.py"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart home AI action broker
+  when: not ansible_check_mode
+
+- name: Install home AI action broker systemd unit
+  ansible.builtin.template:
+    src: home-ai-action-broker.service.j2
+    dest: /etc/systemd/system/home-ai-action-broker.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart home AI action broker
+  when: not ansible_check_mode
+
+- name: Write RKLLM runtime Dockerfile
+  ansible.builtin.template:
+    src: runtime.Dockerfile.j2
+    dest: "{{ home_ai_dir }}/runtime/Dockerfile"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Write home AI secret files
+  ansible.builtin.copy:
+    dest: "{{ home_ai_dir }}/secrets/{{ item.name }}"
+    content: "{{ item.value }}\n"
+    owner: root
+    group: "{{ home_ai_bot_group }}"
+    mode: "0440"
+  loop:
+    - { name: telegram_bot_token, value: "{{ home_ai_telegram_bot_token }}" }
+    - { name: pairing_secret, value: "{{ home_ai_pairing_secret }}" }
+    - { name: brave_api_key, value: "{{ home_ai_brave_api_key }}" }
+    - { name: deepseek_api_key, value: "{{ home_ai_deepseek_api_key }}" }
+    - { name: action_broker_token, value: "{{ home_ai_action_broker_token }}" }
+    - { name: qbittorrent_username, value: "{{ home_ai_qbittorrent_username }}" }
+    - { name: qbittorrent_password, value: "{{ home_ai_qbittorrent_password }}" }
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Enable home AI action broker
+  ansible.builtin.systemd:
+    name: home-ai-action-broker.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Apply pending home AI action broker changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for home AI action broker socket
+  ansible.builtin.wait_for:
+    path: "{{ home_ai_action_broker_socket }}"
+    state: present
+    timeout: 30
+  when: not ansible_check_mode
+
+- name: Write home AI public environment
+  ansible.builtin.template:
+    src: home-ai.env.j2
+    dest: "{{ home_ai_dir }}/home-ai.env"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Write home AI Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ home_ai_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Validate home AI Compose file
+  ansible.builtin.command: >-
+    docker compose --project-name {{ home_ai_project_name }}
+    -f {{ home_ai_dir }}/docker-compose.yml config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Install home AI stack systemd unit
+  ansible.builtin.template:
+    src: home-ai-stack.service.j2
+    dest: /etc/systemd/system/home-ai-stack.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Start home AI stack
+  ansible.builtin.command: >-
+    docker compose --project-name {{ home_ai_project_name }}
+    -f {{ home_ai_dir }}/docker-compose.yml
+    up -d --build --remove-orphans
+  args:
+    chdir: "{{ home_ai_dir }}"
+  register: home_ai_compose_up
+  changed_when: "'Started' in home_ai_compose_up.stdout or 'Created' in home_ai_compose_up.stdout or 'Built' in home_ai_compose_up.stdout"
+  when: not ansible_check_mode
+
+- name: Wait for RKLLM health on the internal inference network
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-name
+      - "{{ home_ai_project_name }}"
+      - -f
+      - "{{ home_ai_dir }}/docker-compose.yml"
+      - exec
+      - -T
+      - bot
+      - node
+      - -e
+      - >-
+        fetch("http://rkllm:8080/v1/models")
+        .then(response => process.exit(response.ok ? 0 : 1))
+        .catch(() => process.exit(1))
+  register: home_ai_rkllm_health
+  changed_when: false
+  retries: "{{ (home_ai_wait_timeout / 5) | int }}"
+  delay: 5
+  until: home_ai_rkllm_health.rc == 0
+  when: not ansible_check_mode
+
+- name: Require both home AI services to be running
+  ansible.builtin.command: >-
+    docker compose --project-name {{ home_ai_project_name }}
+    -f {{ home_ai_dir }}/docker-compose.yml ps --status running --services
+  register: home_ai_running_services
+  changed_when: false
+  failed_when: >-
+    'rkllm' not in home_ai_running_services.stdout_lines or
+    'bot' not in home_ai_running_services.stdout_lines
+  when: not ansible_check_mode
+
+- name: Enable home AI stack reconciliation
+  ansible.builtin.systemd:
+    name: home-ai-stack.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

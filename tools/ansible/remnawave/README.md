@@ -43,6 +43,42 @@ npm run remnawave:rotate:credentials
 npm run remnawave:audit:self-steal
 ```
 
+## HOME Internal Squad
+
+`HOME` is reconciled separately from server deployment so an unrelated `site`
+run does not depend on the Remnawave API. The playbook validates the existing
+`HOME` Host and `BRIDGE_HOME_RU_IN`, creates the Squad only when missing, and
+never modifies user assignments:
+
+```bash
+tools/ansible/run_prod_private.sh --playbook remnawave-home-squad --check
+tools/ansible/run_prod_private.sh --playbook remnawave-home-squad
+```
+
+The API token is read on the controller from
+`.private/ansible/prod/remnashop/.env`. It can instead be supplied through the
+`REMNAWAVE_API_TOKEN` environment variable or the
+`remnawave_home_squad_api_token` Ansible variable.
+
+## HOME XHTTP transport
+
+The HOME client endpoint is deployed separately from the system gRPC bridge.
+The playbook prepares a loopback-only VLESS XHTTP `packet-up` inbound, exposes
+it through the real HTTPS landing on ports 80/443, and then transactionally
+switches the `HOME` and `HOME Monitoring Squad` bindings. It never adds regular
+users to `HOME`:
+
+```bash
+tools/ansible/run_prod_private.sh --playbook remnawave-home-xhttp --check
+tools/ansible/run_prod_private.sh --playbook remnawave-home-xhttp
+```
+
+The random XHTTP path is generated once in
+`.private/ansible/prod/remnawave-home-xhttp.json`. The public repository stores
+only renderer and reconciliation logic. During the client-validation stage,
+the legacy gRPC bridge remains available on 8443; restrict it to the master IP
+only after Shadowrocket and Happ Plus both pass.
+
 Скрипт не печатает секреты, создаёт приватный backup с правами `0700/0600`,
 последовательно обновляет `master -> home` и `master -> exit`, перезапускает
 затронутые ноды и синхронизирует активные JSON в `.private`.

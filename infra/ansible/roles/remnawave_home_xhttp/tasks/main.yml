@@ -1,0 +1,109 @@
+- name: Check HOME XHTTP private configuration on controller
+  ansible.builtin.stat:
+    path: "{{ remnawave_home_xhttp_config_file }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_xhttp_config_stat
+
+- name: Reconcile HOME XHTTP profile and active inbound
+  ansible.builtin.command:
+    argv: >-
+      {{
+        ['node', remnawave_home_xhttp_reconciler]
+        + (['--prepare'] if not ansible_check_mode else [])
+      }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_xhttp_prepare
+  changed_when: >-
+    (remnawave_home_xhttp_prepare.stdout | from_json).mode == 'prepared'
+  check_mode: false
+
+- name: Re-check HOME XHTTP private configuration on controller
+  ansible.builtin.stat:
+    path: "{{ remnawave_home_xhttp_config_file }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_xhttp_config_after_prepare
+
+- name: Validate HOME XHTTP private configuration exists
+  ansible.builtin.assert:
+    that:
+      - ansible_check_mode or remnawave_home_xhttp_config_after_prepare.stat.exists
+    fail_msg: "HOME XHTTP private configuration was not created."
+
+- name: Load HOME XHTTP private configuration
+  ansible.builtin.set_fact:
+    remnawave_home_xhttp_private: >-
+      {{ lookup('ansible.builtin.file', remnawave_home_xhttp_config_file) | from_json }}
+  no_log: true
+  when: remnawave_home_xhttp_config_after_prepare.stat.exists
+
+- name: Deploy HOME HTTPS landing and XHTTP reverse proxy
+  ansible.builtin.include_role:
+    name: worker_landing
+  vars:
+    worker_landing_http_bind: "0.0.0.0"
+    worker_landing_http_port: 80
+    worker_landing_https_bind: "0.0.0.0"
+    worker_landing_https_port: 443
+    worker_landing_network_mode_host: true
+    worker_landing_domain: "{{ remnawave_home_xhttp_private.host }}"
+    worker_landing_xhttp_proxy_locations:
+      - path: "{{ remnawave_home_xhttp_private.path }}"
+        upstream: "{{ remnawave_home_xhttp_private.backendListen }}:{{ remnawave_home_xhttp_private.backendPort }}"
+        proxy_protocol: "http"
+        read_timeout: "3600s"
+        send_timeout: "3600s"
+        client_max_body_size: "2m"
+  when: remnawave_home_xhttp_config_after_prepare.stat.exists
+
+- name: Allow public HTTP and HTTPS for HOME landing
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+
+- name: Wait for HOME HTTPS listener
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: 443
+    timeout: 30
+  when: not ansible_check_mode
+
+- name: Verify HOME landing from controller
+  ansible.builtin.uri:
+    url: "https://home.himenkov.ru/"
+    method: GET
+    follow_redirects: none
+    return_content: false
+    status_code:
+      - 200
+      - 301
+      - 302
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  check_mode: false
+  when: not ansible_check_mode
+
+- name: Cut over HOME Host, Squads, and monitoring
+  ansible.builtin.command:
+    argv:
+      - node
+      - "{{ remnawave_home_xhttp_reconciler }}"
+      - --cutover
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_xhttp_cutover
+  changed_when: >-
+    (remnawave_home_xhttp_cutover.stdout | from_json).mode == 'cutover'
+  when: not ansible_check_mode

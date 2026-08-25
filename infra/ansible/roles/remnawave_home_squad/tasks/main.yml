@@ -1,0 +1,303 @@
+- name: Read Remnawave API token override from controller environment
+  ansible.builtin.set_fact:
+    remnawave_home_squad_env_token: >-
+      {{ lookup('ansible.builtin.env', 'REMNAWAVE_API_TOKEN') | default('', true) }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Check Remnawave token file on controller
+  ansible.builtin.stat:
+    path: "{{ remnawave_home_squad_token_env_file }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_squad_token_file
+  when:
+    - remnawave_home_squad_api_token | default('', true) | length == 0
+    - remnawave_home_squad_env_token | length == 0
+
+- name: Validate Remnawave API token source
+  ansible.builtin.assert:
+    that:
+      - >-
+        remnawave_home_squad_api_token | default('', true) | length > 0 or
+        remnawave_home_squad_env_token | length > 0 or
+        (remnawave_home_squad_token_file.stat.exists | default(false))
+    fail_msg: >-
+      Set remnawave_home_squad_api_token, REMNAWAVE_API_TOKEN, or provide
+      {{ remnawave_home_squad_token_env_file }} on the Ansible controller.
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Resolve Remnawave API token
+  ansible.builtin.set_fact:
+    remnawave_home_squad_token_raw: >-
+      {{
+        remnawave_home_squad_api_token
+        if remnawave_home_squad_api_token | default('', true) | length > 0
+        else (
+          remnawave_home_squad_env_token
+          if remnawave_home_squad_env_token | length > 0
+          else lookup(
+            'ansible.builtin.ini',
+            'REMNAWAVE_TOKEN',
+            type='properties',
+            file=remnawave_home_squad_token_env_file
+          )
+        )
+      }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Normalize Remnawave API token
+  ansible.builtin.set_fact:
+    remnawave_home_squad_token: >-
+      {{ remnawave_home_squad_token_raw | trim | trim('"') | trim("'") }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Validate resolved Remnawave API token
+  ansible.builtin.assert:
+    that:
+      - remnawave_home_squad_token | length > 0
+    fail_msg: "Resolved Remnawave API token is empty."
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Read Remnawave Hosts
+  ansible.builtin.uri:
+    url: "{{ remnawave_home_squad_api_base | regex_replace('/$', '') }}/hosts"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ remnawave_home_squad_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_squad_hosts_response
+  no_log: true
+  check_mode: false
+
+- name: Read Remnawave Internal Squads
+  ansible.builtin.uri:
+    url: "{{ remnawave_home_squad_api_base | regex_replace('/$', '') }}/internal-squads"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ remnawave_home_squad_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_squad_squads_response
+  no_log: true
+  check_mode: false
+
+- name: Select HOME Host and Squad dependencies
+  ansible.builtin.set_fact:
+    remnawave_home_squad_matching_hosts: >-
+      {{
+        remnawave_home_squad_hosts_response.json.response
+        | default([], true)
+        | selectattr('remark', 'equalto', remnawave_home_squad_host_remark)
+        | list
+      }}
+    remnawave_home_squad_matching_bridge_squads: >-
+      {{
+        remnawave_home_squad_squads_response.json.response.internalSquads
+        | default([], true)
+        | selectattr('name', 'equalto', remnawave_home_squad_bridge_name)
+        | list
+      }}
+    remnawave_home_squad_matching_home_squads: >-
+      {{
+        remnawave_home_squad_squads_response.json.response.internalSquads
+        | default([], true)
+        | selectattr('name', 'equalto', remnawave_home_squad_name)
+        | list
+      }}
+    remnawave_home_squad_matching_inbounds: >-
+      {{
+        remnawave_home_squad_squads_response.json.response.internalSquads
+        | default([], true)
+        | map(attribute='inbounds')
+        | flatten
+        | selectattr('tag', 'equalto', remnawave_home_squad_inbound_tag)
+        | list
+      }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Validate unique HOME Host and Bridge Exit Squad
+  ansible.builtin.assert:
+    that:
+      - remnawave_home_squad_matching_hosts | length == 1
+      - remnawave_home_squad_matching_bridge_squads | length == 1
+      - remnawave_home_squad_matching_home_squads | length <= 1
+    fail_msg: >-
+      Expected exactly one {{ remnawave_home_squad_host_remark }} Host, exactly one
+      {{ remnawave_home_squad_bridge_name }}, and at most one
+      {{ remnawave_home_squad_name }} Squad.
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Select HOME inbound
+  ansible.builtin.set_fact:
+    remnawave_home_squad_host: "{{ remnawave_home_squad_matching_hosts | first }}"
+    remnawave_home_squad_bridge: "{{ remnawave_home_squad_matching_bridge_squads | first }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+
+- name: Validate HOME inbound and Host binding
+  ansible.builtin.assert:
+    that:
+      - remnawave_home_squad_matching_inbounds | length >= 1
+      - not (remnawave_home_squad_host.isDisabled | bool)
+      - remnawave_home_squad_host.port | int == remnawave_home_squad_port | int
+      - remnawave_home_squad_host.path | default('', true) | length > 1
+      - >-
+        remnawave_home_squad_host.inbound.configProfileUuid ==
+        (remnawave_home_squad_matching_inbounds | first).profileUuid
+      - >-
+        remnawave_home_squad_host.inbound.configProfileInboundUuid ==
+        (remnawave_home_squad_matching_inbounds | first).uuid
+    fail_msg: >-
+      HOME Host must be enabled and bound to {{ remnawave_home_squad_inbound_tag }}
+      on port {{ remnawave_home_squad_port }} with a private XHTTP path.
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Validate existing HOME Squad contents
+  ansible.builtin.assert:
+    that:
+      - (remnawave_home_squad_matching_home_squads | first).inbounds | length == 1
+      - >-
+        ((remnawave_home_squad_matching_home_squads | first).inbounds | first).uuid ==
+        (remnawave_home_squad_matching_inbounds | first).uuid
+    fail_msg: >-
+      Existing {{ remnawave_home_squad_name }} Squad must contain exactly
+      {{ remnawave_home_squad_inbound_tag }}.
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: remnawave_home_squad_matching_home_squads | length == 1
+
+- name: Report HOME Squad creation in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Would create {{ remnawave_home_squad_name }} with only
+      {{ remnawave_home_squad_inbound_tag }}; user assignments remain untouched.
+  delegate_to: localhost
+  become: false
+  run_once: true
+  changed_when: true
+  when:
+    - ansible_check_mode
+    - remnawave_home_squad_matching_home_squads | length == 0
+
+- name: Create HOME Internal Squad
+  ansible.builtin.uri:
+    url: "{{ remnawave_home_squad_api_base | regex_replace('/$', '') }}/internal-squads"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ remnawave_home_squad_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "{{ remnawave_home_squad_name }}"
+      inbounds:
+        - "{{ (remnawave_home_squad_matching_inbounds | first).uuid }}"
+    return_content: true
+    status_code:
+      - 200
+      - 201
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_squad_create_response
+  no_log: true
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - remnawave_home_squad_matching_home_squads | length == 0
+
+- name: Re-read Remnawave Internal Squads
+  ansible.builtin.uri:
+    url: "{{ remnawave_home_squad_api_base | regex_replace('/$', '') }}/internal-squads"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ remnawave_home_squad_token }}"
+      Content-Type: "application/json"
+    return_content: true
+    status_code: 200
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  run_once: true
+  register: remnawave_home_squad_verify_response
+  no_log: true
+  check_mode: false
+  when: not ansible_check_mode or remnawave_home_squad_matching_home_squads | length == 1
+
+- name: Select verified HOME Squad
+  ansible.builtin.set_fact:
+    remnawave_home_squad_verified: >-
+      {{
+        remnawave_home_squad_verify_response.json.response.internalSquads
+        | default([], true)
+        | selectattr('name', 'equalto', remnawave_home_squad_name)
+        | list
+      }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  no_log: true
+  when: not ansible_check_mode or remnawave_home_squad_matching_home_squads | length == 1
+
+- name: Verify reconciled HOME Squad
+  ansible.builtin.assert:
+    that:
+      - remnawave_home_squad_verified | length == 1
+      - (remnawave_home_squad_verified | first).inbounds | length == 1
+      - >-
+        ((remnawave_home_squad_verified | first).inbounds | first).uuid ==
+        (remnawave_home_squad_matching_inbounds | first).uuid
+    fail_msg: >-
+      {{ remnawave_home_squad_name }} was not reconciled to exactly
+      {{ remnawave_home_squad_inbound_tag }}.
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not ansible_check_mode or remnawave_home_squad_matching_home_squads | length == 1
+
+- name: Report reconciled HOME Squad
+  ansible.builtin.debug:
+    msg: >-
+      {{ remnawave_home_squad_name }} is present with only
+      {{ remnawave_home_squad_inbound_tag }} on {{ remnawave_home_squad_port }}/tcp.
+      This role never modifies user assignments.
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: not ansible_check_mode or remnawave_home_squad_matching_home_squads | length == 1

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPTPATH="$(cd "$(dirname "$0")" >/dev/null 2>&1; pwd -P)"
 ROOT_DIR="$(cd "$SCRIPTPATH/../.." >/dev/null 2>&1; pwd -P)"
 
-DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64,linux/arm64}"
 
 if ! docker buildx version >/dev/null 2>&1; then
   echo "docker buildx is required. Install Docker Buildx first."

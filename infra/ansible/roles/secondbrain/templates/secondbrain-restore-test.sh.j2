@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+repo_name="${1:-ssd}"
+snapshot="${2:-latest}"
+case "${repo_name}" in
+  ssd) repo={{ secondbrain_ssd_backup_repo | quote }} ;;
+  hdd) repo={{ secondbrain_hdd_backup_repo | quote }} ;;
+  *) echo "Usage: $0 [ssd|hdd] [snapshot]" >&2; exit 2 ;;
+esac
+
+SERVICE_DIR={{ secondbrain_service_dir | quote }}
+PASSWORD_FILE={{ (secondbrain_backup_config_dir + '/restic-password') | quote }}
+tmpdir="$(mktemp -d /mnt/ssd/secondbrain-restore-test.XXXXXX)"
+container="secondbrain-restore-test-$$"
+
+cleanup() {
+  docker rm -f "${container}" >/dev/null 2>&1 || true
+  if [[ "${tmpdir}" == /mnt/ssd/secondbrain-restore-test.* ]]; then
+    rm -rf -- "${tmpdir}"
+  fi
+}
+trap cleanup EXIT INT TERM
+
+RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" \
+  restic restore "${snapshot}" --target "${tmpdir}"
+
+restored_service="${tmpdir}{{ secondbrain_service_dir }}"
+[[ -d "${restored_service}/data" ]] || {
+  echo "Restored CouchDB data directory is missing." >&2
+  exit 1
+}
+
+set -a
+# shellcheck disable=SC1090
+source "${restored_service}/.env"
+set +a
+
+cp "${restored_service}/config/livesync.ini" "${tmpdir}/livesync-test.ini"
+
+docker run -d --rm \
+  --name "${container}" \
+  -e COUCHDB_USER="${COUCHDB_USER}" \
+  -e COUCHDB_PASSWORD="${COUCHDB_PASSWORD}" \
+  -v "${restored_service}/data:/opt/couchdb/data" \
+  -v "${tmpdir}/livesync-test.ini:/opt/couchdb/etc/local.ini" \
+  -p 127.0.0.1:15985:5984 \
+  {{ secondbrain_couchdb_image | quote }} >/dev/null
+
+for _ in $(seq 1 60); do
+  if curl --fail --silent \
+      --user "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+      "http://127.0.0.1:15985/${COUCHDB_DATABASE}" >/dev/null; then
+    echo "Restore test passed: database ${COUCHDB_DATABASE} is readable from ${repo_name}."
+    exit 0
+  fi
+  sleep 2
+done
+
+echo "Restore test CouchDB did not become ready." >&2
+exit 1
+

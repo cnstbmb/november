@@ -1,0 +1,10 @@
+tonem_xhttp_edge_domain: ""
+tonem_xhttp_edge_cert_name: "{{ tonem_xhttp_edge_domain }}"
+tonem_xhttp_edge_image: "cnstbmb/tonem-web:latest"
+tonem_xhttp_edge_locations: []
+tonem_xhttp_edge_legacy_vhosts: []
+tonem_xhttp_edge_dir: "/opt/landing-lite"
+tonem_xhttp_edge_container_name: "landing-lite"
+tonem_xhttp_edge_project_name: "landing-lite"
+tonem_xhttp_edge_acme_dir: "/var/www/tonem-xhttp-acme"
+tonem_xhttp_edge_min_path_token_length: 22

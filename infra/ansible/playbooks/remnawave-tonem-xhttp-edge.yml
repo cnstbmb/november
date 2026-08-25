@@ -1,0 +1,39 @@
+- name: Deploy a TONEM XHTTP edge facade
+  hosts: "{{ tonem_xhttp_inventory_target }}"
+  gather_facts: true
+  become: true
+  vars:
+    tonem_xhttp_private_file: "{{ playbook_dir }}/../../../.private/ansible/prod/remnawave-tonem-xhttp.json"
+  pre_tasks:
+    - name: Validate requested private target name
+      ansible.builtin.assert:
+        that:
+          - tonem_xhttp_target_name in ['home', 'exit']
+
+    - name: Load private TONEM XHTTP migration state
+      ansible.builtin.set_fact:
+        tonem_xhttp_private: "{{ lookup('ansible.builtin.file', tonem_xhttp_private_file) | from_json }}"
+      no_log: true
+
+    - name: Select TONEM XHTTP edge target
+      ansible.builtin.set_fact:
+        tonem_xhttp_target: "{{ tonem_xhttp_private.targets[tonem_xhttp_target_name] }}"
+      no_log: true
+
+    - name: Refuse disabled TONEM XHTTP edge target
+      ansible.builtin.assert:
+        that:
+          - tonem_xhttp_target.enabled | bool
+        fail_msg: "The requested TONEM XHTTP target is disabled in private state."
+
+  roles:
+    - role: tonem_xhttp_edge
+      vars:
+        tonem_xhttp_edge_domain: "{{ tonem_xhttp_target.domain }}"
+        tonem_xhttp_edge_image: "{{ tonem_xhttp_target.image }}"
+        tonem_xhttp_edge_locations:
+          - path: "{{ tonem_xhttp_target.path }}"
+            upstream: "{{ tonem_xhttp_target.nginxUpstream }}"
+            proxy_protocol: "{{ tonem_xhttp_target.proxyProtocol }}"
+        tonem_xhttp_edge_legacy_vhosts: "{{ tonem_xhttp_target.legacyVhosts | default([]) }}"
+

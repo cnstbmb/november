@@ -1,0 +1,39 @@
+secondbrain_enabled: true
+
+secondbrain_domain: "sync.himenkov.ru"
+secondbrain_dns_zone: "himenkov.ru"
+secondbrain_dns_target: "home.himenkov.ru"
+secondbrain_dns_manage: true
+secondbrain_https_port: 15984
+secondbrain_lan_ip: "192.168.1.164"
+
+secondbrain_service_dir: "/mnt/ssd/services/obsidian-livesync"
+secondbrain_ops_dir: "/mnt/ssd/services/secondbrain-ops"
+secondbrain_data_dir: "{{ secondbrain_service_dir }}/data"
+secondbrain_backup_config_dir: "/etc/secondbrain-backup"
+secondbrain_ssd_backup_repo: "/mnt/ssd/backups/obsidian-livesync"
+secondbrain_hdd_backup_repo: "/mnt/hdd/backups/obsidian-livesync"
+
+secondbrain_couchdb_user: "secondbrain"
+secondbrain_couchdb_database: "secondbrain"
+secondbrain_couchdb_password: ""
+secondbrain_restic_password: ""
+
+secondbrain_upstream_repository: "https://github.com/vrtmrz/obsidian-livesync"
+secondbrain_upstream_commit: "bc41355a740335172c9ca08dad6222f5e79698a8"
+secondbrain_couchdb_image: "couchdb:3.5.2@sha256:68a818978e34c30af0dc01b9025353a596c4c3b730338ad9ece5a95734b45192"
+secondbrain_init_image: "curlimages/curl:8.12.1@sha256:62dc7f48483d54c86914bf0aed8031bb07ac70eb4ef423b97e6af6592df163b5"
+secondbrain_proxy_image: "nginx:1.28.0-alpine@sha256:e8552debd77891036e8928d45f6f6e6d9eee56ce720668c0cdd723f963c3a5c5"
+
+secondbrain_cert_name: "{{ secondbrain_domain }}"
+secondbrain_cert_live_dir: "/etc/letsencrypt/live/{{ secondbrain_cert_name }}"
+secondbrain_certbot_credentials_path: "/etc/letsencrypt/cloudflare.ini"
+secondbrain_certbot_propagation_seconds: 60
+
+secondbrain_backup_keep_daily: 7
+secondbrain_backup_keep_weekly: 5
+secondbrain_backup_keep_monthly: 12
+secondbrain_backup_min_free_gib: 10
+secondbrain_backup_on_calendar: "*-*-* 03:30:00"
+secondbrain_check_on_calendar: "Sun *-*-* 05:15:00"
+secondbrain_ops_git_enabled: false

@@ -1,0 +1,21 @@
+# SecondBrain operations
+
+Server-side infrastructure for the Obsidian SecondBrain.
+
+- LiveSync service: `{{ secondbrain_service_dir }}`
+- Public endpoint: `https://{{ secondbrain_domain }}:{{ secondbrain_https_port }}`
+- CouchDB database/user: `{{ secondbrain_couchdb_database }}` / `{{ secondbrain_couchdb_user }}`
+- CouchDB credentials: `{{ secondbrain_service_dir }}/.env` (root-only)
+- Restic password: `{{ secondbrain_backup_config_dir }}/restic-password` (root-only)
+- Upstream LiveSync commit: `{{ secondbrain_upstream_commit }}`
+
+## Commands
+
+```sh
+sudo secondbrain-status
+sudo systemctl start secondbrain-backup.service
+sudo {{ secondbrain_ops_dir }}/bin/secondbrain-restore-test ssd latest
+```
+
+Do not expose raw CouchDB port 5984. It is bound to loopback only.
+

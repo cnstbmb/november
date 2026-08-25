@@ -6,6 +6,8 @@
     remnawave_panel_nginx_conf_file_effective: "{{ remnawave_panel_nginx_conf_file | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/nginx.conf') }}"
     remnawave_panel_project_name_effective: "{{ remnawave_panel_project_name | default('remnawave-panel') }}"
     remnawave_panel_proxy_container_name_effective: "{{ remnawave_panel_proxy_container_name | default('remnawave-panel-proxy') }}"
+    remnawave_panel_tonem_xhttp_dir_effective: "{{ remnawave_panel_tonem_xhttp_dir | default((remnawave_panel_dir | default('/opt/remnawave-panel')) ~ '/tonem-xhttp') }}"
+    remnawave_panel_tonem_xhttp_acme_dir_effective: "{{ remnawave_panel_tonem_xhttp_acme_dir | default('/var/www/tonem-xhttp-acme') }}"
     remnawave_panel_domain_effective: "{{ remnawave_panel_domain | default('', true) }}"
     remnawave_panel_frontend_domain_effective: "{{ remnawave_panel_frontend_domain | default(remnawave_panel_domain, true) }}"
     remnawave_panel_app_port_effective: "{{ remnawave_panel_app_port | default(3000) }}"
@@ -154,6 +156,17 @@
     path: "{{ remnawave_panel_dir_effective }}"
     state: directory
     mode: "0755"
+
+- name: Ensure TONEM XHTTP extension directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ remnawave_panel_tonem_xhttp_dir_effective }}"
+    - "{{ remnawave_panel_tonem_xhttp_dir_effective }}/servers"
+    - "{{ remnawave_panel_tonem_xhttp_dir_effective }}/locations"
+    - "{{ remnawave_panel_tonem_xhttp_acme_dir_effective }}"
 
 - name: Ensure Remnawave panel landing source directory exists on control-node
   ansible.builtin.stat:

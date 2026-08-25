@@ -1,0 +1,8 @@
+- name: Bypass Zeroblock for the HOME exit node
+  hosts: home_router
+  gather_facts: false
+  become: false
+  vars:
+    home_router_exit_bypass_state: absent
+  roles:
+    - home_router_exit_bypass

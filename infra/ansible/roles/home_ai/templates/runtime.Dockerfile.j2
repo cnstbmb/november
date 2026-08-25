@@ -1,0 +1,25 @@
+FROM --platform={{ home_ai_platform }} {{ home_ai_python_image }}
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir \
+      Flask==2.2.2 \
+      Werkzeug==2.2.2 \
+      Jinja2==3.1.6 \
+      itsdangerous==2.2.0 \
+      click==8.4.2 \
+      MarkupSafe==3.0.3
+
+WORKDIR /app
+COPY server.py /app/server.py
+COPY librkllmrt.so /app/lib/librkllmrt.so
+
+ENV LD_LIBRARY_PATH=/app/lib \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+USER 10001:{{ home_ai_render_gid }}
+ENTRYPOINT ["python", "/app/server.py"]
+CMD ["--rkllm_model_path", "/models/{{ home_ai_model_filename }}", "--target_platform", "rk3576"]

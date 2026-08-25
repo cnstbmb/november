@@ -1,0 +1,2 @@
+remnawave_home_xhttp_config_file: "{{ playbook_dir }}/../../../.private/ansible/prod/remnawave-home-xhttp.json"
+remnawave_home_xhttp_reconciler: "{{ playbook_dir }}/../../../tools/ansible/remnawave/reconcile_home_xhttp.mjs"

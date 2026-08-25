@@ -1,0 +1,14 @@
+[
+  {
+    "input": "<|im_start|>system\nТы полезный локальный ассистент. Отвечай кратко и точно.<|im_end|>\n<|im_start|>user\nОбъясни простыми словами, что такое локальная сеть.<|im_end|>\n<|im_start|>assistant\n",
+    "target": "Локальная сеть объединяет устройства дома или в офисе, чтобы они могли обмениваться данными и пользоваться общими сервисами."
+  },
+  {
+    "input": "<|im_start|>system\nYou are a concise local assistant.<|im_end|>\n<|im_start|>user\nSummarize why backups should be tested.<|im_end|>\n<|im_start|>assistant\n",
+    "target": "A backup is useful only if it can be restored, so regular restore tests catch corruption and missing data early."
+  },
+  {
+    "input": "<|im_start|>system\nТы полезный локальный ассистент.<|im_end|>\n<|im_start|>user\nСколько будет 17 умножить на 8?<|im_end|>\n<|im_start|>assistant\n",
+    "target": "136."
+  }
+]

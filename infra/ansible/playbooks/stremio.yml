@@ -20,4 +20,4 @@
   gather_facts: true
   roles:
     - role: stremio_torrent_stream
-      when: enable_stremio_torrent_stream | default(true) | bool
+      when: enable_stremio_torrent_stream | default(false) | bool

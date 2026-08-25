@@ -1,0 +1,17 @@
+remnawave_tonem_xhttp_domain: "live.tonem.ru"
+remnawave_tonem_xhttp_cert_name: "{{ remnawave_tonem_xhttp_domain }}"
+remnawave_tonem_xhttp_locations: []
+remnawave_tonem_xhttp_upstream: "tonem-web:80"
+remnawave_tonem_xhttp_panel_dir: "/opt/remnawave-panel"
+remnawave_tonem_xhttp_include_dir: "{{ remnawave_tonem_xhttp_panel_dir }}/tonem-xhttp"
+remnawave_tonem_xhttp_acme_dir: "/var/www/tonem-xhttp-acme"
+remnawave_tonem_xhttp_min_path_token_length: 22
+remnawave_tonem_xhttp_docker_bridge_cidr: ""
+remnawave_tonem_xhttp_backend_ports: []
+remnawave_tonem_xhttp_image: "cnstbmb/tonem-web:latest"
+remnawave_tonem_xhttp_web_container: "tonem-web"
+remnawave_tonem_xhttp_server_image: "cnstbmb/tonem-server:latest"
+remnawave_tonem_xhttp_server_container: "tonem-server"
+remnawave_tonem_xhttp_tonem_dir: "/opt/tonem"
+remnawave_tonem_xhttp_proxy_network: "remnawave-network"
+remnawave_tonem_xhttp_proxy_container: "remnawave-panel-proxy"

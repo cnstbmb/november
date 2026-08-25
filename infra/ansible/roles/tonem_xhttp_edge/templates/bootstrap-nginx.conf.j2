@@ -1,0 +1,37 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ tonem_xhttp_edge_domain }};
+    access_log off;
+    server_tokens off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/tonem-xhttp-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 404;
+    }
+}
+{% for legacy_vhost in tonem_xhttp_edge_legacy_vhosts %}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ legacy_vhost.domain }};
+    access_log off;
+    server_tokens off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/tonem-xhttp-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 404;
+    }
+}
+{% endfor %}

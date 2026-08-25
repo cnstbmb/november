@@ -1,0 +1,32 @@
+{% for xhttp_location in remnawave_tonem_xhttp_locations %}
+    location {{ xhttp_location.path }} {
+        access_log off;
+{% if xhttp_location.proxy_protocol | default('grpc') == 'http' %}
+        client_max_body_size {{ xhttp_location.client_max_body_size | default('2m') }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_redirect off;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout {{ xhttp_location.read_timeout | default('3600s') }};
+        proxy_send_timeout {{ xhttp_location.send_timeout | default('3600s') }};
+        proxy_pass http://{{ xhttp_location.upstream }};
+{% else %}
+        client_max_body_size 0;
+        client_body_timeout {{ xhttp_location.client_body_timeout | default('5m') }};
+        grpc_read_timeout {{ xhttp_location.read_timeout | default('315s') }};
+        grpc_send_timeout {{ xhttp_location.send_timeout | default('5m') }};
+        grpc_socket_keepalive on;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP "";
+        grpc_set_header X-Forwarded-For "";
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_pass grpc://{{ xhttp_location.upstream }};
+{% endif %}
+    }
+
+{% endfor %}

@@ -1,0 +1,12 @@
+[Unit]
+Description=SecondBrain CouchDB backup to SSD and HDD
+RequiresMountsFor=/mnt/ssd /mnt/hdd
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart={{ secondbrain_ops_dir }}/bin/secondbrain-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+

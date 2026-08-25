@@ -4,7 +4,7 @@ enable_certbot: false
 enable_monitoring: false
 enable_backups: false
 
-enable_stremio_torrent_stream: true
+enable_stremio_torrent_stream: false
 stremio_torrent_stream_manage_host: true
 stremio_torrent_stream_become: true
 stremio_torrent_stream_dir: "/opt/stremio-torrent-stream"

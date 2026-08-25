@@ -10,6 +10,57 @@ SPEC.loader.exec_module(MODULE)
 
 
 class HomeExitProfileTest(unittest.TestCase):
+    def test_hidden_home_squad_reuses_bridge_inbound(self):
+        self.assertEqual(
+            MODULE.build_home_squad(
+                {"host": "home.example.com", "client_public_enabled": False}
+            ),
+            {"name": "HOME", "inbounds": ["BRIDGE_HOME_RU_IN"]},
+        )
+        self.assertIsNone(MODULE.build_home_squad(None))
+
+    def test_public_home_squads_only_expose_client_inbound(self):
+        home_exit = {"host": "home.example.com", "client_public_enabled": True}
+        expected = {
+            "name": "HOME",
+            "inbounds": ["VLESS_HOME_REALITY_DIRECT"],
+        }
+        self.assertEqual(MODULE.build_home_squad(home_exit), expected)
+        self.assertEqual(
+            MODULE.build_home_monitoring_squad(home_exit),
+            {
+                "name": "HOME Monitoring Squad",
+                "inbounds": ["VLESS_HOME_REALITY_DIRECT"],
+            },
+        )
+
+    def test_home_xhttp_packet_up_uses_loopback_without_tls(self):
+        inbound = MODULE.build_direct_client_inbound(
+            {
+                "public_port": 443,
+                "cert_domain": "home.example.com",
+                "client_transport": "xhttp_nginx_tls",
+                "client_backend_listen": "127.0.0.1",
+                "client_backend_port": 10085,
+                "client_backend_host": "",
+                "client_host": "home.example.com",
+                "client_path": "/private-path",
+                "client_mode": "packet-up",
+            },
+            "VLESS_HOME_REALITY_DIRECT",
+        )
+
+        self.assertEqual(inbound["listen"], "127.0.0.1")
+        self.assertEqual(inbound["port"], 10085)
+        self.assertEqual(inbound["streamSettings"]["network"], "xhttp")
+        self.assertEqual(inbound["streamSettings"]["security"], "none")
+        self.assertEqual(
+            inbound["streamSettings"]["xhttpSettings"]["host"], ""
+        )
+        self.assertEqual(
+            inbound["streamSettings"]["xhttpSettings"]["mode"], "packet-up"
+        )
+
     def test_home_uses_systemd_resolved_instead_of_stubby(self):
         profile = MODULE.build_home_exit_profile(
             {

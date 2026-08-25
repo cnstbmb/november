@@ -1,0 +1,93 @@
+name: obsidian-livesync
+
+services:
+  couchdb:
+    image: {{ secondbrain_couchdb_image }}
+    container_name: livesync-couchdb
+    restart: unless-stopped
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:?Set COUCHDB_USER in .env}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:?Set COUCHDB_PASSWORD in .env}
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+      - ./config/livesync.ini:/opt/couchdb/etc/local.ini
+    ports:
+      - "127.0.0.1:5984:5984"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -sf -u ${COUCHDB_USER}:${COUCHDB_PASSWORD} http://localhost:5984/_session | grep -q ok || exit 1"
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+        reservations:
+          memory: 256M
+    networks:
+      - livesync-net
+
+  couchdb-init:
+    image: {{ secondbrain_init_image }}
+    container_name: livesync-init
+    restart: "no"
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    environment:
+      COUCHDB_INTERNAL_URL: http://couchdb:5984
+      COUCHDB_USER: ${COUCHDB_USER}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD}
+      COUCHDB_DATABASE: ${COUCHDB_DATABASE:-secondbrain}
+    volumes:
+      - ./scripts/couchdb-init.sh:/couchdb-init.sh:ro
+    entrypoint: ["sh", "/couchdb-init.sh"]
+    networks:
+      - livesync-net
+
+  proxy:
+    image: {{ secondbrain_proxy_image }}
+    container_name: livesync-proxy
+    restart: unless-stopped
+    depends_on:
+      couchdb:
+        condition: service_healthy
+    ports:
+      - "{{ secondbrain_https_port }}:8443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ secondbrain_cert_live_dir }}:{{ secondbrain_cert_live_dir }}:ro
+      - /etc/letsencrypt/archive/{{ secondbrain_cert_name }}:/etc/letsencrypt/archive/{{ secondbrain_cert_name }}:ro
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,noexec,nosuid,nodev
+      - /var/run:size=4m,noexec,nosuid,nodev
+      - /tmp:size=8m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - livesync-net
+
+volumes:
+  couchdb-data:
+    name: obsidian-livesync-couchdb-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ secondbrain_data_dir }}
+
+networks:
+  livesync-net:
+    name: obsidian-livesync-net
+    driver: bridge

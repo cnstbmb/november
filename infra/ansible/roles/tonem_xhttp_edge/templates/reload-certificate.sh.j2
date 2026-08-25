@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+docker exec {{ tonem_xhttp_edge_container_name }} nginx -t
+docker exec {{ tonem_xhttp_edge_container_name }} nginx -s reload
+

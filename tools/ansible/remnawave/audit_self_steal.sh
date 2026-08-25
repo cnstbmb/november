@@ -596,7 +596,9 @@ else
   check_json_value "EXIT_NODE target" "${ROOT_DIR}/.private/configs/EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_DIRECT") | .streamSettings.realitySettings.target' "127.0.0.1:9443"
   check_json_value "EXIT_NODE serverName" "${ROOT_DIR}/.private/configs/EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_REALITY_DIRECT") | .streamSettings.realitySettings.serverNames[0]' "himenkov.ru"
 fi
-check_json_path_absent "HOME_EXIT_NODE public direct inbound" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_HOME_REALITY_DIRECT")'
+check_json_value "HOME_EXIT_NODE client network" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_HOME_REALITY_DIRECT") | .streamSettings.network' "xhttp"
+check_json_value "HOME_EXIT_NODE client security" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_HOME_REALITY_DIRECT") | .streamSettings.security' "none"
+check_json_value "HOME_EXIT_NODE client mode" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="VLESS_HOME_REALITY_DIRECT") | .streamSettings.xhttpSettings.mode' "packet-up"
 check_json_value "HOME_EXIT_NODE bridge network" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="BRIDGE_HOME_RU_IN") | .streamSettings.network' "grpc"
 check_json_value "HOME_EXIT_NODE bridge security" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.inbounds[] | select(.tag=="BRIDGE_HOME_RU_IN") | .streamSettings.security' "tls"
 check_json_path_absent "HOME_EXIT_NODE DIRECT egress noises" "${ROOT_DIR}/.private/configs/HOME_EXIT_NODE.json" '.outbounds[] | select(.tag=="DIRECT") | .settings.noises'

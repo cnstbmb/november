@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly SecondBrain restic integrity check
+
+[Timer]
+OnCalendar={{ secondbrain_check_on_calendar }}
+RandomizedDelaySec=20m
+Persistent=true
+Unit=secondbrain-check.service
+
+[Install]
+WantedBy=timers.target
+

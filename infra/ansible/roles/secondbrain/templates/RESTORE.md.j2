@@ -1,0 +1,22 @@
+# Restore procedure
+
+## Verify repositories
+
+```sh
+sudo {{ secondbrain_ops_dir }}/bin/secondbrain-check
+sudo {{ secondbrain_ops_dir }}/bin/secondbrain-restore-test ssd latest
+sudo {{ secondbrain_ops_dir }}/bin/secondbrain-restore-test hdd latest
+```
+
+## Production restore
+
+1. Stop only the `obsidian-livesync` Compose project.
+2. Restore the selected snapshot into a temporary directory first.
+3. Run `secondbrain-restore-test` against the restored copy.
+4. Preserve the current `{{ secondbrain_service_dir }}` as a timestamped rollback copy.
+5. Restore the service directory from SSD, or from HDD if SSD is unavailable.
+6. Start the Compose project and verify authenticated `/_up` and the
+   `{{ secondbrain_couchdb_database }}` database.
+
+Never restore directly over the running CouchDB data directory.
+

@@ -9,12 +9,13 @@ const rootDir = path.resolve(scriptDir, "../../..");
 const tokenEnvFile = path.join(rootDir, ".private/ansible/prod/remnashop/.env");
 const masterVarsFile = path.join(rootDir, ".private/ansible/prod/group_vars/master.yml");
 const backupRoot = path.join(rootDir, ".private/backups/monitoring-home-channel");
+const privateConfigFile = path.join(rootDir, ".private/ansible/prod/remnawave-home-xhttp.json");
 const apiBase = readApiBase();
 const homeHostRemark = "HOME";
-const targetSquadName = "Bridge Exit Squad";
-const expectedHomeInboundTag = "BRIDGE_HOME_RU_IN";
-const expectedHomeGrpcServiceName = "";
-const expectedHomePort = 8443;
+const targetSquadName = "HOME Monitoring Squad";
+const expectedHomeInboundTag = "VLESS_HOME_REALITY_DIRECT";
+const expectedHomeXhttpPath = JSON.parse(fs.readFileSync(privateConfigFile, "utf8")).path;
+const expectedHomePort = 443;
 const expectedHomeDnsRedirect = "127.0.0.53:53";
 
 function readApiToken() {
@@ -36,7 +37,10 @@ function readApiBase() {
       `Set REMNAWAVE_API_BASE or REMNAWAVE_HOST in the private environment at ${tokenEnvFile}`,
     );
   }
-  return `${(match[1] || match[2] || match[3]).trim().replace(/\/$/, "")}/api`;
+  const value = (match[1] || match[2] || match[3]).trim().replace(/\/$/, "");
+  return /^https?:\/\//.test(value)
+    ? `${value}/api`
+    : "https://panel.moscow.himenkov.ru/api";
 }
 
 function readMonitoringShortUuid() {
@@ -141,7 +145,7 @@ function summarize(state, mode) {
     hostInboundCorrect:
       state.homeHost.inbound?.configProfileUuid === state.homeInbound.profileUuid &&
       state.homeHost.inbound?.configProfileInboundUuid === state.homeInbound.uuid,
-    hostTransportCorrect: (state.homeHost.path || "") === expectedHomeGrpcServiceName,
+    hostTransportCorrect: state.homeHost.path === expectedHomeXhttpPath,
     hostPortCorrect: Number(state.homeHost.port) === expectedHomePort,
     homeDnsCorrect: dnsOutbound?.settings?.redirect === expectedHomeDnsRedirect,
     currentSquads: currentSquads.sort(),
@@ -190,7 +194,7 @@ async function applyHomeHostInbound(state) {
       configProfileUuid: state.homeInbound.profileUuid,
       configProfileInboundUuid: state.homeInbound.uuid,
     },
-    path: expectedHomeGrpcServiceName || null,
+    path: expectedHomeXhttpPath,
     port: expectedHomePort,
   });
 }
@@ -312,7 +316,7 @@ if (
   !verifiedSummary.homeDnsCorrect
 ) {
   throw new Error(
-    "HOME host binding, transport, port, DNS, or monitoring membership was not correct after PATCH",
+    "HOME XHTTP binding, path, port, DNS, or monitoring membership was not correct after PATCH",
   );
 }
 

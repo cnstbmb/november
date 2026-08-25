@@ -1,0 +1,17 @@
+[Unit]
+Description=Home AI compose stack reconciliation
+Wants=network-online.target
+After=network-online.target docker.service home-ai-action-broker.service
+Requires=docker.service home-ai-action-broker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory={{ home_ai_dir }}
+ExecStartPre=/usr/bin/test -S {{ home_ai_action_broker_socket }}
+ExecStart=/usr/bin/docker compose --project-name {{ home_ai_project_name }} -f {{ home_ai_dir }}/docker-compose.yml up -d --remove-orphans
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

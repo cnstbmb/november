@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVICE_DIR={{ secondbrain_service_dir | quote }}
+ENV_FILE="${SERVICE_DIR}/.env"
+PASSWORD_FILE={{ (secondbrain_backup_config_dir + '/restic-password') | quote }}
+
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
+echo "== containers =="
+docker compose --project-directory "${SERVICE_DIR}" --env-file "${ENV_FILE}" ps
+
+echo "== CouchDB health =="
+curl --fail --silent --show-error \
+  --user "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+  http://127.0.0.1:5984/_up
+echo
+
+echo "== listeners =="
+ss -lnt | awk 'NR == 1 || /:5984 |:{{ secondbrain_https_port }} /'
+
+echo "== timers =="
+systemctl list-timers --all --no-pager | awk 'NR == 1 || /secondbrain/'
+
+echo "== filesystems =="
+df -h / /mnt/ssd /mnt/hdd
+
+echo "== latest snapshots =="
+for repo in {{ secondbrain_ssd_backup_repo | quote }} {{ secondbrain_hdd_backup_repo | quote }}; do
+  echo "-- ${repo}"
+  if [[ -f "${repo}/config" ]]; then
+    RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" \
+      restic snapshots --latest 1 --compact
+  else
+    echo "not initialized"
+  fi
+done
+
+echo "== ops Git =="
+git -C {{ secondbrain_ops_dir | quote }} status --short --branch 2>/dev/null || true
+

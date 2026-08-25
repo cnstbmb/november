@@ -1,0 +1,5 @@
+- name: Restart home AI action broker
+  ansible.builtin.systemd:
+    name: home-ai-action-broker.service
+    state: restarted
+    daemon_reload: true

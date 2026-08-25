@@ -1,0 +1,537 @@
+- name: Skip SecondBrain when disabled
+  ansible.builtin.meta: end_role
+  when: not (secondbrain_enabled | bool)
+
+- name: Validate SecondBrain deployment inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.architecture == "aarch64"
+      - secondbrain_couchdb_password | length >= 32
+      - secondbrain_restic_password | length >= 32
+      - secondbrain_domain | length > 0
+      - secondbrain_https_port | int > 1024
+      - secondbrain_https_port | int < 65536
+      - letsencrypt_email | default('') | length > 0
+      - cloudflare_api_token | default('') | length > 0
+    fail_msg: >-
+      SecondBrain requires ARM64, strong CouchDB/restic passwords, a domain,
+      Let's Encrypt email and Cloudflare DNS token from private inventory.
+  no_log: true
+
+- name: Verify required storage mounts
+  ansible.builtin.command:
+    argv:
+      - mountpoint
+      - -q
+      - "{{ item }}"
+  loop:
+    - /mnt/ssd
+    - /mnt/hdd
+  changed_when: false
+
+- name: Check free space on SecondBrain mounts
+  ansible.builtin.shell: |
+    set -eu
+    available_kib="$(df -Pk {{ item | quote }} | awk 'NR == 2 {print $4}')"
+    test "${available_kib}" -ge $(({{ secondbrain_backup_min_free_gib }} * 1024 * 1024))
+  args:
+    executable: /bin/bash
+  loop:
+    - /mnt/ssd
+    - /mnt/hdd
+  changed_when: false
+
+- name: Create SecondBrain service directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ secondbrain_service_dir }}", mode: "0750" }
+    - { path: "{{ secondbrain_service_dir }}/config", mode: "0750" }
+    - { path: "{{ secondbrain_service_dir }}/scripts", mode: "0750" }
+    - { path: "{{ secondbrain_data_dir }}", owner: "5984", group: "5984", mode: "0700" }
+    - { path: "{{ secondbrain_ops_dir }}", mode: "0755" }
+    - { path: "{{ secondbrain_ops_dir }}/bin", mode: "0755" }
+    - { path: "{{ secondbrain_ops_dir }}/docs", mode: "0755" }
+    - { path: "{{ secondbrain_ops_dir }}/systemd", mode: "0755" }
+    - { path: "{{ secondbrain_backup_config_dir }}", mode: "0700" }
+    - { path: "{{ secondbrain_ssd_backup_repo | dirname }}", mode: "0700" }
+    - { path: "{{ secondbrain_hdd_backup_repo | dirname }}", mode: "0700" }
+  when: not ansible_check_mode
+
+- name: Install pinned official LiveSync CouchDB configuration
+  ansible.builtin.copy:
+    src: livesync.ini
+    dest: "{{ secondbrain_service_dir }}/config/livesync.ini"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Install pinned official CouchDB initializer
+  ansible.builtin.copy:
+    src: couchdb-init.sh
+    dest: "{{ secondbrain_service_dir }}/scripts/couchdb-init.sh"
+    owner: root
+    group: root
+    mode: "0755"
+  register: secondbrain_initializer_install
+  when: not ansible_check_mode
+
+- name: Remove running initializer that still has the replaced script mounted
+  ansible.builtin.command:
+    argv:
+      - docker
+      - rm
+      - --force
+      - livesync-init
+  register: secondbrain_stale_initializer_remove
+  changed_when: secondbrain_stale_initializer_remove.rc == 0
+  failed_when: secondbrain_stale_initializer_remove.rc not in [0, 1]
+  when:
+    - not ansible_check_mode
+    - secondbrain_initializer_install is changed
+
+- name: Write SecondBrain Compose stack
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ secondbrain_service_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Write SecondBrain TLS proxy configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ secondbrain_service_dir }}/config/nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Write root-only CouchDB environment
+  ansible.builtin.template:
+    src: secondbrain.env.j2
+    dest: "{{ secondbrain_service_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Write root-only restic password
+  ansible.builtin.copy:
+    content: "{{ secondbrain_restic_password }}\n"
+    dest: "{{ secondbrain_backup_config_dir }}/restic-password"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Look up Cloudflare zone
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones?name={{ secondbrain_dns_zone | urlencode }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cloudflare_api_token }}"
+      Content-Type: application/json
+    return_content: true
+    status_code: 200
+  register: secondbrain_cloudflare_zone
+  no_log: true
+  when:
+    - secondbrain_dns_manage | bool
+    - not ansible_check_mode
+
+- name: Require one matching Cloudflare zone
+  ansible.builtin.assert:
+    that:
+      - secondbrain_cloudflare_zone.json.success | bool
+      - secondbrain_cloudflare_zone.json.result | length == 1
+  no_log: true
+  when:
+    - secondbrain_dns_manage | bool
+    - not ansible_check_mode
+
+- name: Look up existing SecondBrain DNS record
+  ansible.builtin.uri:
+    url: >-
+      https://api.cloudflare.com/client/v4/zones/{{ secondbrain_cloudflare_zone.json.result[0].id }}/dns_records?name={{ secondbrain_domain | urlencode }}
+    method: GET
+    headers:
+      Authorization: "Bearer {{ cloudflare_api_token }}"
+      Content-Type: application/json
+    return_content: true
+    status_code: 200
+  register: secondbrain_cloudflare_record
+  no_log: true
+  when:
+    - secondbrain_dns_manage | bool
+    - not ansible_check_mode
+
+- name: Create SecondBrain DNS CNAME
+  ansible.builtin.uri:
+    url: >-
+      https://api.cloudflare.com/client/v4/zones/{{ secondbrain_cloudflare_zone.json.result[0].id }}/dns_records
+    method: POST
+    headers:
+      Authorization: "Bearer {{ cloudflare_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: CNAME
+      name: "{{ secondbrain_domain }}"
+      content: "{{ secondbrain_dns_target }}"
+      proxied: false
+      ttl: 300
+    status_code: 200
+  no_log: true
+  when:
+    - secondbrain_dns_manage | bool
+    - not ansible_check_mode
+    - secondbrain_cloudflare_record.json.result | length == 0
+
+- name: Update SecondBrain DNS CNAME
+  ansible.builtin.uri:
+    url: >-
+      https://api.cloudflare.com/client/v4/zones/{{ secondbrain_cloudflare_zone.json.result[0].id }}/dns_records/{{ secondbrain_cloudflare_record.json.result[0].id }}
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ cloudflare_api_token }}"
+      Content-Type: application/json
+    body_format: json
+    body:
+      type: CNAME
+      name: "{{ secondbrain_domain }}"
+      content: "{{ secondbrain_dns_target }}"
+      proxied: false
+      ttl: 300
+    status_code: 200
+  no_log: true
+  when:
+    - secondbrain_dns_manage | bool
+    - not ansible_check_mode
+    - secondbrain_cloudflare_record.json.result | length > 0
+    - >-
+      secondbrain_cloudflare_record.json.result[0].type != 'CNAME' or
+      secondbrain_cloudflare_record.json.result[0].content != secondbrain_dns_target or
+      secondbrain_cloudflare_record.json.result[0].proxied | bool
+
+- name: Check existing Cloudflare DNS-01 credentials
+  ansible.builtin.stat:
+    path: "{{ secondbrain_certbot_credentials_path }}"
+  register: secondbrain_certbot_credentials
+
+- name: Require root-only Cloudflare DNS-01 credentials
+  ansible.builtin.assert:
+    that:
+      - secondbrain_certbot_credentials.stat.exists
+      - secondbrain_certbot_credentials.stat.mode == '0600'
+    fail_msg: "Missing secure Certbot Cloudflare credentials on NanoPi."
+
+- name: Obtain or renew SecondBrain certificate with DNS-01
+  ansible.builtin.command:
+    argv:
+      - certbot
+      - certonly
+      - --dns-cloudflare
+      - --dns-cloudflare-credentials
+      - "{{ secondbrain_certbot_credentials_path }}"
+      - --dns-cloudflare-propagation-seconds
+      - "{{ secondbrain_certbot_propagation_seconds | string }}"
+      - --cert-name
+      - "{{ secondbrain_cert_name }}"
+      - --non-interactive
+      - --agree-tos
+      - --keep-until-expiring
+      - -m
+      - "{{ letsencrypt_email }}"
+      - -d
+      - "{{ secondbrain_domain }}"
+  register: secondbrain_certbot_result
+  changed_when: "'Certificate not yet due for renewal' not in secondbrain_certbot_result.stdout"
+  when: not ansible_check_mode
+
+- name: Install SecondBrain certificate deploy hook
+  ansible.builtin.template:
+    src: reload-secondbrain-proxy.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-secondbrain-proxy.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Validate SecondBrain Compose configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ secondbrain_service_dir }}"
+      - --env-file
+      - "{{ secondbrain_service_dir }}/.env"
+      - config
+      - --quiet
+  changed_when: false
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Pull pinned SecondBrain images
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ secondbrain_service_dir }}"
+      - --env-file
+      - "{{ secondbrain_service_dir }}/.env"
+      - pull
+  register: secondbrain_compose_pull
+  changed_when: "'Downloaded newer image' in secondbrain_compose_pull.stdout"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Start only the SecondBrain Compose project
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ secondbrain_service_dir }}"
+      - --env-file
+      - "{{ secondbrain_service_dir }}/.env"
+      - up
+      - -d
+      - --remove-orphans
+  register: secondbrain_compose_up
+  changed_when: >-
+    'Started' in secondbrain_compose_up.stderr or
+    'Created' in secondbrain_compose_up.stderr or
+    'Recreated' in secondbrain_compose_up.stderr
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Wait for authenticated CouchDB health
+  ansible.builtin.uri:
+    url: http://127.0.0.1:5984/_up
+    method: GET
+    user: "{{ secondbrain_couchdb_user }}"
+    password: "{{ secondbrain_couchdb_password }}"
+    force_basic_auth: true
+    return_content: true
+    status_code: 200
+  register: secondbrain_couchdb_health
+  until: secondbrain_couchdb_health.json.status | default('') == 'ok'
+  retries: 30
+  delay: 2
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Wait for initialized SecondBrain database
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:5984/{{ secondbrain_couchdb_database }}"
+    method: GET
+    user: "{{ secondbrain_couchdb_user }}"
+    password: "{{ secondbrain_couchdb_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: secondbrain_database_health
+  until: secondbrain_database_health.status == 200
+  retries: 30
+  delay: 2
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Inspect UFW rules
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - status
+  register: secondbrain_ufw_status
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Allow only SecondBrain HTTPS port through UFW
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - "{{ secondbrain_https_port }}/tcp"
+      - comment
+      - SecondBrain LiveSync HTTPS
+  when:
+    - not ansible_check_mode
+    - (secondbrain_https_port | string) not in secondbrain_ufw_status.stdout
+
+- name: Install SecondBrain operational scripts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ secondbrain_ops_dir }}/bin/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - { src: secondbrain-backup.sh.j2, dest: secondbrain-backup }
+    - { src: secondbrain-check.sh.j2, dest: secondbrain-check }
+    - { src: secondbrain-status.sh.j2, dest: secondbrain-status }
+    - { src: secondbrain-restore-test.sh.j2, dest: secondbrain-restore-test }
+  when: not ansible_check_mode
+
+- name: Link SecondBrain status command
+  ansible.builtin.file:
+    src: "{{ secondbrain_ops_dir }}/bin/secondbrain-status"
+    dest: /usr/local/sbin/secondbrain-status
+    state: link
+    force: true
+  when: not ansible_check_mode
+
+- name: Install SecondBrain documentation
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { src: README.md.j2, dest: "{{ secondbrain_ops_dir }}/README.md" }
+    - { src: CLIENT_SETUP.md.j2, dest: "{{ secondbrain_ops_dir }}/docs/CLIENT_SETUP.md" }
+    - { src: RESTORE.md.j2, dest: "{{ secondbrain_ops_dir }}/docs/RESTORE.md" }
+    - { src: MAC_OBSIDIAN_GIT.md.j2, dest: "{{ secondbrain_ops_dir }}/docs/MAC_OBSIDIAN_GIT.md" }
+  when: not ansible_check_mode
+
+- name: Record pinned upstream LiveSync commit
+  ansible.builtin.copy:
+    content: |
+      repository={{ secondbrain_upstream_repository }}
+      commit={{ secondbrain_upstream_commit }}
+    dest: "{{ secondbrain_ops_dir }}/UPSTREAM_VERSION"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Install SecondBrain operations Git ignore
+  ansible.builtin.copy:
+    src: ops.gitignore
+    dest: "{{ secondbrain_ops_dir }}/.gitignore"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Install SecondBrain systemd unit source and deployed copies
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ secondbrain_ops_dir }}/systemd/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - secondbrain-backup.service
+    - secondbrain-backup.timer
+    - secondbrain-check.service
+    - secondbrain-check.timer
+  when: not ansible_check_mode
+
+- name: Link SecondBrain systemd units
+  ansible.builtin.file:
+    src: "{{ secondbrain_ops_dir }}/systemd/{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    state: link
+    force: true
+  loop:
+    - secondbrain-backup.service
+    - secondbrain-backup.timer
+    - secondbrain-check.service
+    - secondbrain-check.timer
+  when: not ansible_check_mode
+
+- name: Enable SecondBrain timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - secondbrain-backup.timer
+    - secondbrain-check.timer
+  when: not ansible_check_mode
+
+- name: Initialize local SecondBrain operations Git repository
+  ansible.builtin.command:
+    argv:
+      - git
+      - init
+      - -b
+      - main
+      - "{{ secondbrain_ops_dir }}"
+    creates: "{{ secondbrain_ops_dir }}/.git"
+  when:
+    - not ansible_check_mode
+    - secondbrain_ops_git_enabled | bool
+
+- name: Configure SecondBrain operations Git identity
+  ansible.builtin.command:
+    argv:
+      - git
+      - -C
+      - "{{ secondbrain_ops_dir }}"
+      - config
+      - "{{ item.key }}"
+      - "{{ item.value }}"
+  loop:
+    - { key: user.name, value: SecondBrain Ops }
+    - { key: user.email, value: secondbrain@localhost }
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - secondbrain_ops_git_enabled | bool
+
+- name: Detect SecondBrain operations Git changes
+  ansible.builtin.command:
+    argv:
+      - git
+      - -C
+      - "{{ secondbrain_ops_dir }}"
+      - status
+      - --porcelain
+  register: secondbrain_ops_git_status
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - secondbrain_ops_git_enabled | bool
+
+- name: Commit SecondBrain operations state
+  ansible.builtin.shell: |
+    set -eu
+    git -C {{ secondbrain_ops_dir | quote }} add --all
+    git -C {{ secondbrain_ops_dir | quote }} commit -m "chore: update SecondBrain operations"
+  args:
+    executable: /bin/bash
+  when:
+    - not ansible_check_mode
+    - secondbrain_ops_git_enabled | bool
+    - secondbrain_ops_git_status.stdout | length > 0
+
+- name: Run initial SecondBrain backup to both repositories
+  ansible.builtin.command:
+    argv:
+      - "{{ secondbrain_ops_dir }}/bin/secondbrain-backup"
+  register: secondbrain_initial_backup
+  changed_when: true
+  when: not ansible_check_mode
+
+- name: Run non-destructive SSD restore test
+  ansible.builtin.command:
+    argv:
+      - "{{ secondbrain_ops_dir }}/bin/secondbrain-restore-test"
+      - ssd
+      - latest
+  register: secondbrain_restore_test
+  changed_when: false
+  when: not ansible_check_mode

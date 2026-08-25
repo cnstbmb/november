@@ -1,0 +1,61 @@
+services:
+  rkllm:
+    platform: "{{ home_ai_platform }}"
+    build:
+      context: ./runtime
+    image: november/rkllm-runtime:1.3.0
+    restart: unless-stopped
+    user: "10001:{{ home_ai_render_gid }}"
+    group_add:
+      - "{{ home_ai_render_gid }}"
+      - "{{ home_ai_video_gid }}"
+    devices:
+      - "{{ home_ai_rknpu_device }}:{{ home_ai_rknpu_device }}"
+      - "{{ home_ai_rknpu_control_device }}:{{ home_ai_rknpu_control_device }}"
+    environment:
+      RKLLM_MAX_CONTEXT: "{{ home_ai_rkllm_context_length }}"
+      RKLLM_MAX_NEW_TOKENS: "{{ home_ai_rkllm_max_new_tokens }}"
+    volumes:
+      - ./models:/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - inference
+
+  bot:
+    platform: "{{ home_ai_platform }}"
+    build:
+      context: ./bot-src
+    image: november/home-ai-bot:1.0.0
+    restart: unless-stopped
+    user: "{{ home_ai_bot_uid }}:{{ home_ai_bot_gid }}"
+    depends_on:
+      - rkllm
+    env_file:
+      - ./home-ai.env
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./data:/data
+      - ./secrets:/run/secrets:ro
+      - "{{ home_ai_action_broker_socket }}:{{ home_ai_action_broker_socket }}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - inference
+      - egress
+
+networks:
+  inference:
+    internal: true
+  egress: {}

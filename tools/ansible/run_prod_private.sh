@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-INVENTORY_PATH="${ROOT_DIR}/.private/ansible/prod/hosts.yml"
+INVENTORY_PATH="${ANSIBLE_INVENTORY_PATH:-${ROOT_DIR}/.private/ansible/prod/hosts.yml}"
 PLAYBOOK_PATH="${ROOT_DIR}/infra/ansible/playbooks/site.yml"
 ANSIBLE_CONFIG_DEFAULT="${ROOT_DIR}/ansible.cfg"
 ROLES_PATH_DEFAULT="${ROOT_DIR}/infra/ansible/roles"
@@ -13,6 +13,8 @@ MENU_MODE=false
 ASK_BECOME_PASS=false
 LIMIT_TARGET=""
 TAGS_TARGET=""
+EXTRA_VARS=()
+EXTRA_VARS_COUNT=0
 
 detect_pkcs11_provider() {
   if [ -n "${ANSIBLE_PKCS11_PROVIDER:-}" ]; then
@@ -76,11 +78,12 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
-  --playbook <value>     site | base | firewall | master | workers | stremio | monitoring | monitoring-agent | backups | tonem-analytics | remnawave-panel | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | firewall | master | workers | stremio | home-ai | monitoring | monitoring-agent | backups | tonem-analytics | remnawave-panel | remnawave-home-squad | remnawave-home-xhttp | remnawave-tonem-xhttp-master | remnawave-tonem-xhttp-edge | home-router-exit-bypass | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
   --tags <pattern>       Ограничить запуск Ansible tags
+  -e, --extra-vars <v>   Передать extra vars в ansible-playbook (можно повторять)
   -h, --help             Показать помощь
 EOF
 }
@@ -94,11 +97,17 @@ resolve_playbook() {
     master) echo "${ROOT_DIR}/infra/ansible/playbooks/master.yml" ;;
     workers) echo "${ROOT_DIR}/infra/ansible/playbooks/workers.yml" ;;
     stremio) echo "${ROOT_DIR}/infra/ansible/playbooks/stremio.yml" ;;
+    home-ai) echo "${ROOT_DIR}/infra/ansible/playbooks/home-ai.yml" ;;
     monitoring) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring.yml" ;;
     monitoring-agent) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring-agent.yml" ;;
     backups) echo "${ROOT_DIR}/infra/ansible/playbooks/backups.yml" ;;
     tonem-analytics) echo "${ROOT_DIR}/infra/ansible/playbooks/tonem-analytics.yml" ;;
     remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
+    remnawave-home-squad) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-home-squad.yml" ;;
+    remnawave-home-xhttp) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-home-xhttp.yml" ;;
+    remnawave-tonem-xhttp-master) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-tonem-xhttp-master.yml" ;;
+    remnawave-tonem-xhttp-edge) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-tonem-xhttp-edge.yml" ;;
+    home-router-exit-bypass) echo "${ROOT_DIR}/infra/ansible/playbooks/home-router-exit-bypass.yml" ;;
     remnashop) echo "${ROOT_DIR}/infra/ansible/playbooks/remnashop.yml" ;;
     adguard-home) echo "${ROOT_DIR}/infra/ansible/playbooks/adguard-home.yml" ;;
     migration-prepare) echo "${ROOT_DIR}/infra/ansible/playbooks/migration-prepare.yml" ;;
@@ -159,6 +168,15 @@ while [ "$#" -gt 0 ]; do
         exit 1
       fi
       TAGS_TARGET="$2"
+      shift 2
+      ;;
+    -e|--extra-vars)
+      if [ "$#" -lt 2 ]; then
+        echo "Missing value for --extra-vars"
+        exit 1
+      fi
+      EXTRA_VARS[${EXTRA_VARS_COUNT}]="$2"
+      EXTRA_VARS_COUNT=$((EXTRA_VARS_COUNT + 1))
       shift 2
       ;;
     --playbook)
@@ -245,6 +263,12 @@ fi
 if [ -n "${TAGS_TARGET}" ]; then
   cmd+=(--tags "${TAGS_TARGET}")
 fi
+
+extra_vars_index=0
+while [ "${extra_vars_index}" -lt "${EXTRA_VARS_COUNT}" ]; do
+  cmd+=(--extra-vars "${EXTRA_VARS[${extra_vars_index}]}")
+  extra_vars_index=$((extra_vars_index + 1))
+done
 
 if [ "${ASK_BECOME_PASS}" = "true" ]; then
   cmd+=(--ask-become-pass)

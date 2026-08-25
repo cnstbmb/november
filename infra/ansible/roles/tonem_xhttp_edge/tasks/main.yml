@@ -1,0 +1,330 @@
+- name: Resolve TONEM XHTTP edge paths
+  ansible.builtin.set_fact:
+    tonem_xhttp_edge_compose_file: "{{ tonem_xhttp_edge_dir }}/docker-compose.yml"
+    tonem_xhttp_edge_rollback_override_file: "{{ tonem_xhttp_edge_dir }}/docker-compose.tonem-xhttp-rollback.yml"
+    tonem_xhttp_edge_nginx_file: "{{ tonem_xhttp_edge_dir }}/nginx.conf"
+    tonem_xhttp_edge_analytics_config_file: "{{ tonem_xhttp_edge_dir }}/analytics-config.js"
+
+- name: Validate TONEM XHTTP edge settings
+  ansible.builtin.assert:
+    that:
+      - tonem_xhttp_edge_domain is match('^[a-z0-9][a-z0-9.-]+[a-z0-9]$')
+      - tonem_xhttp_edge_domain not in ['tonem.ru', 'www.tonem.ru', 'live.tonem.ru']
+      - tonem_xhttp_edge_locations | length > 0
+      - tonem_xhttp_edge_image | length > 0
+      - letsencrypt_email | default('') | length > 0
+    fail_msg: "Configure an edge TONEM subdomain, image, XHTTP locations, and letsencrypt_email."
+
+- name: Validate private TONEM XHTTP edge locations
+  ansible.builtin.assert:
+    that:
+      - item.path is match('^/assets/[A-Za-z0-9_-]{' ~ (tonem_xhttp_edge_min_path_token_length | string) ~ ',}/$')
+      - (item.proxy_protocol | default('http')) in ['grpc', 'http']
+      - item.upstream is match('^127\.0\.0\.1:[0-9]{2,5}$')
+    fail_msg: "Edge XHTTP locations require a high-entropy asset path and loopback-only upstream."
+  loop: "{{ tonem_xhttp_edge_locations }}"
+  no_log: true
+
+- name: Validate legacy XHTTP vhosts retained during overlap
+  ansible.builtin.assert:
+    that:
+      - item.domain is match('^[a-z0-9][a-z0-9.-]+[a-z0-9]$')
+      - (item.cert_name | default(item.domain)) | length > 0
+    fail_msg: "Each legacy cover vhost requires a domain and certificate."
+  loop: "{{ tonem_xhttp_edge_legacy_vhosts }}"
+  no_log: true
+
+- name: Validate private legacy XHTTP locations
+  ansible.builtin.assert:
+    that:
+      - item.1.path is match('^/[A-Za-z0-9._~!$&()*+,;=:@%/-]+$')
+      - (item.1.proxy_protocol | default('http')) in ['grpc', 'http']
+      - item.1.upstream is match('^127\.0\.0\.1:[0-9]{2,5}$')
+    fail_msg: "Legacy overlap locations must remain local and syntactically valid."
+  loop: "{{ tonem_xhttp_edge_legacy_vhosts | subelements('locations') }}"
+  no_log: true
+
+- name: Ensure TONEM XHTTP edge directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ tonem_xhttp_edge_dir }}"
+    - "{{ tonem_xhttp_edge_acme_dir }}/.well-known/acme-challenge"
+
+- name: Allow public HTTP and HTTPS for TONEM XHTTP edge
+  ansible.builtin.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "80"
+    - "443"
+
+- name: Render TONEM XHTTP edge compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ tonem_xhttp_edge_compose_file }}"
+    mode: "0644"
+    backup: true
+  register: tonem_xhttp_edge_compose_rendered
+
+- name: Disable analytics and telemetry in TONEM XHTTP edge runtime
+  ansible.builtin.template:
+    src: analytics-config.js.j2
+    dest: "{{ tonem_xhttp_edge_analytics_config_file }}"
+    mode: "0644"
+
+- name: Render TONEM XHTTP edge rollback image override
+  ansible.builtin.template:
+    src: docker-compose.rollback.yml.j2
+    dest: "{{ tonem_xhttp_edge_rollback_override_file }}"
+    mode: "0644"
+
+- name: Check TONEM XHTTP edge certificate
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ tonem_xhttp_edge_cert_name }}/fullchain.pem"
+  register: tonem_xhttp_edge_certificate
+
+- name: Check legacy overlap certificates
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ item.cert_name | default(item.domain) }}/fullchain.pem"
+  loop: "{{ tonem_xhttp_edge_legacy_vhosts }}"
+  register: tonem_xhttp_edge_legacy_certificates
+  no_log: true
+
+- name: Check legacy overlap private keys
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ item.cert_name | default(item.domain) }}/privkey.pem"
+  loop: "{{ tonem_xhttp_edge_legacy_vhosts }}"
+  register: tonem_xhttp_edge_legacy_private_keys
+  no_log: true
+
+- name: Validate legacy overlap certificates exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "A legacy overlap certificate is missing; refusing a cutover that would break saved links."
+  loop: "{{ tonem_xhttp_edge_legacy_certificates.results | default([]) }}"
+  no_log: true
+
+- name: Validate legacy overlap private keys exist
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "A legacy overlap private key is missing; refusing a cutover that would break saved links."
+  loop: "{{ tonem_xhttp_edge_legacy_private_keys.results | default([]) }}"
+  no_log: true
+
+- name: Inspect previous TONEM XHTTP edge image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{% raw %}{{.Image}}{% endraw %}"
+      - "{{ tonem_xhttp_edge_container_name }}"
+  register: tonem_xhttp_edge_previous_image
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Pull latest configured TONEM XHTTP edge image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - pull
+      - "{{ tonem_xhttp_edge_image }}"
+  register: tonem_xhttp_edge_pull
+  changed_when: "'Downloaded newer image' in tonem_xhttp_edge_pull.stdout"
+  when: not ansible_check_mode
+
+- name: Bootstrap TONEM XHTTP edge HTTP-01 endpoint
+  when:
+    - not tonem_xhttp_edge_certificate.stat.exists
+    - not ansible_check_mode
+  block:
+    - name: Render HTTP-only TONEM XHTTP edge vhost
+      ansible.builtin.template:
+        src: bootstrap-nginx.conf.j2
+        dest: "{{ tonem_xhttp_edge_nginx_file }}"
+        mode: "0644"
+        backup: true
+      register: tonem_xhttp_edge_bootstrap_rendered
+
+    - name: Start HTTP-only TONEM XHTTP edge container
+      ansible.builtin.command:
+        cmd: docker compose --project-name {{ tonem_xhttp_edge_project_name }} up -d --force-recreate --pull never
+        chdir: "{{ tonem_xhttp_edge_dir }}"
+      environment:
+        TONEM_XHTTP_IMAGE: "{{ tonem_xhttp_edge_image }}"
+      changed_when: true
+
+    - name: Validate HTTP-only TONEM XHTTP edge vhost
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - "{{ tonem_xhttp_edge_container_name }}"
+          - nginx
+          - -t
+      changed_when: false
+
+    - name: Obtain TONEM XHTTP edge certificate with HTTP-01
+      ansible.builtin.command:
+        argv:
+          - certbot
+          - certonly
+          - --webroot
+          - --webroot-path
+          - "{{ tonem_xhttp_edge_acme_dir }}"
+          - --cert-name
+          - "{{ tonem_xhttp_edge_cert_name }}"
+          - --non-interactive
+          - --agree-tos
+          - --keep-until-expiring
+          - -m
+          - "{{ letsencrypt_email }}"
+          - -d
+          - "{{ tonem_xhttp_edge_domain }}"
+      no_log: true
+
+- name: Render full TONEM XHTTP edge vhost
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ tonem_xhttp_edge_nginx_file }}"
+    mode: "0600"
+    backup: true
+  register: tonem_xhttp_edge_nginx_rendered
+  no_log: true
+
+- name: Deploy and health-gate TONEM XHTTP edge
+  when: not ansible_check_mode
+  block:
+    - name: Start full TONEM XHTTP edge container
+      ansible.builtin.command:
+        cmd: docker compose --project-name {{ tonem_xhttp_edge_project_name }} up -d --force-recreate --pull never
+        chdir: "{{ tonem_xhttp_edge_dir }}"
+      environment:
+        TONEM_XHTTP_IMAGE: "{{ tonem_xhttp_edge_image }}"
+      changed_when: true
+
+    - name: Validate full TONEM XHTTP edge nginx configuration
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - "{{ tonem_xhttp_edge_container_name }}"
+          - nginx
+          - -t
+      changed_when: false
+
+    - name: Verify TONEM XHTTP edge facade over public TLS
+      ansible.builtin.uri:
+        url: "https://{{ tonem_xhttp_edge_domain }}/"
+        method: GET
+        return_content: true
+        validate_certs: true
+        status_code: 200
+      register: tonem_xhttp_edge_facade
+      retries: 6
+      delay: 5
+      until: tonem_xhttp_edge_facade.status == 200
+
+    - name: Validate TONEM XHTTP edge facade privacy markers
+      ansible.builtin.assert:
+        that:
+          - "'noindex' in (tonem_xhttp_edge_facade.x_robots_tag | default(''))"
+          - "'<link rel=\"canonical\" href=\"https://tonem.ru/\">' in tonem_xhttp_edge_facade.content"
+        fail_msg: "TONEM XHTTP edge facade is missing noindex or the canonical apex URL."
+
+    - name: Verify TONEM XHTTP edge tracking endpoints stay disabled
+      ansible.builtin.uri:
+        url: "https://{{ tonem_xhttp_edge_domain }}{{ item }}"
+        method: GET
+        return_content: false
+        validate_certs: true
+        status_code: 404
+      loop:
+        - /client-telemetry
+        - /analytics/script.js
+
+    - name: Verify exact central API CORS for TONEM XHTTP edge
+      ansible.builtin.uri:
+        url: "https://api.tonem.ru/live"
+        method: GET
+        headers:
+          Origin: "https://{{ tonem_xhttp_edge_domain }}"
+        return_content: false
+        validate_certs: true
+        status_code: 200
+      register: tonem_xhttp_edge_cors
+
+    - name: Validate exact central API CORS response for TONEM XHTTP edge
+      ansible.builtin.assert:
+        that:
+          - tonem_xhttp_edge_cors.access_control_allow_origin == 'https://' ~ tonem_xhttp_edge_domain
+        fail_msg: "api.tonem.ru did not return the exact edge facade CORS origin."
+  rescue:
+    - name: Restore pre-bootstrap TONEM XHTTP edge nginx configuration
+      ansible.builtin.copy:
+        src: "{{ tonem_xhttp_edge_bootstrap_rendered.backup_file }}"
+        dest: "{{ tonem_xhttp_edge_nginx_file }}"
+        remote_src: true
+        mode: preserve
+      when:
+        - tonem_xhttp_edge_bootstrap_rendered is defined
+        - tonem_xhttp_edge_bootstrap_rendered.backup_file | default('') | length > 0
+
+    - name: Restore previous TONEM XHTTP edge nginx configuration
+      ansible.builtin.copy:
+        src: "{{ tonem_xhttp_edge_nginx_rendered.backup_file }}"
+        dest: "{{ tonem_xhttp_edge_nginx_file }}"
+        remote_src: true
+        mode: preserve
+      when:
+        - tonem_xhttp_edge_bootstrap_rendered is not defined or tonem_xhttp_edge_bootstrap_rendered.backup_file | default('') | length == 0
+        - tonem_xhttp_edge_nginx_rendered.backup_file | default('') | length > 0
+
+    - name: Restore previous TONEM XHTTP edge compose file
+      ansible.builtin.copy:
+        src: "{{ tonem_xhttp_edge_compose_rendered.backup_file }}"
+        dest: "{{ tonem_xhttp_edge_compose_file }}"
+        remote_src: true
+        mode: preserve
+      when: tonem_xhttp_edge_compose_rendered.backup_file | default('') | length > 0
+
+    - name: Tag previous TONEM XHTTP edge image for rollback
+      ansible.builtin.command:
+        argv:
+          - docker
+          - tag
+          - "{{ tonem_xhttp_edge_previous_image.stdout }}"
+          - local/tonem-xhttp-edge:rollback
+      when: tonem_xhttp_edge_previous_image.rc | default(1) == 0
+      changed_when: true
+
+    - name: Restore previous TONEM XHTTP edge image
+      ansible.builtin.command:
+        cmd: >-
+          docker compose -f docker-compose.yml -f docker-compose.tonem-xhttp-rollback.yml
+          --project-name {{ tonem_xhttp_edge_project_name }}
+          up -d --force-recreate --pull never
+        chdir: "{{ tonem_xhttp_edge_dir }}"
+      environment:
+        TONEM_XHTTP_IMAGE: "local/tonem-xhttp-edge:rollback"
+      when: tonem_xhttp_edge_previous_image.rc | default(1) == 0
+      changed_when: true
+
+    - name: Stop rollout after TONEM XHTTP edge health-gate failure
+      ansible.builtin.fail:
+        msg: >-
+          TONEM XHTTP edge failed nginx/TLS health gates.
+          The previous image was restored when one was available.
+
+- name: Install TONEM XHTTP edge certificate reload hook
+  ansible.builtin.template:
+    src: reload-certificate.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/reload-tonem-xhttp-edge.sh
+    mode: "0755"

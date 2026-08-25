@@ -13,6 +13,26 @@ def clean_dict(value):
     return {key: item for key, item in value.items() if item is not None}
 
 
+def build_home_squad(home_exit):
+    if not home_exit:
+        return None
+    inbound = (
+        "VLESS_HOME_REALITY_DIRECT"
+        if public_client_enabled(home_exit)
+        else "BRIDGE_HOME_RU_IN"
+    )
+    return {"name": "HOME", "inbounds": [inbound]}
+
+
+def build_home_monitoring_squad(home_exit):
+    if not public_client_enabled(home_exit):
+        return None
+    return {
+        "name": "HOME Monitoring Squad",
+        "inbounds": ["VLESS_HOME_REALITY_DIRECT"],
+    }
+
+
 def emit_yaml(value, indent=0):
     pad = "  " * indent
     if isinstance(value, dict):
@@ -135,18 +155,23 @@ def build_entry_inbound(entry):
     }
 
     if entry.get("client_transport") in ("xhttp_tls", "xhttp_nginx_tls"):
+        client_transport = entry.get("client_transport")
         cert_domain = entry.get("client_cert_domain", entry["host"])
         inbound["port"] = int(entry.get("client_backend_port", entry["public_port"]))
         inbound["listen"] = entry.get("client_backend_listen", "0.0.0.0")
         xhttp_settings = {
-            "host": entry.get("client_host", entry["host"]),
+            "host": (
+                entry.get("client_backend_host", "")
+                if client_transport == "xhttp_nginx_tls"
+                else entry.get("client_host", entry["host"])
+            ),
             "mode": entry.get("client_mode", "stream-one"),
             "path": entry["client_path"],
             "scMaxBufferedPosts": 30,
             "scMaxEachPostBytes": "1000000",
             "scStreamUpServerSecs": "20-80",
         }
-        if entry.get("client_transport") == "xhttp_nginx_tls":
+        if client_transport == "xhttp_nginx_tls":
             inbound["streamSettings"] = {
                 "network": "xhttp",
                 "security": "none",
@@ -219,18 +244,23 @@ def build_direct_client_inbound(node, tag):
     }
 
     if node.get("client_transport") in ("xhttp_tls", "xhttp_nginx_tls"):
+        client_transport = node.get("client_transport")
         cert_domain = node.get("client_cert_domain", node["cert_domain"])
         inbound["port"] = int(node.get("client_backend_port", node["public_port"]))
         inbound["listen"] = node.get("client_backend_listen", "0.0.0.0")
         xhttp_settings = {
-            "host": node.get("client_host", node["cert_domain"]),
+            "host": (
+                node.get("client_backend_host", "")
+                if client_transport == "xhttp_nginx_tls"
+                else node.get("client_host", node["cert_domain"])
+            ),
             "mode": node.get("client_mode", "stream-one"),
             "path": node["client_path"],
             "scMaxBufferedPosts": 30,
             "scMaxEachPostBytes": "1000000",
             "scStreamUpServerSecs": "20-80",
         }
-        if node.get("client_transport") == "xhttp_nginx_tls":
+        if client_transport == "xhttp_nginx_tls":
             inbound["streamSettings"] = {
                 "network": "xhttp",
                 "security": "none",
@@ -1378,6 +1408,7 @@ def main():
                         {
                             "path": entry["client_path"],
                             "upstream": f"{entry.get('client_backend_listen', '127.0.0.1')}:{int(entry['client_backend_port'])}",
+                            "proxy_protocol": "http" if entry.get("client_mode") == "packet-up" else "grpc",
                         }
                     ],
                 }
@@ -1394,6 +1425,7 @@ def main():
                         {
                             "path": exit_node["client_path"],
                             "upstream": f"{exit_node.get('client_backend_listen', '127.0.0.1')}:{int(exit_node['client_backend_port'])}",
+                            "proxy_protocol": "http" if exit_node.get("client_mode") == "packet-up" else "grpc",
                         }
                     ],
                 }
@@ -1410,6 +1442,7 @@ def main():
                         {
                             "path": home_exit["client_path"],
                             "upstream": f"{home_exit.get('client_backend_listen', '127.0.0.1')}:{int(home_exit['client_backend_port'])}",
+                            "proxy_protocol": "http" if home_exit.get("client_mode") == "packet-up" else "grpc",
                         }
                     ],
                 }
@@ -1491,6 +1524,7 @@ def main():
             "security": "tls",
             "server_names": [home_exit.get("client_host", home_exit["cert_domain"])],
             "path": home_exit["client_path"],
+            "mode": home_exit.get("client_mode", "stream-one"),
         }
         if home_exit_xhttp_client
         else (
@@ -1623,24 +1657,31 @@ def main():
                 exit_host_data,
             ]
         ),
-        "squads": [
-            {"name": "Public Squad", "inbounds": public_squad_inbounds},
-            {
-                "name": "Direct Exit Squad",
-                "inbounds": clean_list(
-                    [
-                        "VLESS_REALITY_DIRECT_MSK" if direct_msk else None,
-                        "VLESS_REALITY_DIRECT",
-                    ]
-                    + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else [])
-                ),
-            },
-            {"name": "Bridge Master Squad", "inbounds": ["BRIDGE_MASTER_IN"]},
-            {
-                "name": "Bridge Exit Squad",
-                "inbounds": clean_list(["BRIDGE_EXIT_IN"] + (["BRIDGE_HOME_RU_IN"] if home_exit else [])),
-            },
-        ],
+        "squads": clean_list(
+            [
+                {"name": "Public Squad", "inbounds": public_squad_inbounds},
+                {
+                    "name": "Direct Exit Squad",
+                    "inbounds": clean_list(
+                        [
+                            "VLESS_REALITY_DIRECT_MSK" if direct_msk else None,
+                            "VLESS_REALITY_DIRECT",
+                        ]
+                        + (["VLESS_REALITY_DIRECT_EXIT"] if direct_exit else [])
+                    ),
+                },
+                {"name": "Bridge Master Squad", "inbounds": ["BRIDGE_MASTER_IN"]},
+                {
+                    "name": "Bridge Exit Squad",
+                    "inbounds": clean_list(
+                        ["BRIDGE_EXIT_IN"]
+                        + (["BRIDGE_HOME_RU_IN"] if home_exit else [])
+                    ),
+                },
+                build_home_squad(home_exit),
+                build_home_monitoring_squad(home_exit),
+            ]
+        ),
         "system_users": [
             {
                 "username": "bridge_entry_to_master",
@@ -1693,7 +1734,6 @@ def main():
     }
     if home_exit_public:
         topology_data["hosts"].append(home_exit_host_data)
-        topology_data["squads"][1]["inbounds"].append("VLESS_HOME_REALITY_DIRECT")
         topology_data["client_values"].append(home_exit_client_values)
     if xhttp_moscow and not xhttp_moscow_replaces_reality:
         topology_data["hosts"].insert(

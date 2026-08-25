@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVICE_DIR={{ secondbrain_service_dir | quote }}
+OPS_DIR={{ secondbrain_ops_dir | quote }}
+ENV_FILE="${SERVICE_DIR}/.env"
+PASSWORD_FILE={{ (secondbrain_backup_config_dir + '/restic-password') | quote }}
+SSD_REPO={{ secondbrain_ssd_backup_repo | quote }}
+HDD_REPO={{ secondbrain_hdd_backup_repo | quote }}
+MIN_FREE_KIB=$(({{ secondbrain_backup_min_free_gib }} * 1024 * 1024))
+LOCK_FILE=/run/lock/secondbrain-backup.lock
+
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "Another SecondBrain backup is already running." >&2
+  exit 75
+fi
+
+require_mount() {
+  local mount="$1"
+  local free_kib
+  mountpoint -q "${mount}" || {
+    echo "Required mount is absent: ${mount}" >&2
+    exit 1
+  }
+  free_kib="$(df -Pk "${mount}" | awk 'NR == 2 {print $4}')"
+  if [[ -z "${free_kib}" || "${free_kib}" -lt "${MIN_FREE_KIB}" ]]; then
+    echo "Insufficient free space on ${mount}: ${free_kib:-unknown} KiB" >&2
+    exit 1
+  fi
+}
+
+require_mount /mnt/ssd
+require_mount /mnt/hdd
+
+set -a
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+set +a
+
+compose() {
+  docker compose --project-directory "${SERVICE_DIR}" --env-file "${ENV_FILE}" "$@"
+}
+
+healthy() {
+  curl --fail --silent --show-error \
+    --user "${COUCHDB_USER}:${COUCHDB_PASSWORD}" \
+    http://127.0.0.1:5984/_up | grep -q '"status":"ok"'
+}
+
+wait_healthy() {
+  local attempt
+  for attempt in $(seq 1 60); do
+    healthy && return 0
+    sleep 2
+  done
+  echo "CouchDB did not become healthy." >&2
+  return 1
+}
+
+stopped=0
+restart_couchdb() {
+  if [[ "${stopped}" -eq 1 ]]; then
+    compose up -d couchdb >/dev/null
+    wait_healthy
+    stopped=0
+  fi
+}
+trap restart_couchdb EXIT INT TERM
+
+healthy || {
+  echo "CouchDB is unhealthy before backup." >&2
+  exit 1
+}
+
+compose stop -t 30 couchdb
+stopped=1
+
+timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+successful_repos=()
+backup_failed=0
+
+backup_repo() {
+  local repo="$1"
+  if [[ ! -f "${repo}/config" ]]; then
+    RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" restic init
+  fi
+  if RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" \
+      restic backup "${SERVICE_DIR}" "${OPS_DIR}" \
+        --tag secondbrain --tag "${timestamp}" --host "$(hostname)"; then
+    successful_repos+=("${repo}")
+  else
+    backup_failed=1
+  fi
+}
+
+backup_repo "${SSD_REPO}"
+backup_repo "${HDD_REPO}"
+
+restart_couchdb
+
+for repo in "${successful_repos[@]}"; do
+  RESTIC_REPOSITORY="${repo}" RESTIC_PASSWORD_FILE="${PASSWORD_FILE}" \
+    restic forget --prune \
+      --keep-daily {{ secondbrain_backup_keep_daily }} \
+      --keep-weekly {{ secondbrain_backup_keep_weekly }} \
+      --keep-monthly {{ secondbrain_backup_keep_monthly }}
+done
+
+if [[ "${backup_failed}" -ne 0 ]]; then
+  echo "At least one SecondBrain backup repository failed." >&2
+  exit 1
+fi
+
+echo "SecondBrain backup completed for SSD and HDD."
+

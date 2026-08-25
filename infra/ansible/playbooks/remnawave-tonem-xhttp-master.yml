@@ -1,0 +1,29 @@
+- name: Deploy Moscow TONEM XHTTP facade
+  hosts: master
+  gather_facts: true
+  become: true
+  vars:
+    remnawave_tonem_xhttp_private_file: "{{ playbook_dir }}/../../../.private/ansible/prod/remnawave-tonem-xhttp.json"
+  pre_tasks:
+    - name: Load private TONEM XHTTP migration state
+      ansible.builtin.set_fact:
+        remnawave_tonem_xhttp_private: "{{ lookup('ansible.builtin.file', remnawave_tonem_xhttp_private_file) | from_json }}"
+      no_log: true
+
+    - name: Select Moscow TONEM XHTTP target
+      ansible.builtin.set_fact:
+        remnawave_tonem_xhttp_target: "{{ remnawave_tonem_xhttp_private.targets.moscow }}"
+      no_log: true
+
+  roles:
+    - role: remnawave_tonem_xhttp_master
+      vars:
+        remnawave_tonem_xhttp_domain: "{{ remnawave_tonem_xhttp_target.domain }}"
+        remnawave_tonem_xhttp_image: "{{ remnawave_tonem_xhttp_target.image }}"
+        remnawave_tonem_xhttp_docker_bridge_cidr: "{{ remnawave_tonem_xhttp_target.dockerBridgeCidr }}"
+        remnawave_tonem_xhttp_backend_ports:
+          - "{{ remnawave_tonem_xhttp_target.backendPort }}"
+        remnawave_tonem_xhttp_locations:
+          - path: "{{ remnawave_tonem_xhttp_target.path }}"
+            upstream: "{{ remnawave_tonem_xhttp_target.nginxUpstream }}"
+            proxy_protocol: "{{ remnawave_tonem_xhttp_target.proxyProtocol }}"

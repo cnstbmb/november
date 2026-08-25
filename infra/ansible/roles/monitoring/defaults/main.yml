@@ -65,8 +65,8 @@ monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(fa
 monitoring_home_node_name: ""
 monitoring_home_node_enabled: "{{ (monitoring_home_node_name | length > 0) and (monitoring_home_node_name in hostvars) }}"
 monitoring_home_node_alerting_enabled: false
-monitoring_home_node_temperature_warning_celsius: 70
-monitoring_home_node_temperature_critical_celsius: 80
+monitoring_home_node_temperature_warning_celsius: 65
+monitoring_home_node_temperature_critical_celsius: 72
 monitoring_home_node_memory_warning_percent: 85
 monitoring_home_node_memory_critical_percent: 95
 monitoring_home_node_disk_free_warning_percent: 15

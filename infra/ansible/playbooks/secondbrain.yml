@@ -1,0 +1,7 @@
+- name: Obsidian SecondBrain infrastructure
+  hosts: home_node:stremio
+  become: true
+  gather_facts: true
+  roles:
+    - role: secondbrain
+

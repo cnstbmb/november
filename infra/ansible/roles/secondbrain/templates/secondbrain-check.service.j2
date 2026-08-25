@@ -1,0 +1,10 @@
+[Unit]
+Description=SecondBrain restic integrity check
+RequiresMountsFor=/mnt/ssd /mnt/hdd
+
+[Service]
+Type=oneshot
+ExecStart={{ secondbrain_ops_dir }}/bin/secondbrain-check
+Nice=15
+IOSchedulingClass=idle
+

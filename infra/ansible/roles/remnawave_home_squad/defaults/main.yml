@@ -1,0 +1,8 @@
+remnawave_home_squad_api_base: "https://panel.moscow.himenkov.ru/api"
+remnawave_home_squad_api_token: ""
+remnawave_home_squad_token_env_file: "{{ playbook_dir }}/../../../.private/ansible/prod/remnashop/.env"
+remnawave_home_squad_name: "HOME"
+remnawave_home_squad_bridge_name: "Bridge Exit Squad"
+remnawave_home_squad_host_remark: "HOME"
+remnawave_home_squad_inbound_tag: "VLESS_HOME_REALITY_DIRECT"
+remnawave_home_squad_port: 443

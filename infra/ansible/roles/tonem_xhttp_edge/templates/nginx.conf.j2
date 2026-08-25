@@ -1,0 +1,220 @@
+{% macro noindex_headers() -%}
+        add_header X-Robots-Tag "noindex, nofollow" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+{%- endmacro %}
+
+{% macro render_xhttp_locations() -%}
+{% for xhttp_location in tonem_xhttp_edge_locations %}
+    location {{ xhttp_location.path }} {
+        access_log off;
+{% if xhttp_location.proxy_protocol | default('http') == 'http' %}
+        client_max_body_size {{ xhttp_location.client_max_body_size | default('2m') }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_redirect off;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout {{ xhttp_location.read_timeout | default('3600s') }};
+        proxy_send_timeout {{ xhttp_location.send_timeout | default('3600s') }};
+        proxy_pass http://{{ xhttp_location.upstream }};
+{% else %}
+        client_max_body_size 0;
+        client_body_timeout {{ xhttp_location.client_body_timeout | default('5m') }};
+        grpc_read_timeout {{ xhttp_location.read_timeout | default('315s') }};
+        grpc_send_timeout {{ xhttp_location.send_timeout | default('5m') }};
+        grpc_socket_keepalive on;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP "";
+        grpc_set_header X-Forwarded-For "";
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_pass grpc://{{ xhttp_location.upstream }};
+{% endif %}
+    }
+
+{% endfor %}
+{%- endmacro %}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ tonem_xhttp_edge_domain }};
+    access_log off;
+    error_log /dev/null crit;
+    server_tokens off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/tonem-xhttp-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+{% for legacy_vhost in tonem_xhttp_edge_legacy_vhosts %}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ legacy_vhost.domain }};
+    access_log off;
+    error_log /dev/null crit;
+    server_tokens off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/tonem-xhttp-acme;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ legacy_vhost.domain }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ legacy_vhost.cert_name | default(legacy_vhost.domain) }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ legacy_vhost.cert_name | default(legacy_vhost.domain) }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    server_tokens off;
+    access_log off;
+    error_log /dev/null crit;
+
+{% for xhttp_location in legacy_vhost.locations %}
+    location {{ xhttp_location.path }} {
+        access_log off;
+{% if xhttp_location.proxy_protocol | default('http') == 'http' %}
+        client_max_body_size {{ xhttp_location.client_max_body_size | default('2m') }};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection "";
+        proxy_redirect off;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout {{ xhttp_location.read_timeout | default('3600s') }};
+        proxy_send_timeout {{ xhttp_location.send_timeout | default('3600s') }};
+        proxy_pass http://{{ xhttp_location.upstream }};
+{% else %}
+        client_max_body_size 0;
+        client_body_timeout {{ xhttp_location.client_body_timeout | default('5m') }};
+        grpc_read_timeout {{ xhttp_location.read_timeout | default('315s') }};
+        grpc_send_timeout {{ xhttp_location.send_timeout | default('5m') }};
+        grpc_socket_keepalive on;
+        grpc_set_header Host $host;
+        grpc_set_header X-Real-IP "";
+        grpc_set_header X-Forwarded-For "";
+        grpc_set_header X-Forwarded-Proto $scheme;
+        grpc_pass grpc://{{ xhttp_location.upstream }};
+{% endif %}
+    }
+
+{% endfor %}
+    location / {
+        return 302 https://tonem.ru/;
+    }
+}
+{% endfor %}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name {{ tonem_xhttp_edge_domain }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ tonem_xhttp_edge_cert_name }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ tonem_xhttp_edge_cert_name }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+    access_log off;
+    error_log /dev/null crit;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml image/svg+xml;
+
+{{ render_xhttp_locations() }}
+    location = /client-telemetry {
+{{ noindex_headers() }}
+        return 404;
+    }
+
+    location ^~ /analytics/ {
+{{ noindex_headers() }}
+        return 404;
+    }
+
+    location = /index.html {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location = /ngsw-worker.js {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Service-Worker-Allowed "/" always;
+        try_files $uri =404;
+    }
+
+    location = /safety-worker.js {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location = /worker-basic.min.js {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location = /ngsw.json {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location = /manifest.webmanifest {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache" always;
+        try_files $uri =404;
+    }
+
+    location = /analytics-config.js {
+{{ noindex_headers() }}
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files $uri =404;
+    }
+
+    location ~* \.(?:js|css|png|jpg|jpeg|gif|webp|avif|ico|svg|woff2?|ttf|otf|eot)$ {
+{{ noindex_headers() }}
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    location / {
+{{ noindex_headers() }}
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -1,0 +1,6 @@
+- name: Deploy HOME XHTTP transport and landing
+  hosts: home.himenkov.ru
+  gather_facts: true
+  become: true
+  roles:
+    - remnawave_home_xhttp

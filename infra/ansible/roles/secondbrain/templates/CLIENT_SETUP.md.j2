@@ -1,0 +1,17 @@
+# Client setup
+
+- URI: `https://{{ secondbrain_domain }}:{{ secondbrain_https_port }}`
+- Username: `{{ secondbrain_couchdb_user }}`
+- Database: `{{ secondbrain_couchdb_database }}`
+- CouchDB password: root-only server file `{{ secondbrain_service_dir }}/.env`
+
+Use a separate LiveSync E2EE passphrase. It must never be stored on the server.
+Enable E2EE v2 and path obfuscation. Configure the first Mac as the source, then
+generate a fresh Setup URI for every additional Mac, Windows computer, and iPhone.
+
+Do not use iCloud, OneDrive, Dropbox, Obsidian Sync, or Git pull as a second
+live-sync engine for this Vault.
+
+Do not synchronise `workspace*.json`, LiveSync connection settings, `.LLMHub/rag`,
+caches, logs, nested `.obsidian` directories, or credential-bearing settings.
+

@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily SecondBrain backup
+
+[Timer]
+OnCalendar={{ secondbrain_backup_on_calendar }}
+RandomizedDelaySec=10m
+Persistent=true
+Unit=secondbrain-backup.service
+
+[Install]
+WantedBy=timers.target
+

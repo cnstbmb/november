@@ -1,0 +1,37 @@
+[Unit]
+Description=Jarvis allowlisted home action broker
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group={{ home_ai_bot_group }}
+Environment=ACTION_BROKER_SOCKET={{ home_ai_action_broker_socket }}
+Environment=ACTION_BROKER_TOKEN_FILE={{ home_ai_dir }}/secrets/action_broker_token
+ExecStartPre=/usr/bin/test -S /var/run/docker.sock
+ExecStart=/usr/bin/python3 {{ home_ai_dir }}/action-broker.py
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=home-ai
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/run/home-ai
+
+[Install]
+WantedBy=multi-user.target

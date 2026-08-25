@@ -1,0 +1,25 @@
+- name: Validate HOME router exit bypass settings
+  ansible.builtin.assert:
+    that:
+      - home_router_exit_bypass_source_ipv4 is match('^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
+      - home_router_exit_bypass_direct_mark is match('^0x[0-9A-Fa-f]{1,8}$')
+      - home_router_exit_bypass_state in ['present', 'absent']
+
+- name: Reconcile HOME router exit bypass
+  ansible.builtin.script:
+    cmd: >-
+      reconcile.sh
+      {{ ansible_check_mode | ternary('--check', '--apply') | quote }}
+      {{ home_router_exit_bypass_state | quote }}
+      {{ home_router_exit_bypass_source_ipv4 | quote }}
+      {{ home_router_exit_bypass_direct_mark | quote }}
+    executable: /bin/sh
+  check_mode: false
+  register: home_router_exit_bypass_result
+  changed_when: "'changed=true' in home_router_exit_bypass_result.stdout"
+
+- name: Validate HOME router exit bypass reconciliation
+  ansible.builtin.assert:
+    that:
+      - "'verification=ok' in home_router_exit_bypass_result.stdout"
+    fail_msg: "HOME router Zeroblock bypass reconciliation failed."

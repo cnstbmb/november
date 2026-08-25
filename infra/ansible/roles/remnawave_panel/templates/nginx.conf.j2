@@ -306,3 +306,7 @@ server {
 {%- if remnawave_panel_preserved_tonem_block | default('') | length > 0 %}
 {{ remnawave_panel_preserved_tonem_block }}
 {% endif %}
+
+# Public TONEM XHTTP vhosts are rendered by the dedicated Remnawave transport
+# role. The directory is mounted read-only and may be empty before rollout.
+include /etc/nginx/tonem-xhttp/servers/*.conf;

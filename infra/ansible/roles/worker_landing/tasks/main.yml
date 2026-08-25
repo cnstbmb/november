@@ -105,6 +105,7 @@
     src: nginx.conf.j2
     dest: "{{ worker_landing_nginx_conf_effective }}"
     mode: "0644"
+  register: worker_landing_nginx_config
 
 - name: Render worker landing docker compose file
   ansible.builtin.template:
@@ -119,4 +120,24 @@
     up -d
   args:
     chdir: "{{ worker_landing_dest_dir_effective }}"
+  when: not ansible_check_mode
+
+- name: Validate changed worker landing nginx config in running container
+  ansible.builtin.command: >
+    docker compose -f {{ worker_landing_compose_file_effective }}
+    --project-name {{ worker_landing_project_name_effective }}
+    exec -T landing nginx -t
+  args:
+    chdir: "{{ worker_landing_dest_dir_effective }}"
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Reload changed worker landing nginx config
+  ansible.builtin.command: >
+    docker compose -f {{ worker_landing_compose_file_effective }}
+    --project-name {{ worker_landing_project_name_effective }}
+    exec -T landing nginx -s reload
+  args:
+    chdir: "{{ worker_landing_dest_dir_effective }}"
+  changed_when: worker_landing_nginx_config.changed
   when: not ansible_check_mode

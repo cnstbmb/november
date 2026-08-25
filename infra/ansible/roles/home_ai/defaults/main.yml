@@ -1,0 +1,45 @@
+home_ai_dir: /opt/home-ai
+home_ai_project_name: home-ai
+home_ai_platform: linux/arm64
+home_ai_model_name: qwen3.5-2b-w4a16-grq-rk3576
+home_ai_model_filename: qwen3.5-2b-w4a16-grq-rk3576.rkllm
+home_ai_model_sha256: a546ae597bf514eaa33a607cafc0ea00f152b6cdb7b5a78889e4e7189bf3ffc8
+home_ai_private_env_file: "{{ inventory_dir }}/home-ai.env"
+home_ai_model_local_path: "{{ lookup('ini', 'MODEL_LOCAL_PATH type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_rknpu_device: /dev/dri/renderD129
+home_ai_rknpu_control_device: /dev/dri/card1
+home_ai_render_gid: 990
+home_ai_video_gid: 44
+home_ai_bot_uid: 10002
+home_ai_bot_gid: 10002
+home_ai_bot_group: home-ai-bot
+home_ai_rkllm_context_length: 2048
+home_ai_rkllm_max_new_tokens: 256
+home_ai_rkllm_request_timeout_seconds: 60
+home_ai_rkllm_repo: https://github.com/airockchip/rknn-llm.git
+home_ai_rkllm_commit: 878f9361fd3afa7e167b7079918918f78d2c1c2a
+home_ai_rkllm_archive_local_path: "{{ inventory_dir }}/artifacts/home-ai/rknn-llm-{{ home_ai_rkllm_commit }}.tar.gz"
+home_ai_rkllm_archive_sha256: 6cff7b30d404f4ad851cc445542552779d07d89500b6de7d5d2916c4657f0aed
+home_ai_rkllm_source_dir: "{{ home_ai_dir }}/vendor/rknn-llm-{{ home_ai_rkllm_commit }}"
+home_ai_python_image: python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+home_ai_brave_daily_limit: 100
+home_ai_deepseek_daily_limit: 100
+home_ai_deepseek_max_tokens: 1500
+home_ai_history_ttl_days: 7
+home_ai_history_max_messages: 30
+home_ai_audit_ttl_days: 30
+home_ai_allowed_telegram_user_id: "{{ lookup('ini', 'ALLOWED_TELEGRAM_USER_ID type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_allowed_telegram_chat_id: "{{ lookup('ini', 'ALLOWED_TELEGRAM_CHAT_ID type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_telegram_bot_token: "{{ lookup('ini', 'TELEGRAM_BOT_TOKEN type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_pairing_secret: "{{ lookup('ini', 'PAIRING_SECRET type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_brave_api_key: "{{ lookup('ini', 'BRAVE_API_KEY type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_deepseek_api_key: "{{ lookup('ini', 'DEEPSEEK_API_KEY type=properties file=' ~ home_ai_private_env_file, errors='ignore') }}"
+home_ai_action_broker_token: "{{ lookup('ini', 'ACTION_BROKER_TOKEN type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_qbittorrent_username: "{{ lookup('ini', 'QBITTORRENT_USERNAME type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_qbittorrent_password: "{{ lookup('ini', 'QBITTORRENT_PASSWORD type=properties file=' ~ home_ai_private_env_file) }}"
+home_ai_qbittorrent_url: http://host.docker.internal:8080
+home_ai_deepseek_base_url: https://api.deepseek.com
+home_ai_router_api_url: http://192.168.1.1:9090
+home_ai_router_vpn_selector: Moscow
+home_ai_action_broker_socket: /run/home-ai/action-broker.sock
+home_ai_wait_timeout: 180

@@ -1,0 +1,6 @@
+.env
+*.secret
+*.log
+restore-test.*
+backup-repositories/
+

@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+if docker ps --format '{{ "{{" }}.Names{{ "}}" }}' | grep -Fxq livesync-proxy; then
+  docker kill --signal HUP livesync-proxy >/dev/null
+fi
+

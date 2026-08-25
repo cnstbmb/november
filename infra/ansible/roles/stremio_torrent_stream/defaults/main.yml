@@ -1,4 +1,4 @@
-enable_stremio_torrent_stream: true
+enable_stremio_torrent_stream: false
 stremio_torrent_stream_manage_host: true
 stremio_torrent_stream_become: true
 

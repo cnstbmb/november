@@ -1,0 +1,5 @@
+services:
+  tonem-server:
+    image: "${TONEM_XHTTP_SERVER_IMAGE:-{{ remnawave_tonem_xhttp_server_image }}}"
+  tonem-web:
+    image: "${TONEM_XHTTP_WEB_IMAGE:-{{ remnawave_tonem_xhttp_image }}}"

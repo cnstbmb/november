@@ -1,0 +1,6 @@
+- name: Reconcile Remnawave HOME Internal Squad
+  hosts: master
+  gather_facts: false
+  become: false
+  roles:
+    - remnawave_home_squad

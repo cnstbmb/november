@@ -1,0 +1,431 @@
+- name: Resolve master TONEM XHTTP paths
+  ansible.builtin.set_fact:
+    remnawave_tonem_xhttp_server_file: "{{ remnawave_tonem_xhttp_include_dir }}/servers/{{ remnawave_tonem_xhttp_domain }}.conf"
+    remnawave_tonem_xhttp_location_file: "{{ remnawave_tonem_xhttp_include_dir }}/locations/{{ remnawave_tonem_xhttp_domain }}.conf"
+    remnawave_tonem_xhttp_panel_compose: "{{ remnawave_tonem_xhttp_panel_dir }}/docker-compose.yml"
+    remnawave_tonem_xhttp_web_override_file: "{{ remnawave_tonem_xhttp_tonem_dir }}/docker-compose.tonem-xhttp.yml"
+
+- name: Validate master TONEM XHTTP public settings
+  ansible.builtin.assert:
+    that:
+      - remnawave_tonem_xhttp_domain is match('^[a-z0-9][a-z0-9.-]+[a-z0-9]$')
+      - remnawave_tonem_xhttp_domain != 'tonem.ru'
+      - remnawave_tonem_xhttp_domain != 'www.tonem.ru'
+      - remnawave_tonem_xhttp_locations | length > 0
+      - remnawave_tonem_xhttp_docker_bridge_cidr is match('^[0-9.]+/[0-9]{1,2}$')
+      - remnawave_tonem_xhttp_backend_ports | length > 0
+      - letsencrypt_email | default('') | length > 0
+    fail_msg: >-
+      Configure a direct TONEM subdomain, at least one private XHTTP location,
+      and letsencrypt_email. The apex tonem.ru vhost must remain Cloudflare-only.
+
+- name: Inspect actual master proxy Docker bridge CIDR
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ remnawave_tonem_xhttp_proxy_network }}"
+      - --format
+      - "{% raw %}{{(index .IPAM.Config 0).Subnet}}{% endraw %}"
+  register: remnawave_tonem_xhttp_actual_bridge
+  changed_when: false
+  check_mode: false
+
+- name: Refuse a stale master proxy Docker bridge CIDR
+  ansible.builtin.assert:
+    that:
+      - remnawave_tonem_xhttp_actual_bridge.stdout == remnawave_tonem_xhttp_docker_bridge_cidr
+    fail_msg: >-
+      The private Docker bridge CIDR does not match the live remnawave-network.
+      Update private state before opening the backend firewall rule.
+
+- name: Remove any broad allow rule for master TONEM XHTTP backends
+  ansible.builtin.ufw:
+    delete: true
+    rule: allow
+    port: "{{ item | string }}"
+    proto: tcp
+  loop: "{{ remnawave_tonem_xhttp_backend_ports | map('int') | unique | list }}"
+
+- name: Allow master proxy bridge to reach TONEM XHTTP backends
+  ansible.builtin.ufw:
+    insert: 1
+    rule: allow
+    from_ip: "{{ remnawave_tonem_xhttp_docker_bridge_cidr }}"
+    port: "{{ item | string }}"
+    proto: tcp
+  loop: "{{ remnawave_tonem_xhttp_backend_ports | map('int') | unique | list }}"
+
+- name: Deny public access to master TONEM XHTTP backends
+  ansible.builtin.ufw:
+    rule: deny
+    port: "{{ item | string }}"
+    proto: tcp
+  loop: "{{ remnawave_tonem_xhttp_backend_ports | map('int') | unique | list }}"
+
+- name: Validate private master TONEM XHTTP locations
+  ansible.builtin.assert:
+    that:
+      - item.path is match('^/assets/[A-Za-z0-9_-]{' ~ (remnawave_tonem_xhttp_min_path_token_length | string) ~ ',}/$')
+      - (item.proxy_protocol | default('grpc')) in ['grpc', 'http']
+      - item.upstream is match('^(host\.docker\.internal|127\.0\.0\.1):[0-9]{2,5}$')
+    fail_msg: "TONEM XHTTP locations require a high-entropy asset path and a local-only upstream."
+  loop: "{{ remnawave_tonem_xhttp_locations }}"
+  no_log: true
+
+- name: Ensure master TONEM XHTTP directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ remnawave_tonem_xhttp_include_dir }}/servers"
+    - "{{ remnawave_tonem_xhttp_include_dir }}/locations"
+    - "{{ remnawave_tonem_xhttp_acme_dir }}/.well-known/acme-challenge"
+
+- name: Inspect active Remnawave proxy mounts for TONEM XHTTP extension
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{% raw %}{{range .Mounts}}{{println .Destination}}{{end}}{% endraw %}"
+      - "{{ remnawave_tonem_xhttp_proxy_container }}"
+  register: remnawave_tonem_xhttp_proxy_mounts
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Refuse master rollout before Remnawave proxy extension is mounted
+  ansible.builtin.assert:
+    that:
+      - "'/etc/nginx/tonem-xhttp' in remnawave_tonem_xhttp_proxy_mounts.stdout_lines"
+      - "'/var/www/tonem-xhttp-acme' in remnawave_tonem_xhttp_proxy_mounts.stdout_lines"
+    fail_msg: "Deploy the remnawave_panel role extension before the TONEM XHTTP master facade."
+  when: not ansible_check_mode
+
+- name: Check master TONEM XHTTP certificate
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ remnawave_tonem_xhttp_cert_name }}/fullchain.pem"
+  register: remnawave_tonem_xhttp_certificate
+
+- name: Render isolated TONEM web image override
+  ansible.builtin.template:
+    src: docker-compose.tonem-xhttp.yml.j2
+    dest: "{{ remnawave_tonem_xhttp_web_override_file }}"
+    mode: "0644"
+
+- name: Inspect previous master TONEM web image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{% raw %}{{.Image}}{% endraw %}"
+      - "{{ remnawave_tonem_xhttp_web_container }}"
+  register: remnawave_tonem_xhttp_previous_web_image
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Inspect previous master TONEM server image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{% raw %}{{.Image}}{% endraw %}"
+      - "{{ remnawave_tonem_xhttp_server_container }}"
+  register: remnawave_tonem_xhttp_previous_server_image
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Pull latest configured master TONEM web image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - pull
+      - "{{ remnawave_tonem_xhttp_image }}"
+  register: remnawave_tonem_xhttp_web_pull
+  changed_when: "'Downloaded newer image' in remnawave_tonem_xhttp_web_pull.stdout"
+  when: not ansible_check_mode
+
+- name: Pull latest configured master TONEM server image
+  ansible.builtin.command:
+    argv:
+      - docker
+      - pull
+      - "{{ remnawave_tonem_xhttp_server_image }}"
+  register: remnawave_tonem_xhttp_server_pull
+  changed_when: "'Downloaded newer image' in remnawave_tonem_xhttp_server_pull.stdout"
+  when: not ansible_check_mode
+
+- name: Tag previous master TONEM web image for rollback
+  ansible.builtin.command:
+    argv:
+      - docker
+      - tag
+      - "{{ remnawave_tonem_xhttp_previous_web_image.stdout }}"
+      - local/tonem-xhttp-master:rollback
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - remnawave_tonem_xhttp_previous_web_image.rc | default(1) == 0
+
+- name: Tag previous master TONEM server image for rollback
+  ansible.builtin.command:
+    argv:
+      - docker
+      - tag
+      - "{{ remnawave_tonem_xhttp_previous_server_image.stdout }}"
+      - local/tonem-xhttp-server:rollback
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - remnawave_tonem_xhttp_previous_server_image.rc | default(1) == 0
+
+- name: Bootstrap master TONEM XHTTP HTTP-01 endpoint
+  when:
+    - not remnawave_tonem_xhttp_certificate.stat.exists
+    - not ansible_check_mode
+  block:
+    - name: Render HTTP-only master TONEM XHTTP vhost
+      ansible.builtin.template:
+        src: bootstrap-server.conf.j2
+        dest: "{{ remnawave_tonem_xhttp_server_file }}"
+        mode: "0644"
+        backup: true
+      register: remnawave_tonem_xhttp_bootstrap_rendered
+
+    - name: Validate HTTP-only master TONEM XHTTP vhost
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -t
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: false
+
+    - name: Reload HTTP-only master TONEM XHTTP vhost
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -s reload
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: true
+
+    - name: Obtain master TONEM XHTTP certificate with HTTP-01
+      ansible.builtin.command:
+        argv:
+          - certbot
+          - certonly
+          - --webroot
+          - --webroot-path
+          - "{{ remnawave_tonem_xhttp_acme_dir }}"
+          - --cert-name
+          - "{{ remnawave_tonem_xhttp_cert_name }}"
+          - --non-interactive
+          - --agree-tos
+          - --keep-until-expiring
+          - -m
+          - "{{ letsencrypt_email }}"
+          - -d
+          - "{{ remnawave_tonem_xhttp_domain }}"
+      no_log: true
+
+- name: Deploy and health-gate master TONEM XHTTP facade
+  block:
+    - name: Start latest master TONEM server image without recreating Postgres
+      ansible.builtin.command:
+        cmd: >-
+          docker compose -f docker-compose.yml -f docker-compose.tonem-xhttp.yml
+          up -d --force-recreate --no-deps --pull never tonem-server
+        chdir: "{{ remnawave_tonem_xhttp_tonem_dir }}"
+      environment:
+        TONEM_XHTTP_SERVER_IMAGE: "{{ remnawave_tonem_xhttp_server_image }}"
+        TONEM_XHTTP_WEB_IMAGE: "{{ remnawave_tonem_xhttp_image }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Verify latest master TONEM server container health
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - --format
+          - "{% raw %}{{.State.Health.Status}}{% endraw %}"
+          - "{{ remnawave_tonem_xhttp_server_container }}"
+      register: remnawave_tonem_xhttp_server_health
+      changed_when: false
+      retries: 15
+      delay: 5
+      until: remnawave_tonem_xhttp_server_health.stdout == 'healthy'
+      when: not ansible_check_mode
+
+    - name: Start latest master TONEM web image
+      ansible.builtin.command:
+        cmd: >-
+          docker compose -f docker-compose.yml -f docker-compose.tonem-xhttp.yml
+          up -d --force-recreate --pull never tonem-web
+        chdir: "{{ remnawave_tonem_xhttp_tonem_dir }}"
+      environment:
+        TONEM_XHTTP_SERVER_IMAGE: "{{ remnawave_tonem_xhttp_server_image }}"
+        TONEM_XHTTP_WEB_IMAGE: "{{ remnawave_tonem_xhttp_image }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Render private master TONEM XHTTP locations
+      ansible.builtin.template:
+        src: locations.conf.j2
+        dest: "{{ remnawave_tonem_xhttp_location_file }}"
+        mode: "0600"
+        backup: true
+      register: remnawave_tonem_xhttp_locations_rendered
+      no_log: true
+
+    - name: Render full master TONEM XHTTP vhost
+      ansible.builtin.template:
+        src: server.conf.j2
+        dest: "{{ remnawave_tonem_xhttp_server_file }}"
+        mode: "0644"
+        backup: true
+      register: remnawave_tonem_xhttp_server_rendered
+
+    - name: Validate full master TONEM XHTTP configuration
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -t
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Reload full master TONEM XHTTP configuration
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -s reload
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: true
+      when:
+        - not ansible_check_mode
+        - remnawave_tonem_xhttp_locations_rendered.changed or remnawave_tonem_xhttp_server_rendered.changed
+
+    - name: Verify master TONEM facade over public TLS
+      ansible.builtin.uri:
+        url: "https://{{ remnawave_tonem_xhttp_domain }}/"
+        method: GET
+        return_content: true
+        validate_certs: true
+        status_code: 200
+      register: remnawave_tonem_xhttp_facade
+      retries: 6
+      delay: 5
+      until: remnawave_tonem_xhttp_facade.status == 200
+      when: not ansible_check_mode
+
+    - name: Validate master TONEM facade privacy markers
+      ansible.builtin.assert:
+        that:
+          - "'noindex' in (remnawave_tonem_xhttp_facade.x_robots_tag | default(''))"
+          - "'<link rel=\"canonical\" href=\"https://tonem.ru/\">' in remnawave_tonem_xhttp_facade.content"
+        fail_msg: "Master TONEM facade is missing noindex or the canonical apex URL."
+      when: not ansible_check_mode
+
+    - name: Verify master TONEM tracking endpoints stay disabled
+      ansible.builtin.uri:
+        url: "https://{{ remnawave_tonem_xhttp_domain }}{{ item }}"
+        method: GET
+        return_content: false
+        validate_certs: true
+        status_code: 404
+      loop:
+        - /client-telemetry
+        - /analytics/script.js
+      when: not ansible_check_mode
+
+    - name: Verify exact central API CORS for master TONEM facade
+      ansible.builtin.uri:
+        url: "https://api.tonem.ru/live"
+        method: GET
+        headers:
+          Origin: "https://{{ remnawave_tonem_xhttp_domain }}"
+        return_content: false
+        validate_certs: true
+        status_code: 200
+      register: remnawave_tonem_xhttp_cors
+      when: not ansible_check_mode
+
+    - name: Validate exact central API CORS response for master TONEM facade
+      ansible.builtin.assert:
+        that:
+          - remnawave_tonem_xhttp_cors.access_control_allow_origin == 'https://' ~ remnawave_tonem_xhttp_domain
+        fail_msg: "api.tonem.ru did not return the exact master facade CORS origin."
+      when: not ansible_check_mode
+  rescue:
+    - name: Restore pre-bootstrap master TONEM XHTTP vhost
+      ansible.builtin.copy:
+        src: "{{ remnawave_tonem_xhttp_bootstrap_rendered.backup_file }}"
+        dest: "{{ remnawave_tonem_xhttp_server_file }}"
+        remote_src: true
+        mode: preserve
+      when:
+        - remnawave_tonem_xhttp_bootstrap_rendered is defined
+        - remnawave_tonem_xhttp_bootstrap_rendered.backup_file | default('') | length > 0
+
+    - name: Restore previous full master TONEM XHTTP vhost
+      ansible.builtin.copy:
+        src: "{{ remnawave_tonem_xhttp_server_rendered.backup_file }}"
+        dest: "{{ remnawave_tonem_xhttp_server_file }}"
+        remote_src: true
+        mode: preserve
+      when:
+        - remnawave_tonem_xhttp_bootstrap_rendered is not defined or remnawave_tonem_xhttp_bootstrap_rendered.backup_file | default('') | length == 0
+        - remnawave_tonem_xhttp_server_rendered.backup_file | default('') | length > 0
+
+    - name: Restore previous master TONEM XHTTP locations
+      ansible.builtin.copy:
+        src: "{{ remnawave_tonem_xhttp_locations_rendered.backup_file }}"
+        dest: "{{ remnawave_tonem_xhttp_location_file }}"
+        remote_src: true
+        mode: preserve
+      when: remnawave_tonem_xhttp_locations_rendered.backup_file | default('') | length > 0
+      no_log: true
+
+    - name: Revalidate restored master TONEM XHTTP configuration
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -t
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Reload restored master TONEM XHTTP configuration
+      ansible.builtin.command:
+        cmd: docker compose exec -T remnawave-proxy nginx -s reload
+        chdir: "{{ remnawave_tonem_xhttp_panel_dir }}"
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Restore previous master TONEM web image
+      ansible.builtin.command:
+        cmd: >-
+          docker compose -f docker-compose.yml -f docker-compose.tonem-xhttp.yml
+          up -d --force-recreate --pull never tonem-web
+        chdir: "{{ remnawave_tonem_xhttp_tonem_dir }}"
+      environment:
+        TONEM_XHTTP_SERVER_IMAGE: "{{ remnawave_tonem_xhttp_server_image }}"
+        TONEM_XHTTP_WEB_IMAGE: "local/tonem-xhttp-master:rollback"
+      changed_when: true
+      when:
+        - not ansible_check_mode
+        - remnawave_tonem_xhttp_previous_web_image.rc | default(1) == 0
+
+    - name: Restore previous master TONEM server image without recreating Postgres
+      ansible.builtin.command:
+        cmd: >-
+          docker compose -f docker-compose.yml -f docker-compose.tonem-xhttp.yml
+          up -d --force-recreate --no-deps --pull never tonem-server
+        chdir: "{{ remnawave_tonem_xhttp_tonem_dir }}"
+      environment:
+        TONEM_XHTTP_SERVER_IMAGE: "local/tonem-xhttp-server:rollback"
+        TONEM_XHTTP_WEB_IMAGE: "{{ remnawave_tonem_xhttp_image }}"
+      changed_when: true
+      when:
+        - not ansible_check_mode
+        - remnawave_tonem_xhttp_previous_server_image.rc | default(1) == 0
+
+    - name: Stop rollout after master TONEM XHTTP health-gate failure
+      ansible.builtin.fail:
+        msg: "Master TONEM XHTTP facade failed nginx/TLS health gates; previous configuration was restored."

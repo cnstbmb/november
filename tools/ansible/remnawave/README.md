@@ -28,6 +28,34 @@
   `127.0.0.1:443`.
 - Перед продом проверь сертификаты, service-user UUID и `SECRET_KEY` нод.
 
+## Moscow-only YouTube exit
+
+`YOUTUBE_EXIT_NODE` — скрытая egress-нода для YouTube-трафика, который до
+изменения маршрута выходил из `MASTER_NODE` через `GRPC_TO_EXIT`. DIRECT и HOME
+профили не изменяются. Reconciler выводит в YouTube outbound только Moscow
+inbounds с существующим default-маршрутом `GRPC_TO_EXIT`; DIRECT-inbounds
+исключаются контрактным тестом.
+
+Порядок безопасного развёртывания:
+
+```bash
+npm run remnawave:youtube-exit:test
+npm run remnawave:youtube-exit:check
+npm run remnawave:youtube-exit:prepare
+tools/ansible/run_prod_private.sh --playbook base --limit youtube.himenkov.ru --check
+tools/ansible/run_prod_private.sh --playbook base --limit youtube.himenkov.ru
+tools/ansible/run_prod_private.sh --playbook workers --limit youtube.himenkov.ru --check
+tools/ansible/run_prod_private.sh --playbook workers --limit youtube.himenkov.ru
+npm run remnawave:youtube-exit:cutover
+npm run remnawave:youtube-exit:check
+```
+
+`--prepare` создаёт профиль, служебный inbound и Remnawave node, но не меняет
+маршрутизацию Moscow. `--cutover` разрешён только после появления healthy
+connected node и при точном совпадении live/local `MASTER_NODE`. Перед каждым
+изменением создаётся private backup; при неуспешной проверке cutover профиль
+Moscow автоматически восстанавливается.
+
 ## Аварийная ротация Reality и bridge credentials
 
 Если private Reality-конфиг мог утечь:

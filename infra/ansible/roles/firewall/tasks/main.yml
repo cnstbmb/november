@@ -3,21 +3,15 @@
     name: ufw
     state: present
 
-- name: Set default UFW policies
+- name: Allow SSH
   ansible.builtin.ufw:
-    state: enabled
-    policy: deny
-    direction: incoming
-
-- name: Allow outgoing by default
-  ansible.builtin.ufw:
-    state: enabled
-    policy: allow
-    direction: outgoing
+    rule: allow
+    port: "{{ ansible_port }}"
+    proto: tcp
 
 - name: Allow configured CIDR ingress TCP ports before deny rules
   ansible.builtin.ufw:
-    insert: 1
+    insert: "{{ 1 if not ansible_check_mode else omit }}"
     rule: allow
     from_ip: "{{ item.cidr }}"
     port: "{{ item.port | string }}"
@@ -37,11 +31,17 @@
     - firewall_deny_tcp_ports is defined
     - firewall_deny_tcp_ports | length > 0
 
-- name: Allow SSH
+- name: Set default UFW policies
   ansible.builtin.ufw:
-    rule: allow
-    port: "{{ ansible_port }}"
-    proto: tcp
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Allow outgoing by default
+  ansible.builtin.ufw:
+    state: enabled
+    policy: allow
+    direction: outgoing
 
 - name: Allow configured ingress TCP ports
   ansible.builtin.ufw:

@@ -527,6 +527,9 @@ else
   fail "MASTER Reality private keys: expected two distinct keys"
 fi
 check_json_value "MASTER Amsterdam bridge UUID" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_EXIT") | .settings.vnext[0].users[0].id | length > 0' "true"
+check_json_value "MASTER YouTube bridge address" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_YOUTUBE") | .settings.vnext[0].address' "5.42.111.142"
+check_json_value "MASTER YouTube bridge port" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_YOUTUBE") | .settings.vnext[0].port' "8443"
+check_json_value "MASTER YouTube bridge SNI" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_YOUTUBE") | .streamSettings.tlsSettings.serverName' "youtube.himenkov.ru"
 check_json_path_absent "MASTER legacy Home gRPC outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="GRPC_TO_HOME_RU")'
 check_json_value "MASTER Home kernel-WG protocol" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="WG_TO_HOME_RU") | .protocol' "freedom"
 check_json_value "MASTER Home kernel-WG interface" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.outbounds[] | select(.tag=="WG_TO_HOME_RU") | .streamSettings.sockopt.interface' "home_exit_wg"
@@ -551,7 +554,8 @@ check_json_value "MASTER HYSTERIA2 alpn" "${ROOT_DIR}/.private/configs/MASTER_NO
 check_json_value "MASTER HYSTERIA2 default outbound" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and (.domain? | not) and (.ip? | not) and (.port? | not)) | .outboundTag' "${MOSCOW_HYSTERIA2_OUTBOUND}"
 check_json_value "MASTER HYSTERIA2 service domains direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("domain:sub.moscow.himenkov.ru")) and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4") | .outboundTag' "IPv4"
 check_json_value "MASTER HYSTERIA2 self 443 direct" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="443" and (.inboundTag | index("HYSTERIA2_MOSCOW"))) | .outboundTag' "IPv4"
-check_json_path_absent "MASTER YouTube Moscow direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube")))'
+check_json_value "MASTER YouTube dedicated exit" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube"))) | .outboundTag' "GRPC_TO_YOUTUBE"
+check_json_value "MASTER YouTube excludes DIRECT inbounds" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '[.routing.rules[] | select(.domain? and (.domain | index("geosite:youtube"))) | .inboundTag[] | select(test("DIRECT"))] | length == 0' "true"
 check_json_path_absent "MASTER HYSTERIA2 RU direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.ip? | index("geoip:ru")))'
 check_json_path_absent "MASTER HYSTERIA2 category-ru direct override" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.inboundTag? and (.inboundTag | index("HYSTERIA2_MOSCOW")) and .outboundTag=="IPv4" and (.domain? | index("geosite:category-ru")))'
 check_json_value "MASTER self backend block" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.routing.rules[] | select(.ip? and (.ip | index("193.124.64.187")) and .port=="10085" and (.inboundTag | index("VLESS_XHTTP_MOSCOW"))) | .outboundTag' "BLOCK"
@@ -563,6 +567,9 @@ check_json_path_absent "MASTER Home fallback balancer" "${ROOT_DIR}/.private/con
 check_json_value "MASTER Home observatory selector" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.subjectSelector | join(",")' "WG_TO_HOME_RU"
 check_json_value "MASTER Home observatory interval" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeInterval' "15s"
 check_json_value "MASTER Home observatory probe URL" "${ROOT_DIR}/.private/configs/MASTER_NODE.json" '.observatory.probeUrl' "https://ya.ru/"
+check_json_value "YOUTUBE_EXIT bridge inbound" "${ROOT_DIR}/.private/configs/YOUTUBE_EXIT_NODE.json" '.inbounds[] | select(.tag=="BRIDGE_YOUTUBE_IN") | .port' "8443"
+check_json_value "YOUTUBE_EXIT bridge TLS SNI" "${ROOT_DIR}/.private/configs/YOUTUBE_EXIT_NODE.json" '.inbounds[] | select(.tag=="BRIDGE_YOUTUBE_IN") | .streamSettings.tlsSettings.serverName' "youtube.himenkov.ru"
+check_json_path_absent "YOUTUBE_EXIT public client inbound" "${ROOT_DIR}/.private/configs/YOUTUBE_EXIT_NODE.json" '.inbounds[] | select(.tag!="BRIDGE_YOUTUBE_IN")'
 if rg -U 'firewall_allow_cidr_tcp_ports:[\s\S]*cidr: "172\.18\.0\.0/16"[\s\S]*port: 10085' "${ROOT_DIR}/.private/ansible/prod/group_vars/master.yml" >/dev/null; then
   pass "MASTER 10085 firewall config: allows Docker bridge CIDR"
 else

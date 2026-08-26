@@ -137,6 +137,11 @@ function hasAnyMoscowClientTag(rule) {
 function shouldShareMoscowRule(rule) {
   if (!hasAnyMoscowClientTag(rule)) return false;
   if (rule.outboundTag === "BLOCK") return true;
+  if (
+    rule.outboundTag === "GRPC_TO_YOUTUBE" &&
+    Array.isArray(rule.domain) &&
+    rule.domain.includes("geosite:youtube")
+  ) return true;
   if (rule.outboundTag !== "IPv4") return false;
   if (Array.isArray(rule.domain) && MOSCOW_SERVICE_DOMAINS.every((domain) => rule.domain.includes(domain))) {
     return true;
@@ -163,9 +168,6 @@ function ensureInboundAndRoutes(config) {
   if (!Array.isArray(config.routing?.rules)) throw new Error("MASTER_NODE profile has no routing.rules array");
 
   config.inbounds = config.inbounds.filter((inbound) => inbound.tag !== TAG);
-  config.routing.rules = config.routing.rules.filter(
-    (rule) => !Array.isArray(rule.domain) || !rule.domain.includes("geosite:youtube"),
-  );
   const xhttpIndex = config.inbounds.findIndex((inbound) => inbound.tag === "VLESS_XHTTP_MOSCOW");
   const insertIndex = xhttpIndex >= 0 ? xhttpIndex + 1 : config.inbounds.length;
   config.inbounds.splice(insertIndex, 0, hysteriaInbound());
@@ -332,7 +334,7 @@ console.log(JSON.stringify({
   route: {
     defaultOutbound: DEFAULT_OUTBOUND,
     ruTraffic: "HOME_OR_MOSCOW",
-    youtube: "IPv4",
+    youtube: "GRPC_TO_YOUTUBE",
     selfIp: MOSCOW_PUBLIC_IP,
   },
   restart: restartAfter.response || restartAfter,

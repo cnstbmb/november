@@ -1,0 +1,29 @@
+schemaVersion: 1
+id: brave-discovery
+displayName: Brave Search discovery
+enabled: true
+policyStatus: approved
+allowedModes: [search_discovery]
+live: { enabled: true, approvedAt: 2026-08-28, approvedBy: operator }
+hosts: { exact: [api.search.brave.com], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 0,
+    timeoutMs: 15000,
+    maxResponseBytes: 1048576,
+    contentTypes: [application/json],
+  }
+rateLimit: { minIntervalSeconds: 1, maxPagesPerRun: 4, concurrency: 1 }
+access: { requiresAuth: true, credentialsRef: BRAVE_SEARCH_API_KEY }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: not_applicable_api }
+terms:
+  {
+    url: https://brave.com/search/api/,
+    lastCheckedAt: 2026-08-28T00:00:00Z,
+    evidence: subscribed_api_for_transient_discovery_only,
+  }
+fixture: { enabled: false, manifest: null }

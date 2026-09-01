@@ -1,0 +1,29 @@
+schemaVersion: 1
+id: greenhouse
+displayName: Greenhouse public Job Board API
+enabled: true
+policyStatus: approved
+allowedModes: [public_http]
+live: { enabled: true, approvedAt: 2026-08-28, approvedBy: operator }
+hosts: { exact: [boards-api.greenhouse.io], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 0,
+    timeoutMs: 15000,
+    maxResponseBytes: 1048576,
+    contentTypes: [application/json],
+  }
+rateLimit: { minIntervalSeconds: 1, maxPagesPerRun: 40, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: not_applicable_api }
+terms:
+  {
+    url: https://docs.greenhouse.io/job-board.html,
+    lastCheckedAt: 2026-08-28T00:00:00Z,
+    evidence: official_public_job_board_api,
+  }
+fixture: { enabled: false, manifest: null }

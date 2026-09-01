@@ -1,0 +1,29 @@
+schemaVersion: 1
+id: manual
+displayName: Manual input
+enabled: true
+policyStatus: approved
+allowedModes: [manual_text]
+live: { enabled: false, approvedAt: null, approvedBy: null }
+hosts: { exact: [], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 3,
+    timeoutMs: 10000,
+    maxResponseBytes: 1048576,
+    contentTypes: [text/html],
+  }
+rateLimit: { minIntervalSeconds: 0, maxPagesPerRun: 1, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: not_applicable }
+terms:
+  {
+    url: null,
+    lastCheckedAt: 2026-08-27T00:00:00Z,
+    evidence: user_supplied_content,
+  }
+fixture: { enabled: false, manifest: null }

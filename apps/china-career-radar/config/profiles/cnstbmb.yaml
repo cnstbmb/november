@@ -1,0 +1,43 @@
+schemaVersion: 1
+id: cnstbmb
+displayName: cnstbmb
+citizenships: [RU]
+languages:
+  russian: native
+  english: B1
+  mandarin: none
+experience:
+  frontendYearsMin: 10
+  nodeBackendYears: 5
+  technicalLeadership: limited
+education:
+  level: higher
+  field: Mechanical Engineering
+  institution: Ivanovo State University of Chemistry and Technology
+  graduationYear: 2013
+primaryTracks: [software_engineering]
+roles:
+  include: [senior_frontend, fullstack_typescript_node, node_backend]
+  watch: [tech_lead, software_architect, solution_architect, people_manager]
+  exclude: [mechanical_engineering, teaching]
+skills:
+  [
+    Angular,
+    TypeScript,
+    JavaScript,
+    RxJS,
+    NGXS,
+    signals,
+    Module Federation,
+    Node.js,
+    NestJS,
+    REST,
+    PostgreSQL,
+    Docker,
+    Linux,
+    NGINX,
+  ]
+salaryFloorCnyMonthlyGross: 30000
+preferredCities: [Shanghai]
+relocationPreference: 2027-06-01/2027-08-31
+internshipsAllowed: false

@@ -31,6 +31,8 @@ remnashop_wait_timeout: 120 # seconds to wait for remnashop services and HTTP pr
 monitoring_prometheus_retention: "7d"
 monitoring_prometheus_retention_size: "4GB"
 monitoring_loki_retention: "168h"
+monitoring_china_career_radar_enabled: true
+monitoring_china_career_radar_alerting_enabled: true
 backup_target: "/mnt/backup/november" # can also be shared restic repo like s3:https://endpoint/bucket
 
 # Recommended Remnawave backup set on master:

@@ -1,0 +1,7 @@
+{
+  "source": "https://www.chinajob.com/job/",
+  "capturedAt": "2026-08-27T00:00:00Z",
+  "policy": "Synthetic minimized fixtures based on observed selector structure; no live access in tests.",
+  "redactions": ["employer", "job identifier", "vacancy prose"],
+  "fixtures": ["senior-frontend.html", "senior-frontend-updated.html"]
+}

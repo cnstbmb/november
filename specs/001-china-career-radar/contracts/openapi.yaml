@@ -1,0 +1,79 @@
+openapi: 3.1.0
+info:
+  title: China Career Radar Internal API
+  version: 0.1.0
+  description: Private control-plane contract. Bind to loopback/private network only.
+paths:
+  /health/live:
+    get:
+      operationId: live
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status: { const: ok }
+  /health/ready:
+    get:
+      operationId: ready
+      responses:
+        '200': { description: Required dependencies are ready }
+        '503': { description: A required dependency is unavailable }
+  /internal/jobs/manual-text:
+    post:
+      operationId: addManualText
+      security: [{ InternalToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [text]
+              properties:
+                text: { type: string, minLength: 20, maxLength: 1048576 }
+                title: { type: string, maxLength: 300 }
+                company: { type: string, maxLength: 300 }
+                city: { type: string, maxLength: 120 }
+                url: { type: string, format: uri }
+      responses:
+        '202': { description: Input accepted }
+        '400': { description: Invalid input }
+        '401': { description: Missing or invalid internal token }
+  /internal/jobs/manual-url:
+    post:
+      operationId: addManualUrl
+      security: [{ InternalToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, format: uri, maxLength: 2048 }
+      responses:
+        '202': { description: Fetched or retained as Pending Manual Lead according to policy }
+        '400': { description: Invalid input }
+        '401': { description: Missing or invalid internal token }
+  /internal/stats:
+    get:
+      operationId: stats
+      security: [{ InternalToken: [] }]
+      responses:
+        '200': { description: Sanitized aggregate statistics }
+        '401': { description: Missing or invalid internal token }
+components:
+  securitySchemes:
+    InternalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token

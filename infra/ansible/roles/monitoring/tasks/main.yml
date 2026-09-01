@@ -280,6 +280,27 @@
     - not ansible_check_mode
   tags: [monitoring_home_node]
 
+- name: Render China Career Radar Grafana dashboard
+  ansible.builtin.template:
+    src: dashboard-china-career-radar.json.j2
+    dest: "{{ monitoring_dir }}/grafana/dashboards/china-career-radar.json"
+    mode: "0644"
+  register: monitoring_china_career_radar_dashboard_template
+  when:
+    - monitoring_china_career_radar_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_china_career_radar]
+
+- name: Remove disabled China Career Radar Grafana dashboard
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/dashboards/china-career-radar.json"
+    state: absent
+  register: monitoring_china_career_radar_dashboard_cleanup
+  when:
+    - not (monitoring_china_career_radar_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_china_career_radar]
+
 - name: Remove disabled home-node Grafana dashboard
   ansible.builtin.file:
     path: "{{ monitoring_dir }}/grafana/dashboards/home-node.json"
@@ -382,6 +403,30 @@
     - not (monitoring_router_alerting_enabled | default(false) | bool)
     - not ansible_check_mode
   tags: [monitoring_alerting, monitoring_router]
+
+- name: Render China Career Radar Grafana managed alerting
+  ansible.builtin.template:
+    src: grafana-china-career-radar-alerting.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/alerting/china-career-radar.yml"
+    owner: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    group: "{{ '0' if (monitoring_grafana_tls_enabled | default(false) | bool) else '472' }}"
+    mode: "0400"
+  register: monitoring_china_career_radar_alerting_template
+  when:
+    - monitoring_china_career_radar_enabled | default(false) | bool
+    - monitoring_china_career_radar_alerting_enabled | default(false) | bool
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_china_career_radar]
+
+- name: Remove disabled China Career Radar Grafana managed alerting
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/provisioning/alerting/china-career-radar.yml"
+    state: absent
+  register: monitoring_china_career_radar_alerting_cleanup
+  when:
+    - not (monitoring_china_career_radar_alerting_enabled | default(false) | bool)
+    - not ansible_check_mode
+  tags: [monitoring_alerting, monitoring_china_career_radar]
 
 - name: Find stale Ansible backups in Grafana alerting provisioning
   ansible.builtin.find:
@@ -677,6 +722,8 @@
       (monitoring_home_node_alerting_cleanup is defined and monitoring_home_node_alerting_cleanup.changed)
       or
       (monitoring_router_alerting_cleanup is defined and monitoring_router_alerting_cleanup.changed)
+      or
+      (monitoring_china_career_radar_alerting_cleanup is defined and monitoring_china_career_radar_alerting_cleanup.changed)
   no_log: true
   tags: [monitoring_alerting, monitoring_telegram_credentials, monitoring_email_disabled, monitoring_home_node, monitoring_router]
 
@@ -691,6 +738,8 @@
       (monitoring_config_templates is defined and (monitoring_config_templates.results | selectattr('changed') | list | length > 0))
       or
       (monitoring_grafana_templates is defined and (monitoring_grafana_templates.results | selectattr('changed') | list | length > 0))
+      or
+      (monitoring_china_career_radar_dashboard_template is defined and monitoring_china_career_radar_dashboard_template.changed)
       or
       (monitoring_tonem_postgres_secret_files is defined and (monitoring_tonem_postgres_secret_files.results | selectattr('changed') | list | length > 0))
       or

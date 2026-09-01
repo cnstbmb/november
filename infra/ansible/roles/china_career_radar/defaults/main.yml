@@ -1,0 +1,6 @@
+china_career_radar_dir: /opt/china-career-radar
+china_career_radar_env_src: "{{ repo_root }}/apps/china-career-radar/.env"
+china_career_radar_admin_port: 3110
+china_career_radar_analyzer_provider: deepseek
+china_career_radar_telegram_polling_enabled: true
+china_career_radar_telegram_proxy_url: socks5h://109.234.34.227:1080

@@ -1,0 +1,36 @@
+id: education
+candidateIds: [lanok]
+queries:
+  - 'site:jobs.lever.co (Shanghai OR Beijing OR Shenzhen OR Hangzhou OR Suzhou OR Guangzhou OR Chengdu OR China) ("Russian teacher" OR "primary school" OR "teaching assistant" OR "administrative assistant" OR "personal assistant" OR "office manager" OR 俄语教师 OR 小学 OR 助理)'
+  - '(site:job-boards.greenhouse.io OR site:boards.greenhouse.io) (Shanghai OR Beijing OR Shenzhen OR Hangzhou OR Suzhou OR Guangzhou OR Chengdu OR China) ("Russian teacher" OR "primary school" OR "teaching assistant" OR "administrative assistant" OR "personal assistant" OR "office manager" OR 俄语教师 OR 小学 OR 助理)'
+  - 'site:jobs.ashbyhq.com (Shanghai OR Beijing OR Shenzhen OR Hangzhou OR Suzhou OR Guangzhou OR Chengdu OR China) ("Russian teacher" OR "primary school" OR "teaching assistant" OR "administrative assistant" OR "personal assistant" OR "office manager" OR 俄语教师 OR 小学 OR 助理)'
+  - 'site:jobs.smartrecruiters.com (Shanghai OR Beijing OR Shenzhen OR Hangzhou OR Suzhou OR Guangzhou OR Chengdu OR China) ("Russian teacher" OR "primary school" OR "teaching assistant" OR "administrative assistant" OR "personal assistant" OR "office manager" OR 俄语教师 OR 小学 OR 助理)'
+primary:
+  [
+    Russian teacher,
+    Russian language teacher,
+    native Russian,
+    俄语教师,
+    俄语外教,
+    外籍俄语教师,
+    international school,
+    bilingual school,
+    teaching assistant,
+    academic support,
+    curriculum developer,
+    education operations,
+    教研,
+    教务,
+    国际部,
+  ]
+watch:
+  [
+    English teacher,
+    ESL,
+    secretary,
+    administrative assistant,
+    personal assistant,
+    office manager,
+    school administrator,
+    project coordinator,
+  ]

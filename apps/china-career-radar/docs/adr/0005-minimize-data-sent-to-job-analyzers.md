@@ -1,0 +1,3 @@
+# Minimize data sent to external job analyzers
+
+External analyzers receive a redacted vacancy, an opaque non-personal request subject, and only the skills and language capabilities needed for professional-fit assessment. They never receive candidate identifiers, citizenship or immigration status, real names, contacts, Telegram identifiers, educational institutions, child details, or family logistics. Work Permit policy is computed locally; the model may only extract vacancy-side evidence. This limits irreversible disclosure to an external model while retaining enough context to evaluate professional fit.

@@ -18,6 +18,18 @@ scrape_configs:
         labels:
           host: "{{ master_host }}"
 
+{% if monitoring_china_career_radar_enabled | default(false) | bool %}
+  - job_name: china_career_radar
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - "{{ monitoring_china_career_radar_target }}"
+        labels:
+          host: "{{ master_host }}"
+          role: "master"
+          service: "china_career_radar"
+{% endif %}
+
   - job_name: nodes
     static_configs:
 {% if monitoring_auto_discover_node_targets | default(true) | bool %}

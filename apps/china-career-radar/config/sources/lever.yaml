@@ -1,0 +1,29 @@
+schemaVersion: 1
+id: lever
+displayName: Lever public postings API
+enabled: true
+policyStatus: approved
+allowedModes: [public_http]
+live: { enabled: true, approvedAt: 2026-08-28, approvedBy: operator }
+hosts: { exact: [api.lever.co, api.eu.lever.co], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 0,
+    timeoutMs: 15000,
+    maxResponseBytes: 1048576,
+    contentTypes: [application/json],
+  }
+rateLimit: { minIntervalSeconds: 1, maxPagesPerRun: 40, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: not_applicable_api }
+terms:
+  {
+    url: https://github.com/lever/postings-api,
+    lastCheckedAt: 2026-08-28T00:00:00Z,
+    evidence: official_public_postings_api,
+  }
+fixture: { enabled: false, manifest: null }

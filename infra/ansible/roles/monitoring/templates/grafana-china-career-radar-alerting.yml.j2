@@ -1,0 +1,145 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: china-career-radar-production
+    folder: China Career Radar
+    interval: 1m
+    rules:
+      - uid: china-career-radar-scrape-down
+        title: China Career Radar недоступен
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 300, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'max(up{job="china_career_radar"})', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [1], type: lt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        keepFiringFor: 1m
+        annotations: {summary: 'Prometheus не получает метрики China Career Radar.', dashboard_url: '{{ monitoring_china_career_radar_dashboard_url }}'}
+        labels: {severity: critical, service: china-career-radar}
+        isPaused: false
+        notification_settings: &radar_critical_notification_settings
+          receiver: monitoring-critical
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 1h
+
+      - uid: china-career-radar-discovery-stale
+        title: China Career Radar давно не завершал поиск
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'time() - max(china_career_radar_discovery_last_success_timestamp_seconds or china_career_radar_process_start_timestamp_seconds)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [{{ monitoring_china_career_radar_stale_seconds }}], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 5m
+        keepFiringFor: 1m
+        annotations: {summary: 'Успешного поиска вакансий не было более 7 часов.', dashboard_url: '{{ monitoring_china_career_radar_dashboard_url }}'}
+        labels: {severity: warning, service: china-career-radar}
+        isPaused: false
+        notification_settings: &radar_warning_notification_settings
+          receiver: monitoring-warning
+          group_by: [alertname, grafana_folder, service]
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 2h
+
+      - uid: china-career-radar-discovery-failed
+        title: China Career Radar — ошибка поиска
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'sum(increase(china_career_radar_discovery_runs_total{status="failure"}[15m])) or vector(0)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        keepFiringFor: 1m
+        annotations: {summary: 'Последний цикл поиска завершился ошибкой.', dashboard_url: '{{ monitoring_china_career_radar_dashboard_url }}'}
+        labels: {severity: warning, service: china-career-radar}
+        isPaused: false
+        notification_settings: *radar_warning_notification_settings
+
+      - uid: china-career-radar-telegram-failed
+        title: China Career Radar — ошибка Telegram-доставки
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: {{ monitoring_grafana_prometheus_uid }}
+            model: {editorMode: code, expr: 'sum(increase(china_career_radar_notifications_total{status="failed"}[15m])) or vector(0)', instant: true, intervalMs: 1000, maxDataPoints: 43200, refId: A}
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator: {params: [0], type: gt}
+                  operator: {type: and}
+                  query: {params: [A]}
+                  reducer: {params: [], type: last}
+                  type: query
+              datasource: {type: __expr__, uid: __expr__}
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        keepFiringFor: 1m
+        annotations: {summary: 'Бот не смог отправить подходящую вакансию в Telegram.', dashboard_url: '{{ monitoring_china_career_radar_dashboard_url }}'}
+        labels: {severity: warning, service: china-career-radar}
+        isPaused: false
+        notification_settings: *radar_warning_notification_settings

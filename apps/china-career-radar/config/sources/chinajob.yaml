@@ -1,0 +1,34 @@
+schemaVersion: 1
+id: chinajob
+displayName: ChinaJob
+enabled: true
+policyStatus: pending
+allowedModes: [fixture]
+live: { enabled: false, approvedAt: null, approvedBy: null }
+hosts: { exact: [www.chinajob.com], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 3,
+    timeoutMs: 10000,
+    maxResponseBytes: 1048576,
+    contentTypes: [text/html],
+  }
+rateLimit: { minIntervalSeconds: 300, maxPagesPerRun: 5, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots:
+  {
+    url: https://www.chinajob.com/robots.txt,
+    lastCheckedAt: 2026-08-27T00:00:00Z,
+    result: allowed_job_path,
+  }
+terms:
+  {
+    url: null,
+    lastCheckedAt: 2026-08-27T00:00:00Z,
+    evidence: no_affirmative_permission_found,
+  }
+fixture: { enabled: true, manifest: test/fixtures/chinajob/manifest.json }

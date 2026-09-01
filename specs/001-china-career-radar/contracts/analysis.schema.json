@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://china-career-radar.local/schemas/job-analysis-v1.json",
+  "title": "JobAnalysisV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fitScore", "verdict", "matchedSkills", "missingSkills", "languages", "visa", "legalFlags", "relocation", "salaryAssessment", "reasons", "risks", "evidence", "familyCity"],
+  "properties": {
+    "fitScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "verdict": { "enum": ["reject", "watch", "review", "high_match"] },
+    "matchedSkills": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 120 } },
+    "missingSkills": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 120 } },
+    "languages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "mandarinRequired", "candidateRisk"],
+      "properties": {
+        "required": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 80 } },
+        "mandarinRequired": { "type": "boolean" },
+        "candidateRisk": { "enum": ["low", "medium", "high", "unknown"] }
+      }
+    },
+    "visa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "workPermitRisk"],
+      "properties": {
+        "status": { "enum": ["confirmed", "unsupported", "unknown"] },
+        "workPermitRisk": { "enum": ["low", "medium", "high", "unknown"] }
+      }
+    },
+    "legalFlags": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 240 } },
+    "relocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": { "status": { "enum": ["confirmed", "unsupported", "unknown"] } }
+    },
+    "salaryAssessment": { "enum": ["below_floor", "meets_floor", "above_floor", "compensated_by_benefits", "unknown"] },
+    "reasons": { "type": "array", "minItems": 1, "maxItems": 4, "items": { "type": "string", "maxLength": 300 } },
+    "risks": { "type": "array", "maxItems": 6, "items": { "type": "string", "maxLength": 300 } },
+    "evidence": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "quote"],
+        "properties": {
+          "field": { "type": "string", "maxLength": 120 },
+          "quote": { "type": "string", "maxLength": 400 }
+        }
+      }
+    },
+    "familyCity": { "type": ["string", "null"], "maxLength": 120 }
+  }
+}

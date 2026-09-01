@@ -1,0 +1,100 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "name": "Deployments & alerts", "type": "dashboard"}]},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": 0}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}, "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(up{job=\"china_career_radar\"})", "range": false, "refId": "A"}],
+      "title": "Radar scrape", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "orange", "value": 21600}, {"color": "red", "value": {{ monitoring_china_career_radar_stale_seconds }}}]}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0}, "id": 2,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "time() - max(china_career_radar_discovery_last_success_timestamp_seconds or china_career_radar_process_start_timestamp_seconds)", "range": false, "refId": "A"}],
+      "title": "С последнего успешного поиска", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"text": "Ожидает"}, "1": {"text": "Идёт поиск"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "blue", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0}, "id": 3,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "max(china_career_radar_discovery_running)", "range": false, "refId": "A"}],
+      "title": "Текущее состояние", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}]}, "unit": "s"}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0}, "id": 4,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value"},
+      "targets": [{"editorMode": "code", "expr": "clamp_min(max(china_career_radar_discovery_next_scheduled_timestamp_seconds) - time(), 0)", "range": false, "refId": "A"}],
+      "title": "До следующего запуска", "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "continuous-GrYlRd"}, "min": 0, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 5}, "id": 5,
+      "options": {"displayMode": "gradient", "maxVizHeight": 300, "minVizHeight": 16, "minVizWidth": 8, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+      "targets": [{"editorMode": "code", "expr": "china_career_radar_discovery_last_run_items", "instant": true, "range": false, "refId": "A"}],
+      "title": "Воронка последнего запуска", "type": "bargauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14}, "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (trigger, status) (increase(china_career_radar_discovery_runs_total[$__rate_interval]))", "range": true, "refId": "A"}],
+      "title": "Запуски поиска", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14}, "id": 7,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (candidate, verdict, status) (increase(china_career_radar_analyses_total[$__rate_interval]))", "range": true, "refId": "A"}],
+      "title": "Оценки вакансий", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22}, "id": 8,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (candidate, status) (increase(china_career_radar_notifications_total[$__rate_interval]))", "range": true, "refId": "A"}],
+      "title": "Telegram-доставки", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "{{ monitoring_grafana_prometheus_uid }}"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22}, "id": 9,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (candidate, reason) (increase(china_career_radar_hard_filter_rejections_total[$__rate_interval]))", "range": true, "refId": "A"}],
+      "title": "Причины отсева", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"},
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 30}, "id": 10,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"datasource": {"type": "loki", "uid": "{{ monitoring_grafana_loki_uid }}"}, "editorMode": "code", "expr": "{compose_project=\"china-career-radar\"} | json", "queryType": "range", "refId": "A"}],
+      "title": "Журнал поиска и доставки", "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["china", "jobs", "radar", "production"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "China Career Radar",
+  "uid": "china-career-radar",
+  "version": 1,
+  "weekStart": ""
+}

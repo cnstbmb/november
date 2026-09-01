@@ -1,0 +1,50 @@
+schemaVersion: 1
+id: lanok
+displayName: lanok
+citizenships: [RU]
+languages:
+  russian: native
+  english: C1
+  mandarin: HSK4
+experience:
+  schoolTeachingSince: 2012
+  tutoringSince: 2012
+  gradeRange: 1-11
+education:
+  level: higher
+  field: Primary School and English Language Education
+  institution: Borys Grinchenko Kyiv University
+  graduationYear: 2012
+qualifications:
+  russianInternalEducationQualification: true
+  hsk4CertificateYear: 2019
+primaryTracks: [russian_education, primary_education, administrative_support]
+roles:
+  include:
+    [
+      russian_teacher,
+      primary_teacher,
+      teaching_assistant,
+      secretary,
+      administrative_assistant,
+      personal_assistant,
+      executive_assistant,
+      office_manager,
+      school_administrator,
+      international_department_coordinator,
+      education_operations_coordinator,
+      project_coordinator,
+    ]
+  watch:
+    [
+      english_teacher,
+      esl_teacher,
+      chinese_language_support,
+      curriculum_development,
+      academic_support,
+    ]
+  exclude: [sales_manager, finance, hr_leadership, specialist_management]
+salaryFloorCnyMonthlyGross: 20000
+preferredCities: [Shanghai]
+relocationPreference: 2027-06-01/2027-08-31
+internshipsAllowed: false

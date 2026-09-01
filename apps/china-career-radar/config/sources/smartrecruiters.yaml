@@ -1,0 +1,29 @@
+schemaVersion: 1
+id: smartrecruiters
+displayName: SmartRecruiters public Posting API
+enabled: true
+policyStatus: approved
+allowedModes: [public_http]
+live: { enabled: true, approvedAt: 2026-08-31, approvedBy: operator }
+hosts: { exact: [api.smartrecruiters.com], includeSubdomains: false }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 0,
+    timeoutMs: 15000,
+    maxResponseBytes: 2097152,
+    contentTypes: [application/json],
+  }
+rateLimit: { minIntervalSeconds: 1, maxPagesPerRun: 40, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: not_applicable_api }
+terms:
+  {
+    url: https://developers.smartrecruiters.com/docs/endpoints,
+    lastCheckedAt: 2026-08-31T00:00:00Z,
+    evidence: official_public_posting_api,
+  }
+fixture: { enabled: false, manifest: null }

@@ -1,0 +1,34 @@
+schemaVersion: 1
+id: discovery-only
+displayName: Discovery/manual-only platforms
+enabled: true
+policyStatus: pending
+allowedModes: [search_discovery]
+domains:
+  [
+    zhipin.com,
+    liepin.com,
+    51job.com,
+    zhaopin.com,
+    lagou.com,
+    maimai.cn,
+    weixin.qq.com,
+  ]
+live: { enabled: false, approvedAt: null, approvedBy: null }
+hosts: { exact: [], includeSubdomains: true }
+redirectHosts: []
+network:
+  {
+    schemes: [https],
+    ports: [443],
+    maxRedirects: 0,
+    timeoutMs: 10000,
+    maxResponseBytes: 1048576,
+    contentTypes: [text/html],
+  }
+rateLimit: { minIntervalSeconds: 600, maxPagesPerRun: 0, concurrency: 1 }
+access: { requiresAuth: false, credentialsRef: null }
+egressPolicy: dc
+robots: { url: null, lastCheckedAt: null, result: unknown }
+terms: { url: null, lastCheckedAt: null, evidence: manual_review_required }
+fixture: { enabled: false, manifest: null }

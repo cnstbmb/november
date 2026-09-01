@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_DB: radar
+      POSTGRES_USER: radar
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - radar-postgres-v18:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U radar -d radar"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./source
+      dockerfile: apps/china-career-radar/Dockerfile
+      target: build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - db_password
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        export DATABASE_URL="postgres://radar:$$(cat /run/secrets/db_password)@postgres:5432/radar"
+        exec npm run db:migrate
+
+  app:
+    build:
+      context: ./source
+      dockerfile: apps/china-career-radar/Dockerfile
+    env_file:
+      - app.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      WORKER_LOCATION: dc
+      RADAR_CONFIG_DIR: /app/config
+      ANALYZER_PROVIDER: "{{ china_career_radar_analyzer_provider }}"
+      ATS_PROXY_URL: "{{ china_career_radar_telegram_proxy_url }}"
+      TELEGRAM_POLLING_ENABLED: "{{ china_career_radar_telegram_polling_enabled | bool | lower }}"
+      TELEGRAM_PROXY_URL: "{{ china_career_radar_telegram_proxy_url }}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - db_password_app
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        export DATABASE_URL="postgres://radar:$$(cat /run/secrets/db_password_app)@postgres:5432/radar"
+        exec node dist/main.js
+    ports:
+      - "127.0.0.1:{{ china_career_radar_admin_port }}:3100"
+    networks:
+      default:
+        aliases:
+          - china-career-radar
+    restart: unless-stopped
+
+secrets:
+  db_password:
+    file: ./db-password
+  db_password_app:
+    file: ./db-password-app
+
+volumes:
+  radar-postgres-v18:

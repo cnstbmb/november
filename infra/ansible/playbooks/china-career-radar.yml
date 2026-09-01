@@ -1,0 +1,6 @@
+- name: Deploy China Career Radar
+  hosts: master
+  become: true
+  roles:
+    - role: china_career_radar
+

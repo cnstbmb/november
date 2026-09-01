@@ -58,7 +58,16 @@ monitoring_grafana_loki_uid: "loki"
 monitoring_alerting_telegram_bot_token: "{{ monitoring_tonem_telegram_bot_token | default('') }}"
 monitoring_alerting_telegram_chat_id: "{{ monitoring_tonem_telegram_chat_id | default('') }}"
 monitoring_alerting_telegram_proxy_url: "{{ monitoring_tonem_telegram_proxy_url | default('') }}"
-monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(false) | bool) or (monitoring_home_node_alerting_enabled | default(false) | bool) or (monitoring_router_alerting_enabled | default(false) | bool) }}"
+monitoring_alerting_enabled: "{{ (monitoring_tonem_alerting_enabled | default(false) | bool) or (monitoring_home_node_alerting_enabled | default(false) | bool) or (monitoring_router_alerting_enabled | default(false) | bool) or (monitoring_china_career_radar_alerting_enabled | default(false) | bool) }}"
+
+# China Career Radar exposes internal Prometheus metrics on its application
+# network. The dashboard and alerts are opt-in for hosts that run the radar.
+monitoring_china_career_radar_enabled: false
+monitoring_china_career_radar_target: "china-career-radar:3100"
+monitoring_china_career_radar_network_name: "china-career-radar_default"
+monitoring_china_career_radar_alerting_enabled: false
+monitoring_china_career_radar_stale_seconds: 25200
+monitoring_china_career_radar_dashboard_url: "{{ ((monitoring_grafana_tls_enabled | default(false) | bool) | ternary('https://' ~ monitoring_grafana_tls_domain ~ ':' ~ monitoring_grafana_port, 'http://127.0.0.1:' ~ monitoring_grafana_port)) ~ '/d/china-career-radar/china-career-radar?orgId=1' }}"
 
 # Dedicated home-node dashboard and resource alerts. Production topology is
 # supplied only through private inventory variables.

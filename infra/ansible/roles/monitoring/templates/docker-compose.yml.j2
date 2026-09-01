@@ -1,5 +1,6 @@
 {% set monitoring_attach_remnawave_network = (enable_remnawave_panel | default(false) | bool) or (enable_remnashop | default(false) | bool) or (monitoring_tonem_enabled | default(false) | bool) %}
 {% set monitoring_attach_tonem_network = monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
+{% set monitoring_attach_china_career_radar_network = monitoring_china_career_radar_enabled | default(false) | bool %}
 services:
   prometheus:
     image: prom/prometheus:latest
@@ -24,6 +25,13 @@ services:
     networks:
       - default
       - remnawave-network
+{% if monitoring_attach_china_career_radar_network %}
+      - china-career-radar-network
+{% endif %}
+{% elif monitoring_attach_china_career_radar_network %}
+    networks:
+      - default
+      - china-career-radar-network
 {% endif %}
 
 {% if monitoring_tonem_postgres_exporter_enabled | default(false) | bool %}
@@ -200,7 +208,7 @@ volumes:
   grafana-public-data:
   loki-data:
 
-{% if monitoring_attach_remnawave_network or monitoring_attach_tonem_network %}
+{% if monitoring_attach_remnawave_network or monitoring_attach_tonem_network or monitoring_attach_china_career_radar_network %}
 networks:
 {% if monitoring_attach_remnawave_network %}
   remnawave-network:
@@ -210,6 +218,11 @@ networks:
 {% if monitoring_attach_tonem_network %}
   tonem-network:
     name: "{{ monitoring_tonem_network_name }}"
+    external: true
+{% endif %}
+{% if monitoring_attach_china_career_radar_network %}
+  china-career-radar-network:
+    name: "{{ monitoring_china_career_radar_network_name }}"
     external: true
 {% endif %}
 {% endif %}

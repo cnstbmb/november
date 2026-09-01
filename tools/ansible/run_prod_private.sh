@@ -78,7 +78,7 @@ Usage:
 
 Options:
   --menu                 Интерактивный выбор playbook (site/base/master/workers/stremio)
-  --playbook <value>     site | base | firewall | master | workers | stremio | home-ai | monitoring | monitoring-agent | backups | tonem-analytics | remnawave-panel | remnawave-home-squad | remnawave-home-xhttp | remnawave-tonem-xhttp-master | remnawave-tonem-xhttp-edge | home-router-exit-bypass | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
+  --playbook <value>     site | base | firewall | master | workers | stremio | home-ai | monitoring | monitoring-agent | backups | tonem-analytics | china-career-radar | remnawave-panel | remnawave-home-squad | remnawave-home-xhttp | remnawave-tonem-xhttp-master | remnawave-tonem-xhttp-edge | home-router-exit-bypass | remnashop | adguard-home | migration-prepare | migration-node | migration-socks5-allow | migration-backups | migration-restic | migration-monitoring-agents | /abs/path/to/playbook.yml
   --check                Запуск ansible в dry-run режиме (--check)
   --ask-become-pass      Запросить sudo пароль
   --limit <pattern>      Ограничить запуск по хостам/группам
@@ -102,6 +102,7 @@ resolve_playbook() {
     monitoring-agent) echo "${ROOT_DIR}/infra/ansible/playbooks/monitoring-agent.yml" ;;
     backups) echo "${ROOT_DIR}/infra/ansible/playbooks/backups.yml" ;;
     tonem-analytics) echo "${ROOT_DIR}/infra/ansible/playbooks/tonem-analytics.yml" ;;
+    china-career-radar) echo "${ROOT_DIR}/infra/ansible/playbooks/china-career-radar.yml" ;;
     remnawave-panel) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-panel.yml" ;;
     remnawave-home-squad) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-home-squad.yml" ;;
     remnawave-home-xhttp) echo "${ROOT_DIR}/infra/ansible/playbooks/remnawave-home-xhttp.yml" ;;

@@ -5,10 +5,11 @@ import { BlogPostFullData } from '@app/shared/blog/types';
 import { AuthService } from '@lib/auth/auth.service';
 
 @Component({
-  selector: 'app-post',
-  templateUrl: './post.component.html',
-  styleUrls: ['./post.component.less'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-post',
+    templateUrl: './post.component.html',
+    styleUrls: ['./post.component.less'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false
 })
 export class PostComponent {
   @Input()

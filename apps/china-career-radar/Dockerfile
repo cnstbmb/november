@@ -1,4 +1,4 @@
-FROM node:24.20-bookworm-slim AS build
+FROM node:24.20.0-bookworm-slim AS build
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/china-career-radar/package.json apps/china-career-radar/package.json
@@ -7,13 +7,13 @@ COPY apps/china-career-radar apps/china-career-radar
 WORKDIR /workspace/apps/china-career-radar
 RUN npm run build
 
-FROM node:24.20-bookworm-slim AS production-deps
+FROM node:24.20.0-bookworm-slim AS production-deps
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/china-career-radar/package.json apps/china-career-radar/package.json
 RUN npm ci --workspace china-career-radar --include-workspace-root=false --omit=dev --ignore-scripts
 
-FROM node:24.20-bookworm-slim
+FROM node:24.20.0-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=production-deps /workspace/node_modules /app/node_modules

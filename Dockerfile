@@ -1,4 +1,4 @@
-FROM node:20.19.6-alpine AS builder
+FROM node:24.20.0-alpine AS builder
 
 WORKDIR /home/app/server
 
@@ -23,7 +23,7 @@ WORKDIR /home/app/server
 RUN rm -rf node_modules
 
 
-FROM node:20.19.6-alpine
+FROM node:24.20.0-alpine
 
 WORKDIR /home/app/server
 

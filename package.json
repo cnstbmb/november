@@ -4,6 +4,20 @@
   "description": "monorepo",
   "private": true,
   "main": "null",
+  "engines": {
+    "node": ">=24.20.0 <25",
+    "npm": ">=11.19.0 <12"
+  },
+  "packageManager": "npm@11.19.0",
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    },
+    "less": "^4.9.0",
+    "sockjs": {
+      "uuid": "^11.1.1"
+    }
+  },
   "workspaces": [
     "apps/backend",
     "apps/frontend",
@@ -169,9 +183,23 @@
   },
   "homepage": "https://github.com/cnstbmb/november#readme",
   "devDependencies": {
-    "@types/jest": "^29.2.2",
+    "chokidar": "^5.0.0",
     "husky": "^7.0.4",
-    "jest": "^29.3.0",
-    "ts-jest": "^29.0.3"
+    "quill": "2.0.2",
+    "typescript": "6.0.3"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "@parcel/watcher@2.6.0": true,
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "bcrypt@6.0.0": true,
+    "prisma@5.22.0": true,
+    "cpu-features": false,
+    "fsevents": false,
+    "lmdb@3.5.6": true,
+    "msgpackr-extract@3.0.4": true,
+    "ssh2": false
   }
 }

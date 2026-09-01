@@ -32,19 +32,18 @@
               "src/assets"
             ],
             "allowedCommonJsDependencies": [
-              "quill"
+              "quill",
+              "quill-delta"
             ],
             "styles": [
               "src/styles.less",
-              "../../node_modules/primeicons/primeicons.css",
-              "../../node_modules/primeflex/primeflex.css",
-              "../../node_modules/quill/dist/quill.core.css",
-              "../../node_modules/quill/dist/quill.snow.css",
-              "../../node_modules/quill/dist/quill.bubble.css"
+              "primeicons/primeicons.css",
+              "primeflex/primeflex.css",
+              "quill/dist/quill.core.css",
+              "quill/dist/quill.snow.css",
+              "quill/dist/quill.bubble.css"
             ],
-            "scripts": [
-              "../../node_modules/quill/dist/quill.min.js"
-            ]
+            "scripts": []
           },
           "configurations": {
             "production": {
@@ -141,5 +140,31 @@
       "@ngrx/schematics"
     ],
     "analytics": "372a2f47-8fdc-4ece-bbd6-ab17cdcd6a44"
+  },
+  "schematics": {
+    "@schematics/angular:component": {
+      "type": "component"
+    },
+    "@schematics/angular:directive": {
+      "type": "directive"
+    },
+    "@schematics/angular:service": {
+      "type": "service"
+    },
+    "@schematics/angular:guard": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:interceptor": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:module": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:pipe": {
+      "typeSeparator": "."
+    },
+    "@schematics/angular:resolver": {
+      "typeSeparator": "."
+    }
   }
 }

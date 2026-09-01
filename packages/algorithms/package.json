@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "jest ."
+    "test": "vitest run --globals"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.11"
   }
 }

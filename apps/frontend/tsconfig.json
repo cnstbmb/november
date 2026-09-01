@@ -2,20 +2,19 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "paths": {
       "@assets/*": [
-        "src/assets/*"
+        "./src/assets/*"
       ],
       "@lib/*": [
-        "src/app/lib/*"
+        "./src/app/lib/*"
       ],
       "@app/*": [
-        "src/app/*"
+        "./src/app/*"
       ],
       "@shared/*": [
-        "src/app/shared/*"
+        "./src/app/shared/*"
       ]
     },
     "forceConsistentCasingInFileNames": true,
@@ -24,18 +23,14 @@
     "noFallthroughCasesInSwitch": true,
     "sourceMap": true,
     "declaration": true,
-    "downlevelIteration": true,
     "experimentalDecorators": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "importHelpers": true,
     "target": "ES2022",
     "module": "es2020",
     "lib": [
       "es2018",
       "dom"
-    ],
-    "typeRoots": [
-      "node_modules/@types"
     ],
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false

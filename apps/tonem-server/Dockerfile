@@ -2,7 +2,7 @@
 
 # ── Build stage ──────────────────────────────────────────────────────────────
 # Context: repository root (npm workspaces hoist deps to the root node_modules).
-FROM node:22-alpine AS build
+FROM node:24.20.0-alpine AS build
 WORKDIR /repo
 
 # Prisma requires openssl on Alpine for engine generation.
@@ -24,7 +24,7 @@ RUN PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x \
   && npm --workspace tonem-server run build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:24.20.0-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "@jest/globals";
+import { afterEach, describe, expect, test } from "vitest";
 import { type INestApplication, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {

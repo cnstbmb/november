@@ -7,10 +7,11 @@ interface Links {
 }
 
 @Component({
-  selector: 'app-contacts',
-  templateUrl: './contacts.component.html',
-  styleUrls: ['./contacts.component.less'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-contacts',
+    templateUrl: './contacts.component.html',
+    styleUrls: ['./contacts.component.less'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false
 })
 export class ContactsComponent {
   readonly socialLinks: Links[] = [

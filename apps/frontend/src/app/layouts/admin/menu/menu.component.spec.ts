@@ -1,4 +1,7 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { AuthService } from '@app/lib/auth/auth.service';
 
 import { MenuComponent } from './menu.component';
 
@@ -8,7 +11,10 @@ describe('MenuComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [MenuComponent]
+      imports: [RouterTestingModule],
+      declarations: [MenuComponent],
+      providers: [{ provide: AuthService, useValue: { logout: () => undefined } }],
+      schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
   });
 

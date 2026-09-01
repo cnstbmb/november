@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -eu
+
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 env
@@ -11,7 +13,7 @@ cd $SCRIPTPATH/../../
 
 rm -rf compiled
 #rm -rf compiled/configs
-node ./node_modules/typescript/bin/tsc
+tsc
 cp -r ./configs ./compiled/configs
 
 end=`date +%s`

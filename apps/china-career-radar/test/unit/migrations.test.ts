@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 
 describe("database idempotency constraints", () => {
   const migration = readFileSync(

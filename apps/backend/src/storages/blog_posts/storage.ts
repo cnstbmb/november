@@ -86,7 +86,7 @@ export class BlogStorage {
         return (await this.client.query<{ id: string }>(query, [now, id])).rows[0].id;
     }
 
-    private buildFilterSubquery<T = Record<string, QueryParams>>(
+    private buildFilterSubquery<T extends object = Record<string, QueryParams>>(
         filters: T
     ): { subquery: string; params: QueryParams[] } {
         const entries = Object.entries(filters);

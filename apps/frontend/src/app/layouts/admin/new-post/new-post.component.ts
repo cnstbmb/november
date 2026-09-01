@@ -6,10 +6,11 @@ import { ApiService as BlogApi } from '@lib/blog/api.service';
 import { MessageService, ToastMessageOptions } from 'primeng/api';
 
 @Component({
-  selector: 'app-new-post',
-  templateUrl: './new-post.component.html',
-  styleUrls: ['./new-post.component.less'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-new-post',
+    templateUrl: './new-post.component.html',
+    styleUrls: ['./new-post.component.less'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false
 })
 export class NewPostComponent implements OnDestroy {
   readonly postForm = this.fb.group({

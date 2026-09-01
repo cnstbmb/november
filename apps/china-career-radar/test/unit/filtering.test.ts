@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { hardFilter } from "../../src/filtering/hard-filter";
 import { normalizeJob } from "../../src/normalization/normalizer";
 import type { CandidateProfile } from "../../src/domain";

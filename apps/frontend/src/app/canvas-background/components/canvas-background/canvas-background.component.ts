@@ -17,10 +17,11 @@ import { Box } from '@app/canvas-background/components/canvas-background/box';
 import { darkGrey, grey, white } from '@app/canvas-background/components/canvas-background/colors';
 
 @Component({
-  selector: 'app-canvas-background',
-  templateUrl: './canvas-background.component.html',
-  styleUrls: ['./canvas-background.component.less'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-canvas-background',
+    templateUrl: './canvas-background.component.html',
+    styleUrls: ['./canvas-background.component.less'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false
 })
 export class CanvasBackgroundComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('canvasElement') private canvas!: ElementRef<HTMLCanvasElement>;

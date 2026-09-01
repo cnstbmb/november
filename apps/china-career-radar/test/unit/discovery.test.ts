@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, test, vi } from "vitest";
 import { RadarConfig } from "../../src/config/config";
 import {
   BraveSearchProvider,
@@ -22,7 +22,7 @@ import { formatDiscoveryRunSummary } from "../../src/telegram/discovery-summary"
 
 describe("Brave vacancy discovery", () => {
   test("returns only supported public ATS job URLs without retaining search snippets", async () => {
-    const getJson = jest.fn<SearchHttpClient["getJson"]>(async () => ({
+    const getJson = vi.fn<SearchHttpClient["getJson"]>(async () => ({
       web: {
         results: [
           {
@@ -115,7 +115,7 @@ describe("Brave vacancy discovery", () => {
 
 describe("public ATS vacancy retrieval", () => {
   test("retrieves a discovered Lever posting as a complete job lead", async () => {
-    const getJson = jest.fn<AtsHttpClient["getJson"]>(async () => ({
+    const getJson = vi.fn<AtsHttpClient["getJson"]>(async () => ({
       id: "11111111-1111-4111-8111-111111111111",
       text: "Senior TypeScript Engineer",
       categories: {
@@ -163,7 +163,7 @@ describe("public ATS vacancy retrieval", () => {
   });
 
   test("retrieves a discovered Greenhouse posting through its public Job Board API", async () => {
-    const getJson = jest.fn<AtsHttpClient["getJson"]>(async () => ({
+    const getJson = vi.fn<AtsHttpClient["getJson"]>(async () => ({
       id: 1234567,
       title: "Russian and English Primary School Teacher",
       company_name: "Shanghai International School",
@@ -196,7 +196,7 @@ describe("public ATS vacancy retrieval", () => {
   });
 
   test("retrieves a discovered Ashby posting through its public Job Posting API", async () => {
-    const getJson = jest.fn<AtsHttpClient["getJson"]>(async () => ({
+    const getJson = vi.fn<AtsHttpClient["getJson"]>(async () => ({
       apiVersion: "1",
       jobs: [
         {
@@ -252,7 +252,7 @@ describe("public ATS vacancy retrieval", () => {
   });
 
   test("retrieves a discovered SmartRecruiters posting through its public Posting API", async () => {
-    const getJson = jest.fn<AtsHttpClient["getJson"]>(async () => ({
+    const getJson = vi.fn<AtsHttpClient["getJson"]>(async () => ({
       id: "744000123456789",
       uuid: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       name: "School Operations Manager",
@@ -338,10 +338,10 @@ describe("two-profile discovery run", () => {
       sourceJobId: "11111111-1111-4111-8111-111111111111",
     };
     const search = {
-      search: jest.fn(async () => [lead]),
+      search: vi.fn(async () => [lead]),
     } satisfies VacancySearchProvider;
     const fetcher = {
-      fetch: jest.fn(async () => ({
+      fetch: vi.fn(async () => ({
         sourceId: "lever",
         mode: "public_http" as const,
         sourceJobId: lead.sourceJobId,
@@ -356,7 +356,7 @@ describe("two-profile discovery run", () => {
     } satisfies DiscoveryJobFetcher;
     const observed: string[] = [];
     const ingestion = {
-      run: jest.fn<DiscoveryIngestionRunner["run"]>(async (adapter) => {
+      run: vi.fn<DiscoveryIngestionRunner["run"]>(async (adapter) => {
         for await (const job of adapter.collect())
           observed.push(job.canonicalUrl!);
         return [
@@ -423,13 +423,13 @@ describe("two-profile discovery run", () => {
       sourceJobId: "22222222-2222-4222-8222-222222222222",
     };
     const search = {
-      search: jest.fn<VacancySearchProvider["search"]>(async (query) => {
+      search: vi.fn<VacancySearchProvider["search"]>(async (query) => {
         if (query === "broken query") throw new Error("temporary outage");
         return [brokenLead, goodLead];
       }),
     };
     const fetcher = {
-      fetch: jest.fn<DiscoveryJobFetcher["fetch"]>(async (lead) => {
+      fetch: vi.fn<DiscoveryJobFetcher["fetch"]>(async (lead) => {
         if (lead === brokenLead) throw new Error("posting is closed");
         return {
           sourceId: "greenhouse",
@@ -446,7 +446,7 @@ describe("two-profile discovery run", () => {
       }),
     };
     const ingestion = {
-      run: jest.fn<DiscoveryIngestionRunner["run"]>(async () => []),
+      run: vi.fn<DiscoveryIngestionRunner["run"]>(async () => []),
     };
     const service = new DiscoveryService(search, fetcher, ingestion, [
       {

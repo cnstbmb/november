@@ -1,3 +1,4 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ContactsComponent } from './contacts.component';
@@ -8,7 +9,8 @@ describe('ContactsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ContactsComponent]
+      declarations: [ContactsComponent],
+      schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
   });
 

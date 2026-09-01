@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { TabMenuModule } from 'primeng/tabmenu';
+import { TabsModule } from 'primeng/tabs';
 import { ButtonModule } from 'primeng/button';
 import { EditorModule } from 'primeng/editor';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
@@ -17,7 +17,7 @@ import { LinkShorterComponent } from './link-shorter/link-shorter.component';
   imports: [
     CommonModule,
     AdminRoutingModule,
-    TabMenuModule,
+    TabsModule,
     EditorModule,
     FormsModule,
     ReactiveFormsModule,

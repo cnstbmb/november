@@ -1,6 +1,29 @@
-<p-tabMenu [model]="items" [activeItem]="activeMenuItem"></p-tabMenu>
-<div [ngSwitch]="fragment">
-  <app-new-post *ngSwitchCase="adminFragments.newPost"></app-new-post>
-  <app-link-shorter *ngSwitchCase="adminFragments.linkShorter"></app-link-shorter>
-  <div *ngSwitchDefault>Welcome to admin page</div>
+<p-tabs [value]="fragment ?? ''" (valueChange)="selectTab($event)">
+  <p-tablist>
+    <p-tab [value]="adminFragments.newPost">
+      <i class="pi pi-fw pi-file"></i>
+      <span>New post</span>
+    </p-tab>
+    <p-tab [value]="adminFragments.linkShorter">
+      <i class="pi pi-fw pi-link"></i>
+      <span>Link shorter</span>
+    </p-tab>
+    <p-tab value="logout">
+      <i class="pi pi-fw pi-power-off"></i>
+      <span>Logout</span>
+    </p-tab>
+  </p-tablist>
+</p-tabs>
+<div>
+  @switch (fragment) {
+    @case (adminFragments.newPost) {
+      <app-new-post></app-new-post>
+    }
+    @case (adminFragments.linkShorter) {
+      <app-link-shorter></app-link-shorter>
+    }
+    @default {
+      <div>Welcome to admin page</div>
+    }
+  }
 </div>

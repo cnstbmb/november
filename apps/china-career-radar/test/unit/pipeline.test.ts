@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, test, vi } from "vitest";
 import type { RadarConfig } from "../../src/config/config";
 import type {
   ActiveProfile,
@@ -57,24 +57,24 @@ const analysis: AnalyzerResult = {
 describe("ingestion pipeline idempotency", () => {
   test("exposes successful analysis and Telegram delivery outcomes", async () => {
     const db = {
-      syncSources: jest.fn(async () => undefined),
-      beginRun: jest.fn(async () => "run-id"),
-      finishRun: jest.fn(async () => undefined),
-      syncProfiles: jest.fn(async () => [profile]),
-      persistVersion: jest.fn(async () => ({
+      syncSources: vi.fn(async () => undefined),
+      beginRun: vi.fn(async () => "run-id"),
+      finishRun: vi.fn(async () => undefined),
+      syncProfiles: vi.fn(async () => [profile]),
+      persistVersion: vi.fn(async () => ({
         jobId: "job-id",
         versionId: "version-id",
         versionNumber: 1,
         isNewJob: true,
         isNewVersion: true,
       })),
-      saveFilter: jest.fn(async () => undefined),
-      reserveAnalysis: jest.fn(async () => ({ id: "analysis-id" })),
-      completeAnalysis: jest.fn(async () => undefined),
-      failAnalysis: jest.fn(async () => undefined),
-      reserveDelivery: jest.fn(async () => "delivery-id"),
-      completeDelivery: jest.fn(async () => undefined),
-      failDelivery: jest.fn(async () => undefined),
+      saveFilter: vi.fn(async () => undefined),
+      reserveAnalysis: vi.fn(async () => ({ id: "analysis-id" })),
+      completeAnalysis: vi.fn(async () => undefined),
+      failAnalysis: vi.fn(async () => undefined),
+      reserveDelivery: vi.fn(async () => "delivery-id"),
+      completeDelivery: vi.fn(async () => undefined),
+      failDelivery: vi.fn(async () => undefined),
     } as unknown as DatabaseService;
     const config = {
       sourcePolicies: [],
@@ -89,7 +89,7 @@ describe("ingestion pipeline idempotency", () => {
     const analyzer = {
       provider: "mock",
       model: "mock-v1",
-      analyze: jest.fn(async () => ({
+      analyze: vi.fn(async () => ({
         ...analysis,
         analysis: {
           ...analysis.analysis,
@@ -98,7 +98,7 @@ describe("ingestion pipeline idempotency", () => {
         },
       })),
     } satisfies JobAnalyzer;
-    const notify = jest.fn(async () => ({ externalId: "42" }));
+    const notify = vi.fn(async () => ({ externalId: "42" }));
     const notifier = {
       channel: "telegram",
       notify,
@@ -169,13 +169,13 @@ describe("ingestion pipeline idempotency", () => {
   test("unchanged observations do not rerun analysis while changed content creates a version", async () => {
     const versions = new Map<string, { id: string; version: number }>();
     const reservedAnalyses = new Set<string>();
-    const analyze = jest.fn(async () => analysis);
+    const analyze = vi.fn(async () => analysis);
     const db = {
-      syncSources: jest.fn(async () => undefined),
-      beginRun: jest.fn(async () => "run-id"),
-      finishRun: jest.fn(async () => undefined),
-      syncProfiles: jest.fn(async () => [profile]),
-      persistVersion: jest.fn(async (_raw: RawJobInput, job: NormalizedJob) => {
+      syncSources: vi.fn(async () => undefined),
+      beginRun: vi.fn(async () => "run-id"),
+      finishRun: vi.fn(async () => undefined),
+      syncProfiles: vi.fn(async () => [profile]),
+      persistVersion: vi.fn(async (_raw: RawJobInput, job: NormalizedJob) => {
         const existing = versions.get(job.contentHash);
         if (existing)
           return {
@@ -196,16 +196,16 @@ describe("ingestion pipeline idempotency", () => {
           isNewVersion: true,
         };
       }),
-      saveFilter: jest.fn(async () => undefined),
-      reserveAnalysis: jest.fn(async (versionId: string) => {
+      saveFilter: vi.fn(async () => undefined),
+      reserveAnalysis: vi.fn(async (versionId: string) => {
         if (reservedAnalyses.has(versionId)) return undefined;
         reservedAnalyses.add(versionId);
         return { id: `analysis-${versionId}`, key: versionId };
       }),
-      completeAnalysis: jest.fn(async () => undefined),
-      failAnalysis: jest.fn(async () => undefined),
-      reserveDelivery: jest.fn(async () => undefined),
-      completeDelivery: jest.fn(async () => undefined),
+      completeAnalysis: vi.fn(async () => undefined),
+      failAnalysis: vi.fn(async () => undefined),
+      reserveDelivery: vi.fn(async () => undefined),
+      completeDelivery: vi.fn(async () => undefined),
     } as unknown as DatabaseService;
     const config = {
       sourcePolicies: [],
@@ -224,7 +224,7 @@ describe("ingestion pipeline idempotency", () => {
     } satisfies JobAnalyzer;
     const notifier = {
       channel: "console",
-      notify: jest.fn(async () => ({})),
+      notify: vi.fn(async () => ({})),
     } satisfies Notifier;
     const pipeline = new IngestionPipeline(db, config, analyzer, notifier);
     const base =
@@ -279,27 +279,27 @@ describe("ingestion pipeline idempotency", () => {
       },
     };
     const db = {
-      syncSources: jest.fn(async () => undefined),
-      beginRun: jest.fn(async () => "run-id"),
-      finishRun: jest.fn(async () => undefined),
-      syncProfiles: jest.fn(async () => [profile, lanok]),
-      persistVersion: jest.fn(async () => ({
+      syncSources: vi.fn(async () => undefined),
+      beginRun: vi.fn(async () => "run-id"),
+      finishRun: vi.fn(async () => undefined),
+      syncProfiles: vi.fn(async () => [profile, lanok]),
+      persistVersion: vi.fn(async () => ({
         jobId: "job-id",
         versionId: "version-id",
         versionNumber: 1,
         isNewJob: true,
         isNewVersion: true,
       })),
-      saveFilter: jest.fn(async () => undefined),
-      reserveAnalysis: jest.fn(
+      saveFilter: vi.fn(async () => undefined),
+      reserveAnalysis: vi.fn(
         async (_versionId: string, profileId: string) => ({
           id: `analysis-${profileId}`,
         }),
       ),
-      completeAnalysis: jest.fn(async () => undefined),
-      failAnalysis: jest.fn(async () => undefined),
-      reserveDelivery: jest.fn(async () => undefined),
-      completeDelivery: jest.fn(async () => undefined),
+      completeAnalysis: vi.fn(async () => undefined),
+      failAnalysis: vi.fn(async () => undefined),
+      reserveDelivery: vi.fn(async () => undefined),
+      completeDelivery: vi.fn(async () => undefined),
     } as unknown as DatabaseService;
     const config = {
       sourcePolicies: [],
@@ -314,7 +314,7 @@ describe("ingestion pipeline idempotency", () => {
     const analyzer = {
       provider: "mock",
       model: "mock-v1",
-      analyze: jest.fn<JobAnalyzer["analyze"]>(
+      analyze: vi.fn<JobAnalyzer["analyze"]>(
         async (_job, _profile, context) => {
           if (context.candidateId === "cnstbmb")
             throw new Error("analysis_evidence_missing:Salary range");
@@ -324,7 +324,7 @@ describe("ingestion pipeline idempotency", () => {
     } satisfies JobAnalyzer;
     const notifier = {
       channel: "console",
-      notify: jest.fn(async () => ({})),
+      notify: vi.fn(async () => ({})),
     } satisfies Notifier;
     const pipeline = new IngestionPipeline(db, config, analyzer, notifier);
     const adapter: SourceAdapter = {
@@ -361,25 +361,25 @@ describe("ingestion pipeline idempotency", () => {
 
   test("an unchanged discovered job completes a candidate analysis missed by an earlier interrupted run", async () => {
     const db = {
-      syncSources: jest.fn(async () => undefined),
-      beginRun: jest.fn(async () => "recovery-run"),
-      finishRun: jest.fn(async () => undefined),
-      syncProfiles: jest.fn(async () => [profile]),
-      persistVersion: jest.fn(async () => ({
+      syncSources: vi.fn(async () => undefined),
+      beginRun: vi.fn(async () => "recovery-run"),
+      finishRun: vi.fn(async () => undefined),
+      syncProfiles: vi.fn(async () => [profile]),
+      persistVersion: vi.fn(async () => ({
         jobId: "existing-job",
         versionId: "existing-version",
         versionNumber: 1,
         isNewJob: false,
         isNewVersion: false,
       })),
-      saveFilter: jest.fn(async () => undefined),
-      reserveAnalysis: jest.fn(async () => ({
+      saveFilter: vi.fn(async () => undefined),
+      reserveAnalysis: vi.fn(async () => ({
         id: "missing-analysis",
       })),
-      completeAnalysis: jest.fn(async () => undefined),
-      failAnalysis: jest.fn(async () => undefined),
-      reserveDelivery: jest.fn(async () => undefined),
-      completeDelivery: jest.fn(async () => undefined),
+      completeAnalysis: vi.fn(async () => undefined),
+      failAnalysis: vi.fn(async () => undefined),
+      reserveDelivery: vi.fn(async () => undefined),
+      completeDelivery: vi.fn(async () => undefined),
     } as unknown as DatabaseService;
     const config = {
       sourcePolicies: [],
@@ -394,11 +394,11 @@ describe("ingestion pipeline idempotency", () => {
     const analyzer = {
       provider: "mock",
       model: "mock-v1",
-      analyze: jest.fn(async () => analysis),
+      analyze: vi.fn(async () => analysis),
     } satisfies JobAnalyzer;
     const pipeline = new IngestionPipeline(db, config, analyzer, {
       channel: "console",
-      notify: jest.fn(async () => ({})),
+      notify: vi.fn(async () => ({})),
     });
     const adapter: SourceAdapter = {
       sourceId: "brave-discovery",

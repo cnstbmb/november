@@ -7,10 +7,11 @@ import { Route } from '@shared/routes';
 import { AdminFragments } from '@app/shared/route/fragments';
 
 @Component({
-  selector: 'app-auth',
-  templateUrl: './login.component.html',
-  styleUrls: ['./login.component.less'],
-  changeDetection: ChangeDetectionStrategy.OnPush
+    selector: 'app-auth',
+    templateUrl: './login.component.html',
+    styleUrls: ['./login.component.less'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false
 })
 export class LoginComponent {
   readonly authForm = this.fb.group({

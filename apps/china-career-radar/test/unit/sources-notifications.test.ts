@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { SocksProxyAgent } from "socks-proxy-agent";
 import { RadarConfig } from "../../src/config/config";
 import { formatJobCard } from "../../src/notifications/notifiers";
